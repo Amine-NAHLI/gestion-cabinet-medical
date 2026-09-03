@@ -11,6 +11,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@neondatabase/serverless": "^1.1.0",
+    "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.4",
     "next-auth": "^4.24.15",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -32,6 +34,7 @@
     "eslint-config-next": "16.3.4",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

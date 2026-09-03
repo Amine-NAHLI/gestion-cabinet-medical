@@ -1,9 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 
-// Vérifie que la variable d'environnement est bien définie
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL must be a Neon postgres connection string");
+  throw new Error('DATABASE_URL is not defined in the environment variables.');
 }
 
 const sql = neon(process.env.DATABASE_URL);
