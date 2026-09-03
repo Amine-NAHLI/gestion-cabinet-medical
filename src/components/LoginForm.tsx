@@ -8,11 +8,13 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
 
     const res = await signIn("credentials", {
       email,
@@ -22,6 +24,7 @@ export default function LoginForm() {
 
     if (res?.error) {
       setError("Email ou mot de passe incorrect");
+      setIsLoading(false);
     } else {
       router.push("/dashboard");
       router.refresh();
@@ -29,41 +32,41 @@ export default function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+    <form onSubmit={handleSubmit}>
       {error && (
-        <div style={{ color: '#d32f2f', padding: '0.75rem', backgroundColor: '#ffebee', borderRadius: '4px', fontSize: '0.9rem' }}>
+        <div className="error-message">
           {error}
         </div>
       )}
       
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <label htmlFor="email" style={{ marginBottom: '0.5rem', fontWeight: 500 }}>Email</label>
+      <div className="form-group">
+        <label htmlFor="email" className="form-label">Email Professionnel</label>
         <input 
           id="email"
           type="email" 
           value={email} 
           onChange={(e) => setEmail(e.target.value)} 
           required 
-          style={{ padding: '0.75rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '1rem' }}
-          placeholder="votre@email.com"
+          className="form-input"
+          placeholder="docteur@cabinet.com"
         />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <label htmlFor="password" style={{ marginBottom: '0.5rem', fontWeight: 500 }}>Mot de passe</label>
+      <div className="form-group">
+        <label htmlFor="password" className="form-label">Mot de passe</label>
         <input 
           id="password"
           type="password" 
           value={password} 
           onChange={(e) => setPassword(e.target.value)} 
           required 
-          style={{ padding: '0.75rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '1rem' }}
+          className="form-input"
           placeholder="••••••••"
         />
       </div>
 
-      <button type="submit" style={{ padding: '0.85rem', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '1rem', fontSize: '1rem', fontWeight: 600 }}>
-        Se connecter
+      <button type="submit" className="submit-btn" disabled={isLoading}>
+        {isLoading ? 'Connexion en cours...' : 'Se connecter'}
       </button>
     </form>
   );
