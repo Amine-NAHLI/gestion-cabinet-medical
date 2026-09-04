@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import LoginForm from "@/components/LoginForm";
+import Script from "next/script";
 
 export default function LoginPage() {
   const [role, setRole] = useState<'doctor' | 'assistant'>('doctor');
@@ -40,10 +41,27 @@ export default function LoginPage() {
                 )}
               </div>
               
-              {/* Image Illustration */}
-              <div className="rounded-2xl overflow-hidden bg-white/80 p-3 lg:p-4 border border-slate-200/70 shadow-sm backdrop-blur-sm">
-                <div className="w-full flex items-center justify-center rounded-xl overflow-hidden">
-                  <img alt="MediCare Clean Clinic Illustration" className="w-full h-auto max-h-72 object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WJm7XjOk3aoOUacMFHR1P5-CDhbHXHeBpT5xP0WROcL-5hFIg12gmKFJxkKkNl20f4bFMmwZIYLXsj0WJGKusRk6nxls2ujxSSc5yuyCTMXFEAj4AJxd12rvcOA-qsp4T_0-2uHSoE221prCslQ9ZNXPjtd7rejRCP40NMo6AvW-HbxY6fuuam7a1yLqLOxyQT6uLCDbnhwf9Sbi37NUiWv7qzwpML1Y8iCjb4xjuRJGHoII8hy2aj7fY"/>
+              {/* Spline 3D Illustration */}
+              <div className="rounded-2xl overflow-hidden bg-white/5 p-2 lg:p-4 border border-slate-200/50 shadow-sm backdrop-blur-sm h-64 sm:h-72 w-full relative">
+                <Script type="module" src="https://unpkg.com/@splinetool/viewer/build/spline-viewer.js" strategy="afterInteractive" />
+                
+                {/* Overlay pour empêcher le clic sur le logo si jamais */}
+                <div className="absolute inset-0 bg-transparent pointer-events-none z-10" />
+                
+                <div className="absolute inset-0 overflow-hidden rounded-xl">
+                  {role === 'doctor' ? (
+                    /* @ts-ignore */
+                    <spline-viewer 
+                      url="https://prod.spline.design/D8nbLxD8dUS4yp5t/scene.splinecode" 
+                      background="transparent"
+                      style={{ width: '100%', height: 'calc(100% + 60px)', position: 'absolute', top: 0, left: 0, backgroundColor: 'transparent' }}
+                    ></spline-viewer>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-white/40 border border-dashed border-slate-300">
+                      <span className="material-symbols-outlined text-4xl mb-2">3d_rotation</span>
+                      <p className="font-medium text-sm">Modèle 3D Assistante en attente...</p>
+                    </div>
+                  )}
                 </div>
               </div>
               
