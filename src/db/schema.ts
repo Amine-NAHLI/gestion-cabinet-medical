@@ -26,7 +26,8 @@ export const visits = pgTable("visits", {
   id: serial("id").primaryKey(),
   patientId: integer("patient_id").references(() => patients.id).notNull(),
   date: timestamp("date").defaultNow().notNull(),
-  status: text("status").notNull().default("waiting"), // 'waiting' (in list), 'consulting', 'finished'
+  status: text("status").notNull().default("waiting"), // 'waiting' (assistant queue), 'ready' (sent to doctor), 'consulting', 'finished'
+  isAppointment: boolean("is_appointment").default(false).notNull(),
   
   // Medical Info (filled by doctor)
   disease: text("disease"),
