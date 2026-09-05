@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import LogoutButton from "./LogoutButton";
+import { MotionDiv, MotionLink } from "./MotionWrapper";
 
 export default async function Sidebar() {
   const session = await getServerSession(authOptions);
@@ -9,7 +10,7 @@ export default async function Sidebar() {
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 min-h-screen flex flex-col transition-all duration-300 shadow-sm relative z-20">
-      <div className="p-6 flex items-center gap-3 border-b border-slate-100">
+      <MotionDiv initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="p-6 flex items-center gap-3 border-b border-slate-100">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-xs ${role === 'doctor' ? 'bg-sky-600' : 'bg-teal-600'}`}>
           <span className="material-symbols-outlined">{role === 'doctor' ? 'stethoscope' : 'assignment_ind'}</span>
         </div>
@@ -19,53 +20,53 @@ export default async function Sidebar() {
             Espace {role === 'doctor' ? 'Médecin' : 'Assistante'}
           </p>
         </div>
-      </div>
+      </MotionDiv>
 
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         <div className="mb-4 mt-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
           Consultations
         </div>
 
-        <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
           <span className="material-symbols-outlined text-slate-400 group-hover:text-teal-500 transition-colors">home</span>
           <span>Accueil</span>
-        </Link>
+        </MotionLink>
         
-        <Link href="/dashboard/queue" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/queue" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
           <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-500 transition-colors">queue</span>
           <span>File d'attente</span>
-        </Link>
+        </MotionLink>
 
         {role === 'assistant' && (
-          <Link href="/dashboard/payments" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+          <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/payments" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
             <span className="material-symbols-outlined text-slate-400 group-hover:text-teal-500 transition-colors">payments</span>
             <span>Paiements</span>
-          </Link>
+          </MotionLink>
         )}
 
         <div className="mb-4 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
           Données
         </div>
 
-        <Link href="/dashboard/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
           <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-500 transition-colors">history</span>
           <span>Historique</span>
-        </Link>
+        </MotionLink>
 
-        <Link href="/dashboard/appointments" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/appointments" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
           <span className="material-symbols-outlined text-slate-400 group-hover:text-fuchsia-500 transition-colors">event</span>
           <span>Rendez-vous</span>
-        </Link>
+        </MotionLink>
 
         {role === 'doctor' && (
           <>
             <div className="mb-4 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
               Cabinet
             </div>
-            <Link href="/dashboard/stats" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+            <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/stats" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
               <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-500 transition-colors">bar_chart</span>
               <span>Statistiques</span>
-            </Link>
+            </MotionLink>
           </>
         )}
       </nav>

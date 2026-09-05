@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MotionDiv } from "./MotionWrapper";
 import { addPatientAndVisit } from "@/actions/patients";
 
 export default function AddPatientModal() {
@@ -27,8 +28,13 @@ export default function AddPatientModal() {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <MotionDiv 
+            initial={{ opacity: 0, scale: 0.9 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            transition={{ type: "spring", duration: 0.5 }}
+            className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100"
+          >
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-xl font-bold text-slate-900">Nouvelle Inscription</h2>
               <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600">
@@ -85,7 +91,7 @@ export default function AddPatientModal() {
                 </button>
               </div>
             </form>
-          </div>
+          </MotionDiv>
         </div>
       )}
     </>
