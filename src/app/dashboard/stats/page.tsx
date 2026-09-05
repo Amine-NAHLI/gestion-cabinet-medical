@@ -8,11 +8,15 @@ import StatsCharts from "./StatsCharts";
 export default async function StatsPage() {
   const session = await getServerSession(authOptions);
   
-  // Fetch all finished and paid visits and patients for the chart
+  // Fetch all finished and paid visits and patients for the chart and invoice report
   const allVisits = await db.select({
     id: visits.id,
     amountToPay: visits.amountToPay,
     createdAt: visits.createdAt,
+    disease: visits.disease,
+    paymentStatus: visits.paymentStatus,
+    patientFirstName: patients.firstName,
+    patientLastName: patients.lastName,
     patientAge: patients.age
   }).from(visits)
     .innerJoin(patients, eq(visits.patientId, patients.id))

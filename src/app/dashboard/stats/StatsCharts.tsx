@@ -3,14 +3,18 @@
 import React, { useState, useMemo, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { motion } from 'framer-motion';
-import { toPng } from 'html-to-image';
-import { jsPDF } from 'jspdf';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type VisitData = {
   id: number;
   amountToPay: number;
   createdAt: string;
   patientAge: number;
+  patientFirstName?: string;
+  patientLastName?: string;
+  disease?: string | null;
+  paymentStatus?: string;
 };
 
 export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
@@ -189,49 +193,226 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
   }, [filteredVisits]);
 
 
-  // Fonction d'export PDF compatible Tailwind v4 (oklch)
-  const exportPDF = async () => {
-    if (!printRef.current) return;
+  // Fonction d'export PDF sous forme de FACTURE OFFICIELLE & RELEVÉ D'ENCAISSEMENTS
+  const exportPDF = () => {
     setIsExporting(true);
-    
+
     try {
-      const dataUrl = await toPng(printRef.current, {
-        quality: 0.98,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // 1. En-tête Médical Haut (Bannière)
+      doc.setFillColor(15, 23, 42); // Slate 900
+      doc.rect(0, 0, pageWidth, 24, 'F');
+
+      // Bandeau d'accentuation Turquoise
+      doc.setFillColor(13, 148, 136); // Teal 600
+      doc.rect(0, 24, pageWidth, 2, 'F');
+
+      // Titre dans la bannière
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(15);
+      doc.setFont('helvetica', 'bold');
+      doc.text("MEDICABINET", 14, 15);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(203, 213, 225); // Slate 300
+      doc.text("RELEVÉ D'ENCAISSEMENTS & FACTURATION GLOBALE", pageWidth - 14, 15, { align: 'right' });
+
+      // 2. Coordonnées Cabinet (Gauche) & Détails Facture (Droite)
+      const startY = 36;
+
+      // Infos Cabinet
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Cabinet Médical Dr. Amine NAHLI", 14, startY);
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
+      doc.text("Médecine Générale & Soins Cliniques", 14, startY + 5);
+      doc.text("Boulevard d'Anfa, Casablanca, Maroc", 14, startY + 10);
+      doc.text("Tél : +212 5 22 00 00 00 | Email : contact@medicabinet.ma", 14, startY + 15);
+      doc.text("IF : 40182910 | ICE : 002910293000041", 14, startY + 20);
+
+      // Cartouche Facture (Droite)
+      const periodLabelMap: Record<string, string> = {
+        day: "Aujourd'hui",
+        week: "7 derniers jours",
+        month: "Ce mois",
+        all: "Historique global",
+      };
+
+      const invoiceBoxX = 120;
+      const invoiceBoxW = 76;
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(invoiceBoxX, startY - 4, invoiceBoxW, 28, 2.5, 2.5, 'FD');
+
+      doc.setFontSize(9.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(2, 132, 199); // Sky 600
+      const invoiceNum = `FAC-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+      doc.text(`FACTURE N° ${invoiceNum}`, invoiceBoxX + 4, startY + 3);
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Date d'émission : ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, invoiceBoxX + 4, startY + 10);
+      doc.text(`Période : ${periodLabelMap[period]}`, invoiceBoxX + 4, startY + 15);
+      doc.text(`Règlement : Espèces / Chèque (Encaissé)`, invoiceBoxX + 4, startY + 20);
+
+      // 3. Encadré Synthèse Financière (3 colonnes KPI)
+      const kpiY = startY + 30;
+      const colW = (pageWidth - 28 - 8) / 3;
+
+      // Box 1 : Total Actes
+      doc.setFillColor(241, 245, 249);
+      doc.roundedRect(14, kpiY, colW, 15, 2, 2, 'F');
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text("TOTAL CONSULTATIONS", 18, kpiY + 5);
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${totalVisits} acte(s)`, 18, kpiY + 11.5);
+
+      // Box 2 : Total Encaissé
+      doc.setFillColor(236, 253, 245); // Emerald 50
+      doc.roundedRect(14 + colW + 4, kpiY, colW, 15, 2, 2, 'F');
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(5, 150, 105); // Emerald 600
+      doc.text("TOTAL NET ENCAISSÉ", 18 + colW + 4, kpiY + 5);
+      doc.setFontSize(11);
+      doc.setTextColor(4, 120, 87); // Emerald 700
+      doc.text(`${totalRevenue.toLocaleString('fr-FR')} DH`, 18 + colW + 4, kpiY + 11.5);
+
+      // Box 3 : Tarif Moyen
+      const avg = totalVisits > 0 ? Math.round(totalRevenue / totalVisits) : 0;
+      doc.setFillColor(240, 249, 255); // Sky 50
+      doc.roundedRect(14 + (colW + 4) * 2, kpiY, colW, 15, 2, 2, 'F');
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(2, 132, 199);
+      doc.text("TARIF MOYEN / CONSULTATION", 18 + (colW + 4) * 2, kpiY + 5);
+      doc.setFontSize(11);
+      doc.setTextColor(3, 105, 161);
+      doc.text(`${avg} DH`, 18 + (colW + 4) * 2, kpiY + 11.5);
+
+      // 4. Tableau Détaillé des Prestations (Facture)
+      const tableData = filteredVisits.map((v, idx) => {
+        const d = new Date(v.createdAt);
+        const dateStr = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const patientName = [v.patientLastName, v.patientFirstName].filter(Boolean).join(' ').toUpperCase() || `Patient #${v.id}`;
+        const ageStr = v.patientAge ? `${v.patientAge} ans` : "-";
+        const motiveStr = v.disease || "Consultation médicale";
+        const amountStr = `${v.amountToPay.toLocaleString('fr-FR')} DH`;
+
+        return [
+          String(idx + 1).padStart(2, '0'),
+          `${dateStr} ${timeStr}`,
+          patientName,
+          ageStr,
+          motiveStr,
+          "PAYÉ",
+          amountStr,
+        ];
       });
 
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
+      autoTable(doc, {
+        startY: kpiY + 20,
+        margin: { left: 14, right: 14 },
+        head: [["N°", "Date & Heure", "Patient", "Âge", "Désignation de la Consultation", "Statut", "Montant Net"]],
+        body: tableData.length > 0 ? tableData : [["-", "-", "Aucune consultation sur cette période", "-", "-", "-", "0 DH"]],
+        foot: [
+          [
+            {
+              content: "TOTAL FACTURÉ NET À PAYER (DH)",
+              colSpan: 6,
+              styles: { halign: "right", fontStyle: "bold", fontSize: 9, textColor: [15, 23, 42] },
+            },
+            {
+              content: `${totalRevenue.toLocaleString("fr-FR")} DH`,
+              styles: { halign: "right", fontStyle: "bold", fontSize: 9.5, textColor: [5, 150, 105] },
+            },
+          ],
+        ],
+        theme: "grid",
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: 255,
+          fontStyle: "bold",
+          fontSize: 7.5,
+          cellPadding: 3,
+        },
+        bodyStyles: {
+          fontSize: 7.5,
+          textColor: [30, 41, 59],
+          cellPadding: 2.8,
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 10, halign: "center" },
+          1: { cellWidth: 26 },
+          2: { cellWidth: 42, fontStyle: "bold" },
+          3: { cellWidth: 14, halign: "center" },
+          4: { cellWidth: 50 },
+          5: { cellWidth: 18, halign: "center", fontStyle: "bold", textColor: [5, 150, 105] },
+          6: { cellWidth: 22, halign: "right", fontStyle: "bold" },
+        },
+      });
+
+      // 5. Bas de page : Arrêté de somme & Cachet
+      const finalY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 8 : startY + 60;
       
-      const margin = 10;
-      const contentWidth = pageWidth - (margin * 2);
-
-      const img = new Image();
-      img.src = dataUrl;
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
-
-      const contentHeight = (img.height * contentWidth) / img.width;
-
-      if (contentHeight > pageHeight - (margin * 2)) {
-        // Ajuster l'échelle pour tout faire tenir sur une page A4 propre
-        const scale = (pageHeight - (margin * 2)) / contentHeight;
-        const scaledWidth = contentWidth * scale;
-        const scaledHeight = contentHeight * scale;
-        const xOffset = margin + (contentWidth - scaledWidth) / 2;
-        pdf.addImage(dataUrl, 'PNG', xOffset, margin, scaledWidth, scaledHeight);
-      } else {
-        pdf.addImage(dataUrl, 'PNG', margin, margin, contentWidth, contentHeight);
+      const bottomY = finalY > pageHeight - 45 ? 20 : finalY;
+      if (finalY > pageHeight - 45) {
+        doc.addPage();
       }
 
-      pdf.save(`Rapport_Statistiques_${period}.pdf`);
+      // Texte d'arrêté de la facture
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      doc.text("Arrêtée la présente facture globale à la somme de :", 14, bottomY);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${totalRevenue.toLocaleString('fr-FR')} Dirhams Marocains (${totalVisits} consultation${totalVisits > 1 ? 's' : ''}).`, 14, bottomY + 5);
+
+      // Cadre signature & cachet
+      const stampX = pageWidth - 70;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineDashPattern([2, 2], 0);
+      doc.roundedRect(stampX, bottomY - 2, 56, 24, 2, 2, 'S');
+      doc.setLineDashPattern([], 0);
+
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text("Cachet & Signature du Cabinet", stampX + 28, bottomY + 3, { align: "center" });
+
+      // Pied de page légal fixe
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(148, 163, 184);
+      doc.text(
+        "Document officiel généré automatiquement par MediCabinet Système Médical — Certifié conforme.",
+        pageWidth / 2,
+        pageHeight - 6,
+        { align: "center" }
+      );
+
+      doc.save(`Facture_Cabinet_${period}_${new Date().toISOString().split("T")[0]}.pdf`);
     } catch (err: any) {
-      console.error("Erreur lors de l'export PDF:", err);
-      alert("Une erreur s'est produite lors de la génération du PDF: " + (err?.message || ""));
+      console.error("Erreur lors de la génération de la facture PDF:", err);
+      alert("Erreur lors de la génération de la facture: " + (err?.message || ""));
     } finally {
       setIsExporting(false);
     }
