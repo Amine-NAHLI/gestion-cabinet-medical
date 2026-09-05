@@ -58,17 +58,13 @@ export default async function Sidebar() {
           <span>Rendez-vous</span>
         </MotionLink>
 
-        {role === 'doctor' && (
-          <>
-            <div className="mb-4 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Cabinet
-            </div>
-            <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/stats" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
-              <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-500 transition-colors">bar_chart</span>
-              <span>Statistiques</span>
-            </MotionLink>
-          </>
-        )}
+        <div className="mb-4 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          Cabinet
+        </div>
+        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/stats" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+          <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-500 transition-colors">bar_chart</span>
+          <span>Statistiques</span>
+        </MotionLink>
       </nav>
 
       <div className="p-4 border-t border-slate-100 bg-slate-50/50">

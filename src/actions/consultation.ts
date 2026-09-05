@@ -28,9 +28,13 @@ export async function savePrescription(visitId: number, medicines: { name: strin
 }
 
 export async function finishConsultation(visitId: number, amountToPay: number | null) {
+  const finalAmount = amountToPay !== null && !isNaN(amountToPay) && amountToPay > 0 
+    ? amountToPay.toFixed(2) 
+    : null;
+
   await db.update(visits)
     .set({ 
-      amountToPay: amountToPay !== null && !isNaN(amountToPay) ? amountToPay.toString() : null, 
+      amountToPay: finalAmount, 
       status: "finished", 
       paymentStatus: "pending" 
     })

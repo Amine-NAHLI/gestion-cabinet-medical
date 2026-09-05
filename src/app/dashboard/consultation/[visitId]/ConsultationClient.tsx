@@ -65,8 +65,8 @@ export default function ConsultationClient({ visitId, initialData, patient, hasP
         await createAppointment(initialData.patientId, nextDate);
       }
 
-      const amountRaw = formData.get("amount") as string;
-      const amount = amountRaw ? parseInt(amountRaw) : null;
+      const amountRaw = (formData.get("amount") as string || "").trim();
+      const amount = amountRaw !== "" && !isNaN(Number(amountRaw)) && Number(amountRaw) > 0 ? Number(amountRaw) : null;
       
       await finishConsultation(visitId, amount);
       window.location.href = "/dashboard/history";
@@ -179,7 +179,7 @@ export default function ConsultationClient({ visitId, initialData, patient, hasP
             
             <div className="relative max-w-xs mx-auto">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">DH</span>
-              <input type="number" name="amount" placeholder="Optionnel" step="10" className="w-full pl-14 pr-4 py-4 text-3xl font-bold text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-teal-500 focus:ring-0 text-center" />
+              <input type="number" name="amount" autoComplete="off" placeholder="Optionnel" step="10" className="w-full pl-14 pr-4 py-4 text-3xl font-bold text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-teal-500 focus:ring-0 text-center" />
             </div>
 
             <div className="pt-6 border-t border-slate-100 max-w-sm mx-auto text-left">
