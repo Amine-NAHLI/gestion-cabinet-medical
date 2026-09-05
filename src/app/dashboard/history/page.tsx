@@ -5,6 +5,8 @@ import { visits, patients } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function HistoryPage() {
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role;

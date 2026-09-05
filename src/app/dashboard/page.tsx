@@ -7,6 +7,8 @@ import Link from "next/link";
 import AddPatientModal from "@/components/AddPatientModal";
 import { MotionDiv } from "@/components/MotionWrapper";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardIndex() {
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role;

@@ -7,6 +7,8 @@ import AddPatientModal from "@/components/AddPatientModal";
 import SendToDoctorButton from "@/components/SendToDoctorButton";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function QueuePage() {
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role;
