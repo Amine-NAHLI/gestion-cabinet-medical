@@ -31,7 +31,7 @@ export default async function DashboardIndex() {
   const todayVisits = allVisits.filter(v => v.createdAt >= today);
   const waitingCount = todayVisits.filter(v => v.status === 'waiting').length;
   const finishedCount = todayVisits.filter(v => v.status === 'finished').length;
-  const readyPatient = todayVisits.find(v => v.status === 'ready' || v.status === 'consulting');
+  const readyPatient = todayVisits.find(v => v.status === 'ready');
   const revenueToday = todayVisits.reduce((acc, v) => acc + (v.amountToPay ? parseFloat(v.amountToPay as string) : 0), 0);
 
   const todayAppointmentsCount = allAppointments.filter(a => {
@@ -109,20 +109,20 @@ export default async function DashboardIndex() {
           <h2 className="text-xl font-bold text-slate-800">Votre Prochain Patient</h2>
           
           {readyPatient ? (
-            <div className={`${readyPatient.status === 'consulting' ? 'bg-sky-50 border-sky-200' : 'bg-emerald-50 border-emerald-200'} border p-8 rounded-3xl shadow-sm relative overflow-hidden`}>
-              <div className={`absolute top-0 left-0 w-2 h-full ${readyPatient.status === 'consulting' ? 'bg-sky-500' : 'bg-emerald-500'}`}></div>
+            <div className="bg-emerald-50 border border-emerald-200 p-8 rounded-3xl shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
               <div className="flex items-start justify-between">
                 <div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 inline-block ${readyPatient.status === 'consulting' ? 'bg-sky-200 text-sky-800' : 'bg-emerald-200 text-emerald-800'}`}>
-                    {readyPatient.status === 'consulting' ? 'En consultation' : 'Prêt pour vous'}
+                  <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 inline-block bg-emerald-200 text-emerald-800">
+                    Prêt pour vous
                   </span>
                   <h3 className="text-3xl font-black text-slate-900 mb-2">{readyPatient.patient.lastName} {readyPatient.patient.firstName}</h3>
-                  <p className={`${readyPatient.status === 'consulting' ? 'text-sky-700' : 'text-emerald-700'} font-medium`}>
-                    {readyPatient.status === 'consulting' ? 'Dossier ouvert. Cliquez pour reprendre.' : "L'assistante vous a envoyé ce patient."}
+                  <p className="text-emerald-700 font-medium">
+                    L&apos;assistante vous a envoyé ce patient.
                   </p>
                 </div>
-                <Link href={`/dashboard/consultation/${readyPatient.id}`} className={`${readyPatient.status === 'consulting' ? 'bg-sky-600 hover:bg-sky-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-md flex items-center gap-2`}>
-                  {readyPatient.status === 'consulting' ? 'Reprendre' : 'Consulter'}
+                <Link href={`/dashboard/consultation/${readyPatient.id}`} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-md flex items-center gap-2">
+                  Consulter
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </Link>
               </div>

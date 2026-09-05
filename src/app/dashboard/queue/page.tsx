@@ -31,7 +31,6 @@ export default async function QueuePage() {
 
   const waitingList = visitArray.filter(v => v.status === 'waiting');
   const readyList = visitArray.filter(v => v.status === 'ready');
-  const consultingList = visitArray.filter(v => v.status === 'consulting');
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -44,31 +43,6 @@ export default async function QueuePage() {
       </div>
 
       <div className="space-y-8">
-        
-        {/* En consultation */}
-        {consultingList.length > 0 && (
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse"></span>
-              En Consultation Actuelle
-            </h2>
-            {consultingList.map(visit => (
-              <div key={visit.id} className="block bg-sky-600 text-white p-5 rounded-2xl shadow-md">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-bold text-lg">{visit.patient.lastName} {visit.patient.firstName}</h3>
-                    <p className="text-sky-100 text-sm mt-1">Patient en salle</p>
-                  </div>
-                  {role === 'doctor' && (
-                    <Link href={`/dashboard/consultation/${visit.id}`} className="bg-white text-sky-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-sky-50 transition-colors">
-                      Reprendre
-                    </Link>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Personne Suivante (Prêt pour le médecin) */}
         {role === 'doctor' && readyList.length > 0 && (

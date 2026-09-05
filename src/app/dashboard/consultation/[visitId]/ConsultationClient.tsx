@@ -69,7 +69,7 @@ export default function ConsultationClient({ visitId, initialData, patient, hasP
       const amount = amountRaw ? parseInt(amountRaw) : null;
       
       await finishConsultation(visitId, amount);
-      window.location.href = "/dashboard";
+      window.location.href = "/dashboard/history";
     } catch (err: any) {
       console.error("Erreur lors de la clôture:", err);
       alert("Une erreur est survenue lors de la clôture: " + err.message);

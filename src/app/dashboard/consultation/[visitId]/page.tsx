@@ -7,15 +7,14 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import ConsultationClient from "./ConsultationClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function ConsultationPage({ params }: { params: Promise<{ visitId: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session || (session.user as any).role !== 'doctor') redirect("/dashboard");
 
   const resolvedParams = await params;
   const visitId = parseInt(resolvedParams.visitId);
-
-  // Marquer comme 'en consultation' dès l'ouverture
-  await db.update(visits).set({ status: 'consulting' }).where(eq(visits.id, visitId));
 
   const visitArray = await db
     .select()

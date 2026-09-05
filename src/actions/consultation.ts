@@ -11,7 +11,7 @@ export async function updateMedicalNotes(visitId: number, formData: FormData) {
   const notes = formData.get("notes") as string;
 
   await db.update(visits)
-    .set({ disease, diagnosis, notes, status: "consulting" })
+    .set({ disease, diagnosis, notes })
     .where(eq(visits.id, visitId));
   
   revalidatePath(`/dashboard/consultation/${visitId}`);
@@ -37,5 +37,6 @@ export async function finishConsultation(visitId: number, amountToPay: number | 
     .where(eq(visits.id, visitId));
   
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/history");
   return { success: true };
 }
