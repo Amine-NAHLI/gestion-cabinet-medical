@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { processPayment } from "@/actions/payment";
+import { motion } from "framer-motion";
 
 export default function PaymentButton({ visitId, initialAmount }: { visitId: number, initialAmount: string | null }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,32 +15,40 @@ export default function PaymentButton({ visitId, initialAmount }: { visitId: num
     }
     setIsLoading(true);
     await processPayment(visitId, initialAmount ? undefined : parseInt(amount));
-    // L'action revalidatePath mettra à jour l'UI automatiquement
   }
 
   return (
     <div className="flex items-center gap-3">
       {!initialAmount && (
-        <input 
-          type="number" 
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Montant (DH)"
-          className="w-32 px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-        />
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 font-mono">
+            DH
+          </span>
+          <input 
+            type="number" 
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Montant"
+            className="w-28 pl-9 pr-3 py-2 text-xs font-bold text-slate-800 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none transition-all"
+          />
+        </div>
       )}
-      <button 
+      <motion.button 
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
         onClick={handlePayment} 
         disabled={isLoading}
-        className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors shadow-sm disabled:opacity-70 flex items-center gap-2"
+        className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all shadow-xs hover:shadow-md hover:shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
       >
-        {isLoading ? "En cours..." : (
+        {isLoading ? (
+          "En cours..."
+        ) : (
           <>
-            <span className="material-symbols-outlined text-sm">payments</span>
+            <span className="material-symbols-outlined text-base">payments</span>
             Encaisser
           </>
         )}
-      </button>
+      </motion.button>
     </div>
   );
 }
