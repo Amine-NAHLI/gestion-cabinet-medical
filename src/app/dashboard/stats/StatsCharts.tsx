@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { motion } from 'framer-motion';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
 type VisitData = {
@@ -189,24 +189,49 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
   }, [filteredVisits]);
 
 
-  // Fonction d'export PDF
+  // Fonction d'export PDF compatible Tailwind v4 (oklch)
   const exportPDF = async () => {
     if (!printRef.current) return;
     setIsExporting(true);
     
     try {
-      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#f8fafc' });
-      const imgData = canvas.toDataURL('image/png');
+      const dataUrl = await toPng(printRef.current, {
+        quality: 0.98,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+      });
+
       const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const margin = 10;
+      const contentWidth = pageWidth - (margin * 2);
+
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const contentHeight = (img.height * contentWidth) / img.width;
+
+      if (contentHeight > pageHeight - (margin * 2)) {
+        // Ajuster l'échelle pour tout faire tenir sur une page A4 propre
+        const scale = (pageHeight - (margin * 2)) / contentHeight;
+        const scaledWidth = contentWidth * scale;
+        const scaledHeight = contentHeight * scale;
+        const xOffset = margin + (contentWidth - scaledWidth) / 2;
+        pdf.addImage(dataUrl, 'PNG', xOffset, margin, scaledWidth, scaledHeight);
+      } else {
+        pdf.addImage(dataUrl, 'PNG', margin, margin, contentWidth, contentHeight);
+      }
+
       pdf.save(`Rapport_Statistiques_${period}.pdf`);
-    } catch (err) {
-      console.error("Erreur lors de l'export", err);
-      alert("Une erreur s'est produite lors de la génération du PDF.");
+    } catch (err: any) {
+      console.error("Erreur lors de l'export PDF:", err);
+      alert("Une erreur s'est produite lors de la génération du PDF: " + (err?.message || ""));
     } finally {
       setIsExporting(false);
     }
