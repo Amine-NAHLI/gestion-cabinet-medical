@@ -15,5 +15,5 @@ export async function processPayment(visitId: number, amountToPay?: number) {
     .set(updateData)
     .where(eq(visits.id, visitId));
   
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }

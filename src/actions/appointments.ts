@@ -11,7 +11,7 @@ export async function createAppointment(patientId: number, dateStr: string) {
       patientId,
       date: new Date(dateStr)
     });
-    revalidatePath("/dashboard/appointments");
+    revalidatePath("/dashboard", "layout");
     return { success: true };
   } catch (error) {
     console.error("Erreur de création de rendez-vous:", error);
@@ -30,8 +30,7 @@ export async function transformAppointmentToVisit(appointmentId: number, patient
     // Supprimer le rendez-vous
     await db.delete(appointments).where(eq(appointments.id, appointmentId));
     
-    revalidatePath("/dashboard/appointments");
-    revalidatePath("/dashboard/queue");
+    revalidatePath("/dashboard", "layout");
     return { success: true };
   } catch (error) {
     console.error("Erreur de transformation:", error);

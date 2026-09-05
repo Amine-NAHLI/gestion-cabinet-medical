@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
 import { visits, patients } from "@/db/schema";
-import { eq, sql, asc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import PaymentButton from "@/components/PaymentButton";
 import { redirect } from "next/navigation";
 
@@ -23,7 +23,7 @@ export default async function PaymentsPage() {
     })
     .from(visits)
     .innerJoin(patients, eq(visits.patientId, patients.id))
-    .where(sql`${visits.status} = 'finished' AND ${visits.paymentStatus} = 'pending'`)
+    .where(and(eq(visits.status, 'finished'), eq(visits.paymentStatus, 'pending')))
     .orderBy(asc(visits.createdAt));
 
   return (

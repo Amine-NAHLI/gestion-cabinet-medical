@@ -26,8 +26,7 @@ export async function addPatientAndVisit(formData: FormData) {
       status: "waiting",
     });
 
-    revalidatePath("/dashboard/queue");
-    revalidatePath("/dashboard/patients");
+    revalidatePath("/dashboard", "layout");
     return { success: true };
   } catch (error) {
     console.error("Erreur lors de l'ajout:", error);
@@ -40,7 +39,7 @@ export async function sendPatientToDoctor(visitId: number) {
     await db.update(visits)
       .set({ status: 'ready' })
       .where(eq(visits.id, visitId));
-    revalidatePath("/dashboard/queue");
+    revalidatePath("/dashboard", "layout");
     return { success: true };
   } catch (error) {
     console.error("Erreur d'envoi au médecin:", error);
