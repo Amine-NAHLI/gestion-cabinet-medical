@@ -7,9 +7,9 @@ import { useRouter } from "next/navigation";
 import MedicalAutocomplete from "@/components/MedicalAutocomplete";
 import PrescriptionPDF from "@/components/PrescriptionPDF";
 
-export default function ConsultationClient({ visitId, initialData, hasPrescription }: { visitId: number, initialData: any, hasPrescription: boolean }) {
+export default function ConsultationClient({ visitId, initialData, patient, hasPrescription, initialMedicines = [] }: { visitId: number, initialData: any, patient: any, hasPrescription: boolean, initialMedicines?: { name: string; instructions: string }[] }) {
   const [activeTab, setActiveTab] = useState<'dossier' | 'ordonnance' | 'cloture'>('dossier');
-  const [medicines, setMedicines] = useState<{ name: string; instructions: string }[]>([]);
+  const [medicines, setMedicines] = useState<{ name: string; instructions: string }[]>(initialMedicines);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const router = useRouter();
 
@@ -56,18 +56,24 @@ export default function ConsultationClient({ visitId, initialData, hasPrescripti
   // Handlers pour la clôture
   async function handleFinish(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    // Traiter le prochain rendez-vous si renseigné
-    const nextDate = formData.get("nextAppointment") as string;
-    if (nextDate) {
-      await createAppointment(initialData.patientId, nextDate);
-    }
+    try {
+      const formData = new FormData(e.currentTarget);
+      
+      // Traiter le prochain rendez-vous si renseigné
+      const nextDate = formData.get("nextAppointment") as string;
+      if (nextDate) {
+        await createAppointment(initialData.patientId, nextDate);
+      }
 
-    const amountRaw = formData.get("amount") as string;
-    const amount = amountRaw ? parseInt(amountRaw) : null;
-    await finishConsultation(visitId, amount);
-    router.push("/dashboard");
+      const amountRaw = formData.get("amount") as string;
+      const amount = amountRaw ? parseInt(amountRaw) : null;
+      
+      await finishConsultation(visitId, amount);
+      window.location.href = "/dashboard";
+    } catch (err: any) {
+      console.error("Erreur lors de la clôture:", err);
+      alert("Une erreur est survenue lors de la clôture: " + err.message);
+    }
   }
 
   return (
@@ -190,7 +196,7 @@ export default function ConsultationClient({ visitId, initialData, hasPrescripti
       </div>
 
       {/* COMPOSANT D'IMPRESSION (caché à l'écran, visible à l'impression) */}
-      <PrescriptionPDF patient={initialData.patient} medicines={medicines} date={new Date()} />
+      <PrescriptionPDF patient={patient} medicines={medicines} date={new Date()} />
     </div>
   );
 }

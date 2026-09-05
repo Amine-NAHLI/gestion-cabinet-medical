@@ -18,6 +18,7 @@ export async function updateMedicalNotes(visitId: number, formData: FormData) {
 }
 
 export async function savePrescription(visitId: number, medicines: { name: string; instructions: string }[]) {
+  await db.delete(prescriptions).where(eq(prescriptions.visitId, visitId));
   await db.insert(prescriptions).values({
     visitId,
     medicines,
@@ -29,11 +30,12 @@ export async function savePrescription(visitId: number, medicines: { name: strin
 export async function finishConsultation(visitId: number, amountToPay: number | null) {
   await db.update(visits)
     .set({ 
-      amountToPay: amountToPay ? amountToPay.toString() : null as any, 
+      amountToPay: amountToPay !== null && !isNaN(amountToPay) ? amountToPay.toString() : null, 
       status: "finished", 
       paymentStatus: "pending" 
     })
     .where(eq(visits.id, visitId));
   
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
+  return { success: true };
 }

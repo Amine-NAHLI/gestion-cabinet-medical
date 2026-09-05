@@ -28,6 +28,7 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
 
   const prescriptionArray = await db.select().from(prescriptions).where(eq(prescriptions.visitId, visitId));
   const hasPrescription = prescriptionArray.length > 0;
+  const initialMedicines = hasPrescription ? (prescriptionArray[0].medicines as any) : [];
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -48,7 +49,7 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
       </div>
 
       {/* Interface interactive (Dossier, Ordonnance, Facturation) */}
-      <ConsultationClient visitId={visitId} initialData={visit.visits} hasPrescription={hasPrescription} />
+      <ConsultationClient visitId={visitId} initialData={visit.visits} patient={visit.patients} hasPrescription={hasPrescription} initialMedicines={initialMedicines} />
     </div>
   );
 }
