@@ -1,140 +1,139 @@
 "use client";
+
 import { useState } from "react";
 import LoginForm from "@/components/LoginForm";
+import { motion } from "framer-motion";
 
 export default function LoginPage() {
   const [role, setRole] = useState<'doctor' | 'assistant'>('doctor');
 
   return (
-    <div className="flex items-center justify-center p-4 sm:p-6 lg:p-10 min-h-screen w-full">
-      <main className="w-full max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 items-stretch">
+    <div className="h-screen max-h-screen w-screen overflow-hidden flex items-center justify-center p-3 sm:p-4 bg-gradient-to-br from-slate-100 via-slate-50 to-sky-50/40 selection:bg-slate-900 selection:text-white relative">
+      
+      {/* Ambient Depth Lights */}
+      <div className="absolute -top-24 -left-24 w-80 h-80 bg-sky-300/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-teal-300/25 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Main Dual Card - Strict viewport fitting */}
+      <motion.main
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="w-full max-w-4xl max-h-[92vh] sm:max-h-[530px] bg-white rounded-[28px] shadow-2xl shadow-slate-900/10 border border-slate-200/80 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10"
+      >
+        
+        {/* LEFT PANEL : Deep Gradient with Organic Wave & Floating Micro-badges */}
+        <section className="hidden lg:flex lg:col-span-5 flex-col justify-between p-8 relative overflow-hidden text-white bg-gradient-to-br from-[#070e1c] via-[#0a162b] to-[#0c1f3d]">
           
-          {/* LEFT SECTION */}
-          <section className="hidden md:flex md:col-span-5 lg:col-span-6 flex-col justify-between rounded-3xl bg-gradient-to-b from-sky-50/70 via-slate-50 to-teal-50/50 p-8 lg:p-10 border border-slate-200/80 shadow-sm relative overflow-hidden transition-all duration-500">
-            <div className={`absolute -right-20 -top-20 w-72 h-72 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${role === 'doctor' ? 'bg-teal-100/50' : 'bg-sky-200/50'}`}></div>
-            <div className={`absolute -left-16 -bottom-16 w-72 h-72 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${role === 'doctor' ? 'bg-sky-100/60' : 'bg-teal-100/60'}`}></div>
-            
-            <div className="relative z-10 space-y-6">
-              
-              {/* Dynamic Headline */}
-              <div className="space-y-3 min-h-[120px]">
-                {role === 'doctor' ? (
-                  <>
-                    <h1 className="font-headline-xl text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                      Votre Espace, <span className="text-sky-600">Intelligent.</span>
-                    </h1>
-                    <p className="font-body-md text-slate-600 text-sm lg:text-base leading-relaxed max-w-md">
-                      Gérez vos patients, vos rendez-vous et vos dossiers médicaux sur une plateforme simple et sécurisée.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h1 className="font-headline-xl text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                      L'Administration, <span className="text-teal-600">Simplifiée.</span>
-                    </h1>
-                    <p className="font-body-md text-slate-600 text-sm lg:text-base leading-relaxed max-w-md">
-                      Organisez l'accueil, la facturation et l'agenda du cabinet en un clin d'œil pour un flux de travail fluide.
-                    </p>
-                  </>
-                )}
-              </div>
-              
-              {/* Image Illustration */}
-              <div className="rounded-2xl overflow-hidden bg-white/80 p-3 lg:p-4 border border-slate-200/70 shadow-sm backdrop-blur-sm">
-                <div className="w-full flex items-center justify-center rounded-xl overflow-hidden">
-                  <img alt="MediCare Clean Clinic Illustration" className="w-full h-auto max-h-72 object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WJm7XjOk3aoOUacMFHR1P5-CDhbHXHeBpT5xP0WROcL-5hFIg12gmKFJxkKkNl20f4bFMmwZIYLXsj0WJGKusRk6nxls2ujxSSc5yuyCTMXFEAj4AJxd12rvcOA-qsp4T_0-2uHSoE221prCslQ9ZNXPjtd7rejRCP40NMo6AvW-HbxY6fuuam7a1yLqLOxyQT6uLCDbnhwf9Sbi37NUiWv7qzwpML1Y8iCjb4xjuRJGHoII8hy2aj7fY"/>
-                </div>
-              </div>
-              
-              {/* Dynamic Features Grid */}
-              <div className="grid grid-cols-3 gap-3 pt-2">
-                {role === 'doctor' ? (
-                  <>
-                    <div className="flex flex-col items-center text-center p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-xs">
-                      <div className="w-9 h-9 rounded-lg bg-sky-100/80 flex items-center justify-center text-sky-700 mb-2">
-                        <span className="material-symbols-outlined text-xl">person</span>
-                      </div>
-                      <p className="font-headline-sm text-xs lg:text-sm font-semibold text-slate-800 leading-tight">Dossiers Patients</p>
-                    </div>
-                    <div className="flex flex-col items-center text-center p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-xs">
-                      <div className="w-9 h-9 rounded-lg bg-teal-100/80 flex items-center justify-center text-teal-700 mb-2">
-                        <span className="material-symbols-outlined text-xl">calendar_today</span>
-                      </div>
-                      <p className="font-headline-sm text-xs lg:text-sm font-semibold text-slate-800 leading-tight">Agenda Médical</p>
-                    </div>
-                    <div className="flex flex-col items-center text-center p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-xs">
-                      <div className="w-9 h-9 rounded-lg bg-sky-100/80 flex items-center justify-center text-sky-700 mb-2">
-                        <span className="material-symbols-outlined text-xl">description</span>
-                      </div>
-                      <p className="font-headline-sm text-xs lg:text-sm font-semibold text-slate-800 leading-tight">Prescriptions</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex flex-col items-center text-center p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-xs">
-                      <div className="w-9 h-9 rounded-lg bg-teal-100/80 flex items-center justify-center text-teal-700 mb-2">
-                        <span className="material-symbols-outlined text-xl">calendar_month</span>
-                      </div>
-                      <p className="font-headline-sm text-xs lg:text-sm font-semibold text-slate-800 leading-tight">Accueil & Rendez-vous</p>
-                    </div>
-                    <div className="flex flex-col items-center text-center p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-xs">
-                      <div className="w-9 h-9 rounded-lg bg-emerald-100/80 flex items-center justify-center text-emerald-700 mb-2">
-                        <span className="material-symbols-outlined text-xl">receipt_long</span>
-                      </div>
-                      <p className="font-headline-sm text-xs lg:text-sm font-semibold text-slate-800 leading-tight">Facturation</p>
-                    </div>
-                    <div className="flex flex-col items-center text-center p-3 rounded-xl bg-white/90 border border-slate-200/80 shadow-xs">
-                      <div className="w-9 h-9 rounded-lg bg-sky-100/80 flex items-center justify-center text-sky-700 mb-2">
-                        <span className="material-symbols-outlined text-xl">folder_shared</span>
-                      </div>
-                      <p className="font-headline-sm text-xs lg:text-sm font-semibold text-slate-800 leading-tight">Gestion des Docs</p>
-                    </div>
-                  </>
-                )}
-              </div>
+          {/* Subtle Organic Lights */}
+          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full blur-2xl bg-sky-500/20 pointer-events-none" />
+          <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full blur-2xl bg-teal-500/20 pointer-events-none" />
+
+          {/* Flowing Organic Waves */}
+          <div className="absolute inset-0 pointer-events-none opacity-25 mix-blend-screen">
+            <svg
+              className="w-full h-full object-cover"
+              viewBox="0 0 400 530"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M-30 110 C 90 50, 210 190, 430 80 C 510 30, 530 170, 430 290 C 290 410, 50 330, -30 470 Z"
+                fill="url(#wave1)"
+                opacity="0.6"
+              />
+              <path
+                d="M-50 250 C 50 170, 170 330, 330 230 C 410 170, 450 310, 310 410 C 170 490, 0 390, -50 510 Z"
+                fill="url(#wave2)"
+                opacity="0.4"
+              />
+              <defs>
+                <linearGradient id="wave1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#38bdf8" />
+                  <stop offset="100%" stopColor="#818cf8" />
+                </linearGradient>
+                <linearGradient id="wave2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#2dd4bf" />
+                  <stop offset="100%" stopColor="#38bdf8" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+
+          {/* Brand Header */}
+          <div className="relative z-10 flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xs">
+              <span className="material-symbols-outlined text-lg">health_and_safety</span>
             </div>
-            
-            <div className="relative z-10 pt-6 mt-6 border-t border-slate-200/60 flex items-center justify-between text-xs text-slate-500 font-medium">
-              <span>Approuvé par les équipes de santé</span>
-              <span className="inline-flex items-center gap-1.5 text-teal-700">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
-                Opérationnel
+            <div>
+              <span className="font-bold text-base tracking-tight text-white block leading-none">
+                MediCabinet
+              </span>
+              <span className="text-[10px] font-medium text-slate-400">
+                Système Médical Certifié
               </span>
             </div>
-          </section>
+          </div>
 
-          {/* RIGHT SECTION */}
-          <section className="col-span-1 md:col-span-7 lg:col-span-6 flex items-center justify-center">
-            <div className="w-full max-w-lg bg-white rounded-3xl p-7 sm:p-10 border border-slate-200/90 shadow-xl shadow-slate-200/50 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-3 mb-8">
-                  <img alt="MediCare Logo" className="w-10 h-10 object-contain rounded-xl shadow-xs" src="https://lh3.googleusercontent.com/aida/AEtjO1Xu20agQgPI7nhBJ2KNa8GxHs9qmmY2gVFpx-XR1V64PMrQkoI7_b_v-xcilB7AeepBrDrgc44aieW_XCEX0ssqt3RFVvXNzkv6CgZp_XycEApmINS90gmaSoq_JoxkTUBruLMN8JGiYCKH32pIV8jtMIV9N7I3I5ObxDPzIDTpkgCj9X4OMNwgQYeo21Qo7ImtT_QNVfvC9yUFJVITMzj7HlM5xIvU9dkprCh_668rAIq0aqeFAykDsZ_w"/>
-                  <div>
-                    <span className="font-headline-md text-xl font-bold text-slate-900 tracking-tight block">MediCabinet</span>
-                    <p className="text-xs font-medium text-teal-700">Système de gestion médicale</p>
-                  </div>
-                </div>
-                
-                <div className="mb-6">
-                  <h2 className="font-headline-lg text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Bon retour !</h2>
-                  <p className="text-sm text-slate-500 mt-1.5 font-normal">Choisissez votre rôle et connectez-vous.</p>
-                </div>
+          {/* Center Content: Pure Class & Typography */}
+          <div className="relative z-10 my-auto py-2 space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[10px] font-semibold text-sky-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Espace Praticien Sécurisé
+            </div>
 
-                <LoginForm role={role} setRole={setRole} />
-                
+            <h1 className="text-2xl font-bold tracking-tight text-white leading-snug">
+              L'Excellence <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-teal-200 to-indigo-200">au service</span> de votre clinique.
+            </h1>
+
+            <p className="text-xs text-slate-300/80 leading-relaxed max-w-xs font-normal">
+              Dossiers patients, consultations et facturation unifiés en une seule interface.
+            </p>
+
+            {/* 2 Micro-badges Glassmorphism */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/[0.07] backdrop-blur-md border border-white/[0.09] text-[11px] text-slate-200">
+                <span className="material-symbols-outlined text-xs text-emerald-400">verified_user</span>
+                <span>Norme HDS • Chiffrement 256-bit</span>
               </div>
-              
-              <div className="mt-8 pt-5 text-center border-t border-slate-200">
-                <p className="text-xs text-slate-500">
-                  Besoin d'aide pour accéder à votre compte ?
-                  <a className="text-sky-600 hover:underline font-medium ml-1" href="#support">Contacter l'administrateur</a>
-                </p>
+              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/[0.07] backdrop-blur-md border border-white/[0.09] text-[11px] text-slate-200">
+                <span className="material-symbols-outlined text-xs text-sky-400">sync</span>
+                <span>Cabinet Connecté • Temps réel</span>
               </div>
             </div>
-          </section>
-        </div>
-      </main>
+          </div>
+
+          {/* Footer */}
+          <div className="relative z-10 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400">
+            <span>© {new Date().getFullYear()} MediCabinet</span>
+            <span>Sécurité Certifiée</span>
+          </div>
+        </section>
+
+        {/* RIGHT PANEL : Executive Form */}
+        <section className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between bg-white overflow-y-auto">
+          <div>
+            {/* Header */}
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                Connexion
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5 font-normal">
+                Identifiez-vous pour accéder à votre espace de travail.
+              </p>
+            </div>
+
+            {/* Form */}
+            <LoginForm role={role} setRole={setRole} />
+          </div>
+
+          {/* Security Guarantee in Footer */}
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+            <span className="material-symbols-outlined text-xs text-slate-400">lock</span>
+            <span>Accès sécurisé SSL 256-bit • Données de santé protégées</span>
+          </div>
+        </section>
+      </motion.main>
     </div>
   );
 }

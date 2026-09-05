@@ -1,8 +1,9 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface LoginFormProps {
   role: 'doctor' | 'assistant';
@@ -10,8 +11,8 @@ interface LoginFormProps {
 }
 
 export default function LoginForm({ role, setRole }: LoginFormProps) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("medecin@cabinet.com");
+  const [password, setPassword] = useState("password123");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -19,10 +20,14 @@ export default function LoginForm({ role, setRole }: LoginFormProps) {
 
   const handleRoleSelect = (selectedRole: 'doctor' | 'assistant') => {
     setRole(selectedRole);
-    // On efface les champs quand on change de rôle pour forcer la saisie manuelle
-    setEmail("");
-    setPassword("");
     setError("");
+    if (selectedRole === 'doctor') {
+      setEmail("medecin@cabinet.com");
+      setPassword("password123");
+    } else {
+      setEmail("assistante@cabinet.com");
+      setPassword("password123");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,7 +42,7 @@ export default function LoginForm({ role, setRole }: LoginFormProps) {
     });
 
     if (res?.error) {
-      setError("Email ou mot de passe incorrect");
+      setError("Email ou mot de passe incorrect.");
       setIsLoading(false);
     } else {
       router.push("/dashboard");
@@ -46,141 +51,215 @@ export default function LoginForm({ role, setRole }: LoginFormProps) {
   };
 
   return (
-    <div>
-      {/* Role Selection */}
-      <div className="mb-6">
-        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2.5">Se connecter en tant que</label>
-        <div className="grid grid-cols-2 gap-3.5">
-          {/* Doctor Button */}
-          <button 
+    <div className="space-y-4">
+      {/* 1. Sélecteur de Rôle Style iOS / macOS Segmented Control */}
+      <div>
+        <div className="grid grid-cols-2 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 gap-1 shadow-inner">
+          <button
             type="button"
             onClick={() => handleRoleSelect('doctor')}
-            className={`relative text-left p-4 rounded-2xl transition-all duration-150 cursor-pointer focus:outline-none ${
-              role === 'doctor' 
-                ? 'border-2 border-sky-600 bg-sky-50/60' 
-                : 'border border-slate-200 bg-white hover:bg-slate-50/70'
+            className={`relative py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              role === 'doctor'
+                ? 'text-slate-900 font-extrabold'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <div className="flex items-start justify-between">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                role === 'doctor' ? 'bg-sky-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600'
-              }`}>
-                <span className="material-symbols-outlined text-xl">stethoscope</span>
-              </div>
-              <span className={`items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-600 text-white ${
-                role === 'doctor' ? 'flex' : 'hidden'
-              }`}>
-                <span className="material-symbols-outlined text-xs">check</span>
-                Sélectionné
-              </span>
-            </div>
-            <div className="mt-3">
-              <p className="font-headline-sm text-sm font-bold text-slate-900">Médecin</p>
-              <p className="text-xs text-slate-600 mt-1 leading-snug">Accès patients, rendez-vous et dossiers.</p>
-            </div>
+            {role === 'doctor' && (
+              <motion.div
+                layoutId="roleActivePill"
+                className="absolute inset-0 bg-white rounded-xl shadow-sm border border-slate-200/70"
+                transition={{ type: "spring", stiffness: 450, damping: 32 }}
+              />
+            )}
+            <span
+              className={`relative z-10 material-symbols-outlined text-[18px] transition-colors ${
+                role === 'doctor' ? 'text-sky-600' : 'text-slate-400'
+              }`}
+            >
+              stethoscope
+            </span>
+            <span className="relative z-10 tracking-tight">Médecin</span>
           </button>
 
-          {/* Assistant Button */}
-          <button 
+          <button
             type="button"
             onClick={() => handleRoleSelect('assistant')}
-            className={`relative text-left p-4 rounded-2xl transition-all duration-150 cursor-pointer focus:outline-none ${
-              role === 'assistant' 
-                ? 'border-2 border-teal-600 bg-teal-50/60' 
-                : 'border border-slate-200 bg-white hover:bg-slate-50/70'
+            className={`relative py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              role === 'assistant'
+                ? 'text-slate-900 font-extrabold'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <div className="flex items-start justify-between">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                role === 'assistant' ? 'bg-teal-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600'
-              }`}>
-                <span className="material-symbols-outlined text-xl">assignment_ind</span>
-              </div>
-              <span className={`items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-teal-600 text-white ${
-                role === 'assistant' ? 'flex' : 'hidden'
-              }`}>
-                <span className="material-symbols-outlined text-xs">check</span>
-                Sélectionné
-              </span>
-            </div>
-            <div className="mt-3">
-              <p className="font-headline-sm text-sm font-bold text-slate-900">Assistante</p>
-              <p className="text-xs text-slate-600 mt-1 leading-snug">Gestion de l'accueil et facturation.</p>
-            </div>
+            {role === 'assistant' && (
+              <motion.div
+                layoutId="roleActivePill"
+                className="absolute inset-0 bg-white rounded-xl shadow-sm border border-slate-200/70"
+                transition={{ type: "spring", stiffness: 450, damping: 32 }}
+              />
+            )}
+            <span
+              className={`relative z-10 material-symbols-outlined text-[18px] transition-colors ${
+                role === 'assistant' ? 'text-teal-600' : 'text-slate-400'
+              }`}
+            >
+              assignment_ind
+            </span>
+            <span className="relative z-10 tracking-tight">Assistante</span>
           </button>
         </div>
       </div>
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        {error && (
-          <div className="text-red-600 bg-red-50 p-3 rounded-lg text-sm font-medium border-l-4 border-red-500">
-            {error}
-          </div>
-        )}
+      {/* 2. Badges Démo Chic & Discrets */}
+      <div className="flex items-center justify-between px-1 text-xs">
+        <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+          <span className="material-symbols-outlined text-xs text-amber-500">bolt</span>
+          Accès rapide :
+        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => handleRoleSelect('doctor')}
+            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all border ${
+              role === 'doctor'
+                ? 'bg-sky-50 text-sky-700 border-sky-200 shadow-xs'
+                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            Dr. Vance
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRoleSelect('assistant')}
+            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all border ${
+              role === 'assistant'
+                ? 'bg-teal-50 text-teal-700 border-teal-200 shadow-xs'
+                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            Sarah
+          </button>
+        </div>
+      </div>
 
+      {/* Message d'erreur */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex items-center gap-2 p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium shadow-xs"
+          >
+            <span className="material-symbols-outlined text-sm text-red-500">error</span>
+            <span>{error}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Formulaire */}
+      <form className="space-y-3" onSubmit={handleSubmit}>
+        {/* Email avec Focus Glow */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="email-field">Adresse Email</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <span className="material-symbols-outlined text-lg">mail</span>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1" htmlFor="email-field">
+            Identifiant
+          </label>
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-slate-800 transition-colors">
+              <span className="material-symbols-outlined text-[18px]">alternate_email</span>
             </div>
-            <input 
+            <input
               id="email-field"
-              type="email" 
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="votre.email@cabinet.com" 
-              required 
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 bg-slate-50/50 text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
+              placeholder="adresse@cabinet.com"
+              required
+              className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-slate-900 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500 transition-all shadow-xs"
             />
           </div>
         </div>
 
+        {/* Mot de passe */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="password-field">Mot de passe</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <span className="material-symbols-outlined text-lg">lock</span>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500" htmlFor="password-field">
+              Mot de passe
+            </label>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                alert("Identifiants par défaut : medecin@cabinet.com ou assistante@cabinet.com / password123");
+              }}
+              className="text-[11px] font-medium text-slate-400 hover:text-slate-600 transition"
+            >
+              Oublié ?
+            </a>
+          </div>
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-slate-800 transition-colors">
+              <span className="material-symbols-outlined text-[18px]">lock</span>
             </div>
-            <input 
+            <input
               id="password-field"
               type={isPasswordVisible ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••" 
-              required 
-              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 bg-slate-50/50 text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors"
+              placeholder="••••••••"
+              required
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-slate-900 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500 transition-all shadow-xs"
             />
-            <button 
+            <button
               type="button"
               onClick={() => setIsPasswordVisible(!isPasswordVisible)}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
             >
-              <span className="material-symbols-outlined text-lg">
+              <span className="material-symbols-outlined text-[18px]">
                 {isPasswordVisible ? 'visibility_off' : 'visibility'}
               </span>
             </button>
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-1">
+        {/* Checkbox */}
+        <div className="flex items-center pt-0.5">
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" className="w-4 h-4 rounded text-sky-600 border-slate-300 focus:ring-sky-500" defaultChecked />
-            <span className="text-xs text-slate-600">Se souvenir de moi</span>
+            <input
+              type="checkbox"
+              className="w-3.5 h-3.5 rounded text-slate-900 border-slate-300 focus:ring-slate-900 cursor-pointer"
+              defaultChecked
+            />
+            <span className="text-[11px] text-slate-500 font-medium">Mémoriser la session sur cet appareil</span>
           </label>
-          <a href="#" onClick={(e) => e.preventDefault()} className="text-xs font-medium text-sky-600 hover:text-sky-700 transition">Mot de passe oublié ?</a>
         </div>
 
+        {/* Bouton de Connexion Exécutif Chic avec Reflet */}
         <div className="pt-2">
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isLoading}
-            className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl text-white text-sm font-semibold shadow-sm transition duration-150 cursor-pointer disabled:opacity-70 ${
-              role === 'doctor' ? 'bg-sky-600 hover:bg-sky-700 active:scale-[0.99]' : 'bg-teal-600 hover:bg-teal-700 active:scale-[0.99]'
+            className={`w-full group relative overflow-hidden flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-white font-bold text-xs tracking-wide shadow-md transition-all duration-200 cursor-pointer disabled:opacity-70 ${
+              role === 'doctor'
+                ? 'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 hover:from-slate-800 hover:to-slate-900 shadow-slate-900/20 active:scale-[0.99]'
+                : 'bg-gradient-to-b from-teal-900 via-teal-800 to-teal-950 hover:from-teal-800 hover:to-teal-900 shadow-teal-900/20 active:scale-[0.99]'
             }`}
           >
-            <span>{isLoading ? 'Authentification...' : `Connexion ${role === 'doctor' ? 'Médecin' : 'Assistante'}`}</span>
-            <span className="material-symbols-outlined text-lg">arrow_forward</span>
+            {/* Liseré supérieur réfléchissant */}
+            <div className="absolute inset-x-0 top-0 h-px bg-white/20 pointer-events-none" />
+
+            {isLoading ? (
+              <>
+                <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                <span>Authentification en cours...</span>
+              </>
+            ) : (
+              <>
+                <span>Ouvrir l'Espace {role === 'doctor' ? 'Médecin' : 'Assistante'}</span>
+                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">
+                  arrow_forward
+                </span>
+              </>
+            )}
           </button>
         </div>
       </form>
