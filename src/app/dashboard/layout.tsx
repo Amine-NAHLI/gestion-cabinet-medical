@@ -8,7 +8,8 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role || "assistant";
+  const user = session?.user as { role?: string } | undefined;
+  const role = user?.role || "assistant";
 
   const todayStr = new Date().toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -48,7 +49,7 @@ export default async function DashboardLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-slate-500 text-xs font-medium capitalize hidden sm:flex">
+          <div className="hidden sm:flex items-center gap-3 text-slate-500 text-xs font-medium capitalize">
             <span className="material-symbols-outlined text-base text-slate-400">
               calendar_today
             </span>
