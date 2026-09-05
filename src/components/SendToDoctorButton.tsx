@@ -2,6 +2,7 @@
 
 import { sendPatientToDoctor } from "@/actions/patients";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 export default function SendToDoctorButton({ visitId }: { visitId: number }) {
   const [loading, setLoading] = useState(false);
@@ -13,13 +14,15 @@ export default function SendToDoctorButton({ visitId }: { visitId: number }) {
   }
 
   return (
-    <button 
+    <motion.button 
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       onClick={handleSend}
       disabled={loading}
-      className="bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+      className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-semibold text-xs tracking-wide uppercase transition-all shadow-xs hover:shadow-md hover:shadow-emerald-600/20 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
     >
-      <span className="material-symbols-outlined text-sm">send</span>
+      <span className="material-symbols-outlined text-base">login</span>
       {loading ? "Envoi..." : "Faire entrer"}
-    </button>
+    </motion.button>
   );
 }
