@@ -1,5 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+import { redirect } from "next/navigation";
+import { getClinicSettings } from "@/actions/settings";
 import BottomNav from "@/components/BottomNav";
 
 export default async function DashboardLayout({
@@ -8,8 +10,13 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
-  const user = session?.user as { role?: string } | undefined;
+  if (!session) {
+    redirect("/login");
+  }
+
+  const user = session?.user as { role?: string; name?: string } | undefined;
   const role = user?.role || "assistant";
+  const settings = await getClinicSettings();
 
   const todayStr = new Date().toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -35,7 +42,7 @@ export default async function DashboardLayout({
             </div>
             <div>
               <span className="font-bold text-slate-900 text-lg tracking-tight">
-                MediCabinet
+                {settings?.clinicName || "MediCabinet"}
               </span>
               <span
                 className={`ml-2.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
@@ -49,11 +56,13 @@ export default async function DashboardLayout({
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-3 text-slate-500 text-xs font-medium capitalize">
-            <span className="material-symbols-outlined text-base text-slate-400">
-              calendar_today
-            </span>
-            <span>{todayStr}</span>
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 text-slate-500 text-xs font-semibold capitalize">
+              <span className="material-symbols-outlined text-base text-slate-400">
+                calendar_today
+              </span>
+              <span>{todayStr}</span>
+            </div>
           </div>
         </div>
       </header>

@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/authOptions";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { visits, patients, prescriptions } from "@/db/schema";
+import { getClinicSettings } from "@/actions/settings";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import ConsultationClient from "./ConsultationClient";
@@ -30,6 +31,7 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
   const hasPrescription = prescriptionArray.length > 0;
   const initialMedicines = hasPrescription ? (prescriptionArray[0].medicines as { name: string; instructions: string }[]) : [];
 
+  const settings = await getClinicSettings();
   const initials = `${visit.patients.firstName[0] || ""}${visit.patients.lastName[0] || ""}`.toUpperCase();
 
   return (
@@ -48,6 +50,11 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
               <span className="px-2.5 py-0.5 rounded-full bg-sky-50 border border-sky-200/70 text-sky-700 text-xs font-bold">
                 Dossier #{visit.visits.id}
               </span>
+              {visit.patients.cin && (
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-bold">
+                  {visit.patients.cin}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-500 font-medium mt-1">
               <span>{visit.patients.age} ans</span>
@@ -56,7 +63,7 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
               {visit.patients.mutuelle && (
                 <>
                   <span>•</span>
-                  <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                  <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-700 font-bold text-[11px]">
                     {visit.patients.mutuelle}
                   </span>
                 </>
@@ -75,7 +82,14 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
       </div>
 
       {/* Interface interactive (Dossier, Ordonnance, Facturation) */}
-      <ConsultationClient visitId={visitId} initialData={visit.visits} patient={visit.patients} hasPrescription={hasPrescription} initialMedicines={initialMedicines} />
+      <ConsultationClient 
+        visitId={visitId} 
+        initialData={visit.visits} 
+        patient={visit.patients} 
+        hasPrescription={hasPrescription} 
+        initialMedicines={initialMedicines} 
+        settings={settings}
+      />
     </div>
   );
 }

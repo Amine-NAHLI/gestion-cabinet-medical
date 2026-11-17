@@ -11,26 +11,37 @@ export type VisitData = {
   amountToPay: number;
   hasCustomAmount?: boolean;
   createdAt: string;
+  paidAt?: string | null;
+  paymentMethod?: string | null;
   patientAge: number;
   patientFirstName?: string;
   patientLastName?: string;
   disease?: string | null;
+  diagnosis?: string | null;
   paymentStatus?: string;
   status?: string;
 };
 
 export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
-  const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'all'>('week');
+  // Déterminer la période initiale : si aucune visite cette semaine, ouvrir sur 'all' pour afficher l'historique complet
+  const initialPeriod = useMemo<'day' | 'week' | 'month' | 'all'>(() => {
+    const now = new Date();
+    const last7Days = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    const hasRecent = rawVisits.some(v => new Date(v.paidAt || v.createdAt) >= last7Days);
+    return hasRecent ? 'week' : 'all';
+  }, [rawVisits]);
+
+  const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'all'>(initialPeriod);
   const [isExporting, setIsExporting] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  // 1. Filtrer les consultations selon la période sélectionnée
+  // 1. Filtrer les consultations selon la période sélectionnée (en prenant en compte la date de paiement ou de visite)
   const filteredVisits = useMemo(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     return rawVisits.filter(v => {
-      const visitDate = new Date(v.createdAt);
+      const visitDate = new Date(v.paidAt || v.createdAt);
       if (period === 'day') {
         return visitDate >= today;
       } else if (period === 'week') {
@@ -88,7 +99,8 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
       // Sommer les revenus payés
       filteredVisits.forEach(v => {
         if (v.paymentStatus === 'paid') {
-          const key = new Date(v.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+          const effectiveDate = new Date(v.paidAt || v.createdAt);
+          const key = effectiveDate.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
           if (dateMap[key] !== undefined) {
             dateMap[key] += v.amountToPay;
           }
@@ -104,7 +116,8 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
 
       filteredVisits.forEach(v => {
         if (v.paymentStatus === 'paid') {
-          const hour = new Date(v.createdAt).getHours();
+          const effectiveDate = new Date(v.paidAt || v.createdAt);
+          const hour = effectiveDate.getHours();
           const bucket = hours.find(h => parseInt(h) >= hour) || '20h';
           dateMap[bucket] = (dateMap[bucket] || 0) + v.amountToPay;
         }
@@ -122,24 +135,26 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
 
       filteredVisits.forEach(v => {
         if (v.paymentStatus === 'paid') {
-          const key = new Date(v.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+          const effectiveDate = new Date(v.paidAt || v.createdAt);
+          const key = effectiveDate.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
           if (dateMap[key] !== undefined) {
             dateMap[key] += v.amountToPay;
           }
         }
       });
     } else {
-      // 'all' : Grouper par date existante ou mois
+      // 'all' : Grouper par date réelle
       filteredVisits.forEach(v => {
         if (v.paymentStatus === 'paid') {
-          const key = new Date(v.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+          const effectiveDate = new Date(v.paidAt || v.createdAt);
+          const key = effectiveDate.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
           dateMap[key] = (dateMap[key] || 0) + v.amountToPay;
         }
       });
       Object.keys(dateMap).forEach(k => labels.push(k));
       if (labels.length === 0) {
-        labels.push("Aujourd'hui");
-        dateMap["Aujourd'hui"] = 0;
+        labels.push("Historique");
+        dateMap["Historique"] = 0;
       }
     }
 

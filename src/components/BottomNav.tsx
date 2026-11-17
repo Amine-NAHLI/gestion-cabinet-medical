@@ -36,6 +36,14 @@ export default function BottomNav({ role = "assistant", user }: BottomNavProps) 
       color: "text-amber-600 bg-amber-50",
       activeBg: "bg-amber-600 text-white shadow-amber-500/25",
     },
+    {
+      href: "/dashboard/patients",
+      label: "Patients",
+      icon: "folder_shared",
+      exact: false,
+      color: "text-blue-600 bg-blue-50",
+      activeBg: "bg-blue-600 text-white shadow-blue-500/25",
+    },
     ...(role === "assistant"
       ? [
           {
@@ -71,6 +79,14 @@ export default function BottomNav({ role = "assistant", user }: BottomNavProps) 
       exact: false,
       color: "text-violet-600 bg-violet-50",
       activeBg: "bg-violet-600 text-white shadow-violet-500/25",
+    },
+    {
+      href: "/dashboard/settings",
+      label: "Paramètres",
+      icon: "settings",
+      exact: false,
+      color: "text-slate-600 bg-slate-50",
+      activeBg: "bg-slate-800 text-white shadow-slate-900/25",
     },
   ];
 
@@ -110,7 +126,7 @@ export default function BottomNav({ role = "assistant", user }: BottomNavProps) 
                   }`}
                 >
                   <span
-                    className={`material-symbols-outlined text-[22px] transition-transform duration-200 ${
+                    className={`material-symbols-outlined text-[20px] transition-transform duration-200 ${
                       isActive ? "scale-110" : "group-hover:scale-110"
                     }`}
                   >
@@ -183,7 +199,7 @@ export default function BottomNav({ role = "assistant", user }: BottomNavProps) 
           {/* Logout Button */}
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex items-center gap-1.5 p-2 rounded-2xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors focus:outline-none group"
+            className="flex items-center gap-1.5 p-2 rounded-2xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors focus:outline-none group cursor-pointer"
             title="Déconnexion"
           >
             <span className="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">

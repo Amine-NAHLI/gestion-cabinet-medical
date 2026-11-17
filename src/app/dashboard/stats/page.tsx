@@ -3,13 +3,18 @@ import { visits, patients } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import StatsCharts from "./StatsCharts";
 
+export const dynamic = "force-dynamic";
+
 export default async function StatsPage() {
-  // Fetch all finished visits and patients for comprehensive statistics
+  // Récupérer toutes les consultations terminées avec les patients et les dates de paiement
   const allVisits = await db.select({
     id: visits.id,
     amountToPay: visits.amountToPay,
     createdAt: visits.createdAt,
+    paidAt: visits.paidAt,
+    paymentMethod: visits.paymentMethod,
     disease: visits.disease,
+    diagnosis: visits.diagnosis,
     paymentStatus: visits.paymentStatus,
     status: visits.status,
     patientFirstName: patients.firstName,
@@ -19,20 +24,25 @@ export default async function StatsPage() {
     .innerJoin(patients, eq(visits.patientId, patients.id))
     .where(eq(visits.status, 'finished'));
 
-  // Serialize dates and ensure clean numeric amounts
+  // Sérialisation propre des dates et montants pour le client
   const clientVisits = allVisits.map(v => ({
     ...v,
     amountToPay: v.amountToPay ? parseFloat(v.amountToPay as string) : 0,
     hasCustomAmount: v.amountToPay !== null && v.amountToPay !== undefined,
-    createdAt: v.createdAt.toISOString()
+    createdAt: v.createdAt.toISOString(),
+    paidAt: v.paidAt ? v.paidAt.toISOString() : null,
   }));
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 border border-violet-200/80 text-[11px] font-bold uppercase tracking-wider text-violet-700 mb-2">
+            <span className="material-symbols-outlined text-xs">analytics</span>
+            Indicateurs & Performance Clinique
+          </div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Statistiques & Analyse Financière</h1>
-          <p className="text-slate-500 text-sm mt-1">Indicateurs de performance, facturation et activité du cabinet médical.</p>
+          <p className="text-slate-500 text-sm mt-0.5">Indicateurs de performance, facturation, répartition des pathologies et activité du cabinet.</p>
         </div>
       </div>
 

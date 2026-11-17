@@ -3,46 +3,205 @@
 import { db } from "@/db";
 import { patients, visits } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { ilike, or, eq } from "drizzle-orm";
+import { ilike, or, eq, desc, and } from "drizzle-orm";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/authOptions";
 
 export async function addPatientAndVisit(formData: FormData) {
-  const firstName = formData.get("firstName") as string;
-  const lastName = formData.get("lastName") as string;
-  const phone = formData.get("phone") as string;
-  const age = parseInt(formData.get("age") as string);
-  const mutuelle = formData.get("mutuelle") as string;
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return { success: false, error: "Non autorisé" };
+  }
+
+  const firstName = (formData.get("firstName") as string || "").trim();
+  const lastName = (formData.get("lastName") as string || "").trim();
+  const phone = (formData.get("phone") as string || "").trim();
+  const age = parseInt(formData.get("age") as string) || 0;
+  const mutuelle = (formData.get("mutuelle") as string || "").trim() || null;
+  const cin = (formData.get("cin") as string || "").trim() || null;
+  const gender = (formData.get("gender") as string || "M").trim();
+  const bloodGroup = (formData.get("bloodGroup") as string || "").trim() || null;
+  const allergies = (formData.get("allergies") as string || "").trim() || null;
+  const antecedents = (formData.get("antecedents") as string || "").trim() || null;
 
   try {
-    const [newPatient] = await db.insert(patients).values({
-      firstName,
-      lastName,
-      phone,
-      age,
-      mutuelle: mutuelle || null,
-    }).returning();
+    // Vérifier si un patient existe déjà avec ce CIN ou ce numéro de téléphone
+    let targetPatientId: number | null = null;
+    
+    if (cin) {
+      const existingCin = await db.select().from(patients).where(eq(patients.cin, cin)).limit(1);
+      if (existingCin.length > 0) {
+        targetPatientId = existingCin[0].id;
+      }
+    }
 
+    if (!targetPatientId && phone) {
+      const existingPhone = await db.select().from(patients).where(
+        and(eq(patients.phone, phone), ilike(patients.lastName, lastName))
+      ).limit(1);
+      if (existingPhone.length > 0) {
+        targetPatientId = existingPhone[0].id;
+      }
+    }
+
+    // Si le patient n'existe pas, on le crée
+    if (!targetPatientId) {
+      const [newPatient] = await db.insert(patients).values({
+        firstName,
+        lastName,
+        phone,
+        age,
+        mutuelle,
+        cin,
+        gender,
+        bloodGroup,
+        allergies,
+        antecedents,
+      }).returning();
+      targetPatientId = newPatient.id;
+    } else {
+      // Mettre à jour les éventuelles nouvelles informations
+      await db.update(patients).set({
+        phone: phone || undefined,
+        age: age || undefined,
+        mutuelle: mutuelle || undefined,
+        cin: cin || undefined,
+        allergies: allergies || undefined,
+        antecedents: antecedents || undefined,
+      }).where(eq(patients.id, targetPatientId));
+    }
+
+    // Créer la visite en salle d'attente
     await db.insert(visits).values({
-      patientId: newPatient.id,
+      patientId: targetPatientId,
       status: "waiting",
+      isAppointment: false,
     });
 
     revalidatePath("/dashboard", "layout");
-    return { success: true };
+    revalidatePath("/dashboard/queue");
+    revalidatePath("/dashboard/patients");
+    return { success: true, patientId: targetPatientId };
   } catch (error) {
-    console.error("Erreur lors de l'ajout:", error);
+    console.error("Erreur lors de l'enregistrement du patient:", error);
     return { success: false, error: "Erreur lors de l'enregistrement." };
   }
 }
 
+export async function createVisitForExistingPatient(patientId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return { success: false, error: "Non autorisé" };
+  }
+
+  try {
+    await db.insert(visits).values({
+      patientId,
+      status: "waiting",
+      isAppointment: false,
+    });
+
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/queue");
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur mise en file du patient existant:", error);
+    return { success: false, error: "Impossible de mettre le patient en file d'attente." };
+  }
+}
+
+export async function searchPatients(query: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  try {
+    const list = await db.select().from(patients).where(
+      or(
+        ilike(patients.lastName, `%${trimmed}%`),
+        ilike(patients.firstName, `%${trimmed}%`),
+        ilike(patients.phone, `%${trimmed}%`),
+        ilike(patients.cin, `%${trimmed}%`)
+      )
+    ).limit(10);
+
+    return list;
+  } catch (error) {
+    console.error("Erreur recherche patients:", error);
+    return [];
+  }
+}
+
+export async function updatePatient(patientId: number, formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
+  const firstName = (formData.get("firstName") as string || "").trim();
+  const lastName = (formData.get("lastName") as string || "").trim();
+  const phone = (formData.get("phone") as string || "").trim();
+  const age = parseInt(formData.get("age") as string) || 0;
+  const mutuelle = (formData.get("mutuelle") as string || "").trim() || null;
+  const cin = (formData.get("cin") as string || "").trim() || null;
+  const bloodGroup = (formData.get("bloodGroup") as string || "").trim() || null;
+  const allergies = (formData.get("allergies") as string || "").trim() || null;
+  const antecedents = (formData.get("antecedents") as string || "").trim() || null;
+  const address = (formData.get("address") as string || "").trim() || null;
+
+  try {
+    await db.update(patients).set({
+      firstName,
+      lastName,
+      phone,
+      age,
+      mutuelle,
+      cin,
+      bloodGroup,
+      allergies,
+      antecedents,
+      address,
+    }).where(eq(patients.id, patientId));
+
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/patients");
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur mise à jour dossier patient:", error);
+    return { success: false, error: "Erreur lors de la mise à jour." };
+  }
+}
+
 export async function sendPatientToDoctor(visitId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
   try {
     await db.update(visits)
       .set({ status: 'ready' })
       .where(eq(visits.id, visitId));
     revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/queue");
     return { success: true };
   } catch (error) {
     console.error("Erreur d'envoi au médecin:", error);
     return { success: false, error: "Erreur lors de la mise à jour du statut." };
+  }
+}
+
+export async function cancelVisit(visitId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
+  try {
+    await db.update(visits)
+      .set({ status: 'cancelled' })
+      .where(eq(visits.id, visitId));
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/queue");
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur annulation visite:", error);
+    return { success: false, error: "Erreur lors de l'annulation de la visite." };
   }
 }

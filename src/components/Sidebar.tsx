@@ -24,7 +24,7 @@ export default async function Sidebar() {
 
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         <div className="mb-4 mt-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Consultations
+          Cabinet & Flux
         </div>
 
         <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
@@ -37,6 +37,11 @@ export default async function Sidebar() {
           <span>File d'attente</span>
         </MotionLink>
 
+        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/patients" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+          <span className="material-symbols-outlined text-slate-400 group-hover:text-blue-500 transition-colors">folder_shared</span>
+          <span>Dossiers Patients</span>
+        </MotionLink>
+
         {role === 'assistant' && (
           <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/payments" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
             <span className="material-symbols-outlined text-slate-400 group-hover:text-teal-500 transition-colors">payments</span>
@@ -45,11 +50,11 @@ export default async function Sidebar() {
         )}
 
         <div className="mb-4 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Données
+          Données & Planning
         </div>
 
         <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
-          <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-500 transition-colors">history</span>
+          <span className="material-symbols-outlined text-slate-400 group-hover:text-indigo-500 transition-colors">history</span>
           <span>Historique</span>
         </MotionLink>
 
@@ -58,12 +63,14 @@ export default async function Sidebar() {
           <span>Rendez-vous</span>
         </MotionLink>
 
-        <div className="mb-4 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Cabinet
-        </div>
         <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/stats" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
-          <span className="material-symbols-outlined text-slate-400 group-hover:text-sky-500 transition-colors">bar_chart</span>
+          <span className="material-symbols-outlined text-slate-400 group-hover:text-violet-500 transition-colors">bar_chart</span>
           <span>Statistiques</span>
+        </MotionLink>
+
+        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+          <span className="material-symbols-outlined text-slate-400 group-hover:text-slate-800 transition-colors">settings</span>
+          <span>Paramètres</span>
         </MotionLink>
       </nav>
 

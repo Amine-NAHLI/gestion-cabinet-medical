@@ -2,23 +2,30 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
 import { appointments, patients } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, desc, not } from "drizzle-orm";
 import TransformAppointmentButton from "@/components/TransformAppointmentButton";
+import AddAppointmentModal from "@/components/AddAppointmentModal";
 import { MotionDiv } from "@/components/MotionWrapper";
+
+export const dynamic = "force-dynamic";
 
 export default async function AppointmentsPage() {
   const session = await getServerSession(authOptions);
   const user = session?.user as { role?: string } | undefined;
   const role = user?.role;
 
-  // Récupérer les rendez-vous triés par date
+  // Récupérer les rendez-vous actifs triés chronologiquement
   const appointmentsList = await db.select({
       id: appointments.id,
       date: appointments.date,
+      time: appointments.time,
+      reason: appointments.reason,
+      status: appointments.status,
       patient: patients
     })
     .from(appointments)
     .innerJoin(patients, eq(appointments.patientId, patients.id))
+    .where(not(eq(appointments.status, 'cancelled')))
     .orderBy(asc(appointments.date));
 
   return (
@@ -30,28 +37,25 @@ export default async function AppointmentsPage() {
             <span className="material-symbols-outlined text-xs text-indigo-600">calendar_month</span>
             Planning & Réservations
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Rendez-vous prévus</h1>
-          <p className="text-slate-500 text-sm mt-1">Consultations et visites médicales programmées à l&apos;avance.</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Rendez-vous programmés</h1>
+          <p className="text-slate-500 text-sm mt-1">Planification des consultations à venir et gestion du carnet du cabinet.</p>
         </div>
 
-        <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-            <span className="material-symbols-outlined text-xl">event_available</span>
-          </div>
-          <div>
-            <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Total planifiés</div>
-            <div className="text-lg font-extrabold text-slate-900">{appointmentsList.length} RDV</div>
-          </div>
+        <div className="flex items-center gap-3">
+          <AddAppointmentModal />
         </div>
       </div>
 
       {/* Main Container */}
       <div className="bg-white rounded-3xl shadow-xs border border-slate-200/80 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h2 className="text-base font-bold text-slate-800 flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
             Carnet des rendez-vous ({appointmentsList.length})
           </h2>
+          <span className="text-xs font-semibold text-slate-500">
+            {appointmentsList.filter(a => a.status === 'scheduled').length} en attente
+          </span>
         </div>
         
         <div>
@@ -61,7 +65,7 @@ export default async function AppointmentsPage() {
                 <span className="material-symbols-outlined text-3xl">event_busy</span>
               </div>
               <h3 className="font-bold text-slate-800 text-sm">Aucun rendez-vous planifié</h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm">Les futures réservations ajoutées apparaîtront ici chronologiquement.</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm">Utilisez le bouton "Nouveau Rendez-vous" pour programmer une consultation.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -76,22 +80,29 @@ export default async function AppointmentsPage() {
                   day: 'numeric'
                 });
 
+                const isAdmitted = appt.status === 'admitted';
+
                 return (
                   <MotionDiv 
                     key={appt.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.03 }}
-                    className="p-5 sm:p-6 hover:bg-slate-50/70 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                    className={`p-5 sm:p-6 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${
+                      isAdmitted ? "bg-slate-50/40 opacity-75" : "hover:bg-slate-50/70"
+                    }`}
                   >
                     <div className="flex items-center gap-4">
-                      {/* Date Block */}
-                      <div className="w-13 h-13 rounded-2xl bg-linear-to-b from-indigo-50 to-indigo-100/70 border border-indigo-200/80 flex flex-col items-center justify-center text-indigo-900 shadow-xs">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600">
+                      {/* Date & Time Block */}
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 border border-indigo-200/80 flex flex-col items-center justify-center text-indigo-900 shadow-xs">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 leading-none">
                           {monthName}
                         </span>
-                        <span className="text-lg font-extrabold leading-none">
+                        <span className="text-lg font-black leading-tight">
                           {dayNumber}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-indigo-700 leading-none">
+                          {appt.time || "09:00"}
                         </span>
                       </div>
 
@@ -100,31 +111,47 @@ export default async function AppointmentsPage() {
                       </div>
 
                       <div>
-                        <h3 className="font-bold text-slate-900 text-base group-hover:text-indigo-700 transition-colors">
-                          {appt.patient.lastName} {appt.patient.firstName}
-                        </h3>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-                          <span className="capitalize font-medium">{fullDate}</span>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-slate-900 text-base group-hover:text-indigo-700 transition-colors">
+                            {appt.patient.lastName} {appt.patient.firstName}
+                          </h3>
+                          {appt.reason && (
+                            <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-200/50">
+                              {appt.reason}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
+                          <span className="capitalize font-semibold text-slate-700">{fullDate} à {appt.time || "09:00"}</span>
                           <span>•</span>
                           <span>{appt.patient.age} ans</span>
                           {appt.patient.phone && (
                             <>
                               <span>•</span>
-                              <span>{appt.patient.phone}</span>
+                              <span>Tél : {appt.patient.phone}</span>
                             </>
                           )}
                         </div>
                       </div>
                     </div>
                     
-                    <div className="flex items-center justify-end">
-                      {role === 'assistant' && (
-                        <TransformAppointmentButton appointmentId={appt.id} patientId={appt.patient.id} />
-                      )}
-                      {role === 'doctor' && (
-                        <span className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200/70 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider">
-                          Confirmé
+                    <div className="flex items-center justify-end gap-2">
+                      {isAdmitted ? (
+                        <span className="px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Admis au cabinet
                         </span>
+                      ) : (
+                        <>
+                          {role === 'assistant' && (
+                            <TransformAppointmentButton appointmentId={appt.id} patientId={appt.patient.id} />
+                          )}
+                          {role === 'doctor' && (
+                            <span className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200/70 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider">
+                              Confirmé
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   </MotionDiv>

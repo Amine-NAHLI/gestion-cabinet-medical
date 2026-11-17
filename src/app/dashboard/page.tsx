@@ -1,16 +1,22 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
+import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { visits, patients, appointments } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import AddPatientModal from "@/components/AddPatientModal";
+import AddAppointmentModal from "@/components/AddAppointmentModal";
 import { MotionDiv } from "@/components/MotionWrapper";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardIndex() {
   const session = await getServerSession(authOptions);
+  if (!session) {
+    redirect("/login");
+  }
+
   const role = (session?.user as any)?.role;
 
   // Récupération globale pour les stats
@@ -53,19 +59,20 @@ export default async function DashboardIndex() {
               Gestion du Cabinet
             </h1>
             <p className="text-slate-500 text-sm mt-0.5">
-              Suivi en temps réel de la salle d&apos;attente et des flux patients.
+              Suivi en temps réel de la salle d'attente et des flux patients.
             </p>
           </div>
 
           {/* Actions rapides */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <AddPatientModal />
+            <AddAppointmentModal />
             <Link
               href="/dashboard/queue"
-              className="flex items-center gap-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm shadow-xs transition-all"
+              className="flex items-center gap-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider shadow-xs transition-all"
             >
-              <span className="material-symbols-outlined text-lg text-slate-500">queue</span>
-              <span>Salle d&apos;attente</span>
+              <span className="material-symbols-outlined text-base text-slate-500">queue</span>
+              <span>Salle d'attente</span>
             </Link>
           </div>
         </div>
@@ -107,7 +114,7 @@ export default async function DashboardIndex() {
                 <span className="material-symbols-outlined text-2xl">check_circle</span>
               </div>
               <span className="text-[11px] font-bold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200/60">
-                Aujourd&apos;hui
+                Aujourd'hui
               </span>
             </div>
             <div>
@@ -157,7 +164,7 @@ export default async function DashboardIndex() {
           Cabinet Médical
         </h1>
         <p className="text-slate-500 text-sm mt-0.5">
-          Vue d&apos;ensemble clinique et consultations de la journée.
+          Vue d'ensemble clinique et consultations de la journée.
         </p>
       </div>
 
@@ -182,7 +189,7 @@ export default async function DashboardIndex() {
           
           {readyPatient ? (
             <div className="bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/60 border border-emerald-200/90 p-8 rounded-3xl shadow-sm relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-600"></div>
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-600" />
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl shadow-md shadow-emerald-600/20">
@@ -193,14 +200,14 @@ export default async function DashboardIndex() {
                       {readyPatient.patient.lastName} {readyPatient.patient.firstName}
                     </h3>
                     <p className="text-xs text-slate-500 mt-1 font-medium">
-                      Patient envoyé par l&apos;assistante • {readyPatient.patient.age ? `${readyPatient.patient.age} ans` : "Âge non précisé"}
+                      Patient envoyé par l'assistante • {readyPatient.patient.age ? `${readyPatient.patient.age} ans` : "Âge non précisé"}
                     </p>
                   </div>
                 </div>
 
                 <Link
                   href={`/dashboard/consultation/${readyPatient.id}`}
-                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-7 py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md hover:shadow-lg active:scale-[0.99]"
+                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-7 py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md hover:shadow-lg active:scale-[0.99] cursor-pointer"
                 >
                   <span>Démarrer la consultation</span>
                   <span className="material-symbols-outlined text-lg">arrow_forward</span>
@@ -214,7 +221,7 @@ export default async function DashboardIndex() {
               </div>
               <h3 className="text-lg font-bold text-slate-800">Aucun patient en attente directe</h3>
               <p className="text-xs text-slate-500 max-w-xs mt-1">
-                L&apos;assistante vous enverra le prochain patient dès qu&apos;il sera prêt.
+                L'assistante vous enverra le prochain patient dès qu'il sera prêt.
               </p>
             </div>
           )}
@@ -275,7 +282,7 @@ export default async function DashboardIndex() {
                   <span className="material-symbols-outlined text-xl">hourglass_empty</span>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500">En salle d&apos;attente</p>
+                  <p className="text-xs font-semibold text-slate-500">En salle d'attente</p>
                   <h4 className="text-xl font-bold text-slate-900">{waitingCount}</h4>
                 </div>
               </div>

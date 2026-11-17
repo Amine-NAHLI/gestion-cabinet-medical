@@ -1,0 +1,43 @@
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/authOptions";
+import { getClinicSettings } from "@/actions/settings";
+import SettingsClient from "./SettingsClient";
+
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+  const session = await getServerSession(authOptions);
+  const settings = await getClinicSettings();
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-2">
+          <span className="material-symbols-outlined text-xs">tune</span>
+          Configuration Système
+        </div>
+        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+          Paramètres du Cabinet
+        </h1>
+        <p className="text-slate-500 text-sm mt-0.5">
+          Personnalisez les coordonnées du praticien, les mentions déontologiques et les en-têtes d'ordonnances.
+        </p>
+      </div>
+
+      <SettingsClient
+        initialSettings={{
+          clinicName: settings.clinicName,
+          doctorName: settings.doctorName,
+          specialty: settings.specialty,
+          phone: settings.phone,
+          email: settings.email,
+          address: settings.address,
+          city: settings.city,
+          orderNumber: settings.orderNumber,
+          taxId: settings.taxId,
+          defaultFee: settings.defaultFee as string | null,
+        }}
+      />
+    </div>
+  );
+}
