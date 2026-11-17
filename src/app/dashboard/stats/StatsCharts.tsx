@@ -324,7 +324,7 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text("MEDICABINET", 14, 15);
+      doc.text("MONCABINET", 14, 15);
 
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');

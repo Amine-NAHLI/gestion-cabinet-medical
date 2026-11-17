@@ -15,7 +15,7 @@ export default async function Sidebar() {
           <span className="material-symbols-outlined">{role === 'doctor' ? 'stethoscope' : 'assignment_ind'}</span>
         </div>
         <div>
-          <h1 className="font-bold text-slate-900 text-lg tracking-tight leading-none">MediCabinet</h1>
+          <h1 className="font-bold text-slate-900 text-lg tracking-tight leading-none">MonCabinet</h1>
           <p className={`text-xs font-medium mt-1 ${role === 'doctor' ? 'text-sky-600' : 'text-teal-600'}`}>
             Espace {role === 'doctor' ? 'Médecin' : 'Assistante'}
           </p>

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MediCare — Medical Clinic Management System",
-  description: "Manage patients, appointments and medical records",
+  title: "MonCabinet — Plateforme de Gestion Médicale pour Cabinets & Cliniques",
+  description: "Dossiers patients, consultations médicales, file d'attente et facturation pour cabinets médicaux au Maroc",
 };
 
 export default function RootLayout({

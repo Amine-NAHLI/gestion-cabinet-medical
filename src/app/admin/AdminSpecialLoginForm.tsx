@@ -214,7 +214,7 @@ export default function AdminSpecialLoginForm() {
         <div className="mt-6 pt-4 border-t border-slate-100 text-center">
           <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5 font-medium">
             <span className="material-symbols-outlined text-xs text-emerald-600">verified_user</span>
-            Console réservée au propriétaire de MediCabinet Platform
+            Console réservée au propriétaire de MonCabinet Platform
           </p>
         </div>
       </motion.div>

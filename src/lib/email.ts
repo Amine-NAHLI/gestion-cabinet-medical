@@ -60,7 +60,7 @@ export async function sendAdminOtpNotification(params: SendOtpNotificationParams
       <body>
         <div class="container">
           <div class="header">
-            <h1>MediCabinet SaaS</h1>
+            <h1>MonCabinet</h1>
             <p>Demande d'Activation de Nouveau Cabinet Médical</p>
           </div>
           <div class="content">
@@ -105,7 +105,7 @@ export async function sendAdminOtpNotification(params: SendOtpNotificationParams
             </div>
           </div>
           <div class="footer">
-            MediCabinet Platform • Notification sécurisée envoyée à l'administrateur
+            MonCabinet Platform • Notification sécurisée envoyée à l'administrateur
           </div>
         </div>
       </body>
@@ -115,7 +115,7 @@ export async function sendAdminOtpNotification(params: SendOtpNotificationParams
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: receiverEmail,
-      subject: `🔔 [MediCabinet] Code OTP: ${params.otpCode} • Dr. ${params.doctorName} (${params.clinicCity})`,
+      subject: `🔔 [MonCabinet] Code OTP: ${params.otpCode} • Dr. ${params.doctorName} (${params.clinicCity})`,
       html: emailHtml,
     });
 

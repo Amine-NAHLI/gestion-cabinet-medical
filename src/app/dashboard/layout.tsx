@@ -42,7 +42,7 @@ export default async function DashboardLayout({
             </div>
             <div>
               <span className="font-bold text-slate-900 text-lg tracking-tight">
-                {settings?.clinicName || "MediCabinet"}
+                {settings?.clinicName || "MonCabinet"}
               </span>
               <span
                 className={`ml-2.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${

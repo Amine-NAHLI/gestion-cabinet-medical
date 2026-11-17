@@ -112,7 +112,7 @@ export default function AdminDashboardClient({
   // Copier les identifiants pour WhatsApp / Email
   const copyCredentials = () => {
     if (!passwordModalUser || !newPassword) return;
-    const text = `🏥 *Identifiants MediCabinet*\n👤 *Nom:* ${passwordModalUser.name}\n📧 *Email:* ${passwordModalUser.email}\n🔑 *Nouveau Mot de passe:* ${newPassword}\n🔗 *Lien:* http://localhost:3000/login`;
+    const text = `🏥 *Identifiants MonCabinet*\n👤 *Nom:* ${passwordModalUser.name}\n📧 *Email:* ${passwordModalUser.email}\n🔑 *Nouveau Mot de passe:* ${newPassword}\n🔗 *Lien:* ${typeof window !== 'undefined' ? window.location.origin : ''}/login`;
     navigator.clipboard.writeText(text);
     setCopiedNotice(true);
     setTimeout(() => setCopiedNotice(false), 2500);
@@ -165,7 +165,7 @@ export default function AdminDashboardClient({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base tracking-tight text-slate-900">MediCabinet</span>
+              <span className="font-extrabold text-base tracking-tight text-slate-900">MonCabinet</span>
               <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-700">
                 Super Admin
               </span>

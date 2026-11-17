@@ -45,15 +45,10 @@ export default function LoginPage() {
       >
         {/* Brand Header */}
         <div className="text-center mb-7">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-teal-400 p-0.5 mx-auto mb-3.5 shadow-md shadow-sky-500/15">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-white">
-              <span className="material-symbols-outlined text-2xl text-sky-400">health_and_safety</span>
-            </div>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-            MediCabinet
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+            Mon<span className="text-sky-600">Cabinet</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1 font-normal">
+          <p className="text-xs text-slate-500 mt-1 font-medium">
             Système de Gestion Médicale pour Cabinets & Cliniques
           </p>
         </div>
@@ -90,7 +85,7 @@ export default function LoginPage() {
           <span>Support 24/7</span>
         </div>
         <p className="text-[10px] text-slate-300 mt-1">
-          © {new Date().getFullYear()} MediCabinet Platform. Tous droits réservés.
+          © {new Date().getFullYear()} MonCabinet. Tous droits réservés.
         </p>
       </footer>
     </div>

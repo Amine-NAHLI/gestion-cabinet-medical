@@ -507,7 +507,7 @@ export default function VerifyOtpClient() {
 
       {/* Footer Info */}
       <footer style={{ paddingTop: "2rem", paddingBottom: "1rem", textAlign: "center", fontSize: "0.75rem", color: "#94a3b8" }} className="pt-8 pb-4 text-center relative z-10 text-[11px] text-slate-400 font-medium">
-        MediCabinet Platform • Activation Sécurisée par Code à 6 Chiffres
+        MonCabinet Platform • Activation Sécurisée par Code à 6 Chiffres
       </footer>
     </div>
   );

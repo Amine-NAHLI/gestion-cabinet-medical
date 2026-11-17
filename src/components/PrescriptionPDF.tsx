@@ -36,7 +36,7 @@ export default function PrescriptionPDF({
   const address = settings?.address || "120 Boulevard d'Anfa";
   const city = settings?.city || "Casablanca";
   const phone = settings?.phone || "05 22 45 67 89";
-  const email = settings?.email || "contact@medicabinet.ma";
+  const email = settings?.email || "contact@moncabinet.ma";
   const orderNumber = settings?.orderNumber || "INPE: 045812903 • Ordre: 14209";
 
   const dateStr = date.toLocaleDateString("fr-FR", {
@@ -146,7 +146,7 @@ export default function PrescriptionPDF({
 
       {/* Mentions Bas de Page */}
       <div className="mt-16 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400">
-        <p>Ordonnance valable 3 mois sauf mention contraire • MediCabinet E-Santé</p>
+        <p>Ordonnance valable 3 mois sauf mention contraire • MonCabinet E-Santé</p>
       </div>
     </div>
   );

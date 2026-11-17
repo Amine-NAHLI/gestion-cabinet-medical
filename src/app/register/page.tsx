@@ -98,13 +98,12 @@ export default function RegisterPage() {
 
         {/* En-tête */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-teal-400 p-0.5 mx-auto mb-3 shadow-md shadow-sky-500/15">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-white">
-              <span className="material-symbols-outlined text-2xl text-sky-400">domain_add</span>
-            </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-50 border border-sky-200/80 text-sky-700 text-xs font-bold mb-3">
+            <span className="material-symbols-outlined text-sm">local_hospital</span>
+            MonCabinet • Inscription Praticien
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-            Inscription de votre Cabinet Médical
+            Créer votre Cabinet Médical
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md mx-auto">
             Renseignez les informations de votre pratique. Vous recevrez un code OTP à 6 chiffres pour activer votre cabinet en direct.
