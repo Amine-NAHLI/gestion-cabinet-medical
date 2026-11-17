@@ -31,9 +31,8 @@ export default function AdminSpecialLoginForm() {
         return;
       }
 
-      // Redirection immédiate sur /admin
-      router.push("/admin");
-      router.refresh();
+      // Redirection immédiate sur le panneau Super Admin
+      window.location.href = "/admin";
     } catch {
       setError("Erreur de connexion au serveur.");
       setIsLoading(false);

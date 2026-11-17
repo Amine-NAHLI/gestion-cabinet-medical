@@ -35,13 +35,10 @@ export default function LoginForm() {
       } else {
         const session = await getSession();
         if (session?.user?.role === "superadmin") {
-          router.push("/admin");
-        } else if (session?.user?.role === "assistant") {
-          router.push("/dashboard/assistante");
+          window.location.href = "/admin";
         } else {
-          router.push("/dashboard/medecin");
+          window.location.href = "/dashboard";
         }
-        router.refresh();
       }
     } catch {
       setError("Impossible de contacter le serveur d'authentification.");

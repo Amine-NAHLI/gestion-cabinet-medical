@@ -17,7 +17,11 @@ export async function sendAdminOtpNotification(params: SendOtpNotificationParams
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const receiverEmail = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || "nahli-ami@upf.ac.ma";
   const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
-  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")
+    ? process.env.NEXTAUTH_URL
+    : process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : (process.env.NEXTAUTH_URL || "http://localhost:3000");
 
   console.log(`[EMAIL] Préparation envoi OTP ${params.otpCode} pour Dr. ${params.doctorName} vers ${receiverEmail}...`);
 

@@ -54,6 +54,32 @@ export const authOptions: NextAuthOptions = {
         session.user.clinicId = token.clinicId as number | null;
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Déterminer l'URL canonique de production
+      let host = baseUrl;
+      if (process.env.VERCEL_URL) {
+        host = `https://${process.env.VERCEL_URL}`;
+      } else if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
+        host = process.env.NEXTAUTH_URL;
+      }
+
+      // Si URL relative, concaténer avec le domaine actuel
+      if (url.startsWith("/")) {
+        return `${host}${url}`;
+      }
+
+      // Si même origine ou domaine vercel
+      try {
+        const parsed = new URL(url);
+        if (parsed.origin === host || parsed.hostname.includes("vercel.app")) {
+          return url;
+        }
+      } catch {
+        return host;
+      }
+
+      return host;
     }
   },
   pages: {

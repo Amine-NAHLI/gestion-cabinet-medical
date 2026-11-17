@@ -146,6 +146,15 @@ export default function AdminDashboardClient({
     setActionLoading(null);
   };
 
+  // Déconnexion sécurisée sans dépendre de NEXTAUTH_URL
+  const handleAdminLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+    } finally {
+      window.location.href = "/admin";
+    }
+  };
+
   // Helper pour calculer le temps restant d'un code OTP
   const getTimeRemainingText = (expiresAtStr: string) => {
     const diffMs = new Date(expiresAtStr).getTime() - Date.now();
@@ -200,7 +209,7 @@ export default function AdminDashboardClient({
           </div>
 
           <button
-            onClick={() => signOut({ callbackUrl: "/admin" })}
+            onClick={handleAdminLogout}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">logout</span>

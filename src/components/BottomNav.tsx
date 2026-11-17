@@ -19,6 +19,14 @@ export default function BottomNav({ role = "assistant", user }: BottomNavProps) 
   const pathname = usePathname();
   const [isHovered, setIsHovered] = useState(false);
 
+  const handleLogout = async () => {
+    try {
+      await signOut({ redirect: false });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
+
   const navItems = [
     {
       href: "/dashboard",
@@ -198,7 +206,7 @@ export default function BottomNav({ role = "assistant", user }: BottomNavProps) 
 
           {/* Logout Button */}
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={handleLogout}
             className="flex items-center gap-1.5 p-2 rounded-2xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors focus:outline-none group cursor-pointer"
             title="Déconnexion"
           >
