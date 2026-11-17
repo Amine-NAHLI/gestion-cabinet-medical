@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { visits, patients, prescriptions } from "@/db/schema";
 import { getClinicSettings } from "@/actions/settings";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { getTenantClinicId } from "@/lib/tenant";
 import Link from "next/link";
 import ConsultationClient from "./ConsultationClient";
 
@@ -17,14 +18,18 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
 
   const resolvedParams = await params;
   const visitId = parseInt(resolvedParams.visitId);
+  const clinicId = await getTenantClinicId();
 
+  // Vérification stricte que cette consultation appartient bien à ce cabinet médical
   const visitArray = await db
     .select()
     .from(visits)
     .innerJoin(patients, eq(visits.patientId, patients.id))
-    .where(eq(visits.id, visitId));
+    .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)));
 
-  if (visitArray.length === 0) return <div>Visite introuvable</div>;
+  if (visitArray.length === 0) {
+    redirect("/dashboard");
+  }
   const visit = visitArray[0];
 
   const prescriptionArray = await db.select().from(prescriptions).where(eq(prescriptions.visitId, visitId));

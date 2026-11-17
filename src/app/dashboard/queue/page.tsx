@@ -2,7 +2,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
 import { visits, patients } from "@/db/schema";
-import { eq, sql, asc } from "drizzle-orm";
+import { eq, sql, asc, and } from "drizzle-orm";
+import { getTenantClinicId } from "@/lib/tenant";
 import AddPatientModal from "@/components/AddPatientModal";
 import SendToDoctorButton from "@/components/SendToDoctorButton";
 import CancelVisitButton from "@/components/CancelVisitButton";
@@ -15,21 +16,23 @@ export default async function QueuePage() {
   const session = await getServerSession(authOptions);
   const user = session?.user as { role?: string } | undefined;
   const role = user?.role;
+  const clinicId = await getTenantClinicId();
 
-  // Récupérer les visites d'aujourd'hui uniquement
+  // Récupérer les visites d'aujourd'hui uniquement pour ce cabinet
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const visitArray = await db.select({
+  const visitArray = await db
+    .select({
       id: visits.id,
       status: visits.status,
       isAppointment: visits.isAppointment,
       patient: patients,
-      createdAt: visits.createdAt
+      createdAt: visits.createdAt,
     })
     .from(visits)
     .innerJoin(patients, eq(visits.patientId, patients.id))
-    .where(sql`${visits.createdAt} >= ${todayStart}`)
+    .where(and(eq(visits.clinicId, clinicId), sql`${visits.createdAt} >= ${todayStart}`))
     .orderBy(asc(visits.createdAt));
 
   const waitingList = visitArray.filter(v => v.status === 'waiting');

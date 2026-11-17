@@ -2,14 +2,17 @@
 
 import { db } from "@/db";
 import { visits, prescriptions, customMedications, patients } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
+import { getTenantClinicId } from "@/lib/tenant";
 
 export async function updateMedicalNotes(visitId: number, formData: FormData) {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: "Non autorisé" };
+
+  const clinicId = await getTenantClinicId();
 
   const disease = (formData.get("disease") as string || "").trim() || null;
   const diagnosis = (formData.get("diagnosis") as string || "").trim() || null;
@@ -21,7 +24,8 @@ export async function updateMedicalNotes(visitId: number, formData: FormData) {
   const height = formData.get("height") as string || null;
 
   try {
-    await db.update(visits)
+    await db
+      .update(visits)
       .set({
         disease,
         diagnosis,
@@ -32,7 +36,7 @@ export async function updateMedicalNotes(visitId: number, formData: FormData) {
         weight,
         height,
       })
-      .where(eq(visits.id, visitId));
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)));
     
     revalidatePath(`/dashboard/consultation/${visitId}`);
     return { success: true };
@@ -49,22 +53,42 @@ export async function savePrescription(
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: "Non autorisé" };
 
+  const clinicId = await getTenantClinicId();
+
   try {
-    // 1. Enregistrer ou remplacer l'ordonnance
+    // 1. Vérifier que la visite appartient à ce cabinet
+    const visitCheck = await db
+      .select({ id: visits.id })
+      .from(visits)
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)))
+      .limit(1);
+
+    if (visitCheck.length === 0) {
+      return { success: false, error: "Visite introuvable dans ce cabinet." };
+    }
+
+    // 2. Enregistrer ou remplacer l'ordonnance
     await db.delete(prescriptions).where(eq(prescriptions.visitId, visitId));
     if (medicines.length > 0) {
       await db.insert(prescriptions).values({
+        clinicId,
         visitId,
         medicines,
       });
 
-      // 2. Persister les médicaments dans la base du cabinet
+      // 3. Persister les médicaments dans la base du cabinet
       for (const med of medicines) {
         if (med.name && med.name.trim().length > 1) {
           const medName = med.name.trim();
-          const existing = await db.select().from(customMedications).where(eq(customMedications.name, medName)).limit(1);
+          const existing = await db
+            .select()
+            .from(customMedications)
+            .where(and(eq(customMedications.clinicId, clinicId), eq(customMedications.name, medName)))
+            .limit(1);
+
           if (existing.length === 0) {
             await db.insert(customMedications).values({
+              clinicId,
               name: medName,
               defaultInstructions: med.instructions || null,
             }).catch(() => {});
@@ -89,12 +113,15 @@ export async function finishConsultation(
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: "Non autorisé" };
 
+  const clinicId = await getTenantClinicId();
+
   const finalAmount = amountToPay !== null && !isNaN(amountToPay) && amountToPay >= 0 
     ? amountToPay.toFixed(2) 
     : "0.00";
 
   try {
-    await db.update(visits)
+    await db
+      .update(visits)
       .set({ 
         amountToPay: finalAmount, 
         status: "finished", 
@@ -102,7 +129,7 @@ export async function finishConsultation(
         paymentMethod: paymentMethod || "cash",
         paidAt: amountToPay === 0 ? new Date() : null,
       })
-      .where(eq(visits.id, visitId));
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)));
     
     revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/history");

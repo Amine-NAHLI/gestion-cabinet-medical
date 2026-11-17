@@ -2,7 +2,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
 import { appointments, patients } from "@/db/schema";
-import { eq, asc, desc, not } from "drizzle-orm";
+import { eq, asc, desc, not, and } from "drizzle-orm";
+import { getTenantClinicId } from "@/lib/tenant";
 import TransformAppointmentButton from "@/components/TransformAppointmentButton";
 import AddAppointmentModal from "@/components/AddAppointmentModal";
 import { MotionDiv } from "@/components/MotionWrapper";
@@ -13,19 +14,21 @@ export default async function AppointmentsPage() {
   const session = await getServerSession(authOptions);
   const user = session?.user as { role?: string } | undefined;
   const role = user?.role;
+  const clinicId = await getTenantClinicId();
 
-  // Récupérer les rendez-vous actifs triés chronologiquement
-  const appointmentsList = await db.select({
+  // Récupérer les rendez-vous actifs triés chronologiquement pour ce cabinet
+  const appointmentsList = await db
+    .select({
       id: appointments.id,
       date: appointments.date,
       time: appointments.time,
       reason: appointments.reason,
       status: appointments.status,
-      patient: patients
+      patient: patients,
     })
     .from(appointments)
     .innerJoin(patients, eq(appointments.patientId, patients.id))
-    .where(not(eq(appointments.status, 'cancelled')))
+    .where(and(eq(appointments.clinicId, clinicId), not(eq(appointments.status, "cancelled"))))
     .orderBy(asc(appointments.date));
 
   return (

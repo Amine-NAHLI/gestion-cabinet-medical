@@ -3,7 +3,8 @@ import { authOptions } from "@/lib/authOptions";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { visits, patients, appointments } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import { getTenantClinicId } from "@/lib/tenant";
 import Link from "next/link";
 import AddPatientModal from "@/components/AddPatientModal";
 import AddAppointmentModal from "@/components/AddAppointmentModal";
@@ -18,17 +19,26 @@ export default async function DashboardIndex() {
   }
 
   const role = (session?.user as any)?.role;
+  const clinicId = await getTenantClinicId();
 
-  // Récupération globale pour les stats
-  const allVisits = await db.select({
-    id: visits.id,
-    status: visits.status,
-    createdAt: visits.createdAt,
-    amountToPay: visits.amountToPay,
-    patient: patients
-  }).from(visits).innerJoin(patients, eq(visits.patientId, patients.id)).orderBy(desc(visits.createdAt));
+  // Récupération strictement isolée par cabinet (Multi-Tenancy)
+  const allVisits = await db
+    .select({
+      id: visits.id,
+      status: visits.status,
+      createdAt: visits.createdAt,
+      amountToPay: visits.amountToPay,
+      patient: patients,
+    })
+    .from(visits)
+    .innerJoin(patients, eq(visits.patientId, patients.id))
+    .where(eq(visits.clinicId, clinicId))
+    .orderBy(desc(visits.createdAt));
 
-  const allAppointments = await db.select().from(appointments);
+  const allAppointments = await db
+    .select()
+    .from(appointments)
+    .where(eq(appointments.clinicId, clinicId));
 
   // Filtres pour aujourd'hui
   const today = new Date();

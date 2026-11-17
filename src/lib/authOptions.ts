@@ -20,6 +20,7 @@ export const authOptions: NextAuthOptions = {
         const user = userArray[0];
 
         if (!user) return null;
+        if (user.status === "suspended") return null;
 
         const passwordsMatch = await bcrypt.compare(credentials.password, user.password);
 
@@ -29,6 +30,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name,
             role: user.role,
+            clinicId: user.clinicId,
           };
         }
 
@@ -39,13 +41,17 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.id = (user as any).id;
         token.role = (user as any).role;
+        token.clinicId = (user as any).clinicId;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).role = token.role;
+        session.user.id = token.id as string;
+        session.user.role = token.role as string;
+        session.user.clinicId = token.clinicId as number | null;
       }
       return session;
     }

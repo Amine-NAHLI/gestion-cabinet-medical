@@ -3,16 +3,27 @@ import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
 import { patients, visits } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
+import { getTenantClinicId } from "@/lib/tenant";
 import PatientsClient from "./PatientsClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function PatientsPage() {
   const session = await getServerSession(authOptions);
+  const clinicId = await getTenantClinicId();
 
-  // Récupérer tous les patients et leurs visites associées
-  const allPatients = await db.select().from(patients).orderBy(desc(patients.createdAt));
-  const allVisits = await db.select().from(visits).orderBy(desc(visits.createdAt));
+  // Récupérer les patients et visites strictement de ce cabinet
+  const allPatients = await db
+    .select()
+    .from(patients)
+    .where(eq(patients.clinicId, clinicId))
+    .orderBy(desc(patients.createdAt));
+
+  const allVisits = await db
+    .select()
+    .from(visits)
+    .where(eq(visits.clinicId, clinicId))
+    .orderBy(desc(visits.createdAt));
 
   // Regrouper l'historique par patient
   const patientsWithVisits = allPatients.map((p) => {

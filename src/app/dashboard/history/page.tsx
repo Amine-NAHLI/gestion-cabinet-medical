@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
 import { visits, patients } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { getTenantClinicId } from "@/lib/tenant";
 import HistoryClient from "./HistoryClient";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +12,11 @@ export default async function HistoryPage() {
   const session = await getServerSession(authOptions);
   const user = session?.user as { role?: string } | undefined;
   const role = user?.role;
+  const clinicId = await getTenantClinicId();
 
-  // Pour le médecin : tout l'historique clôturé
-  // Pour l'assistante : les consultations terminées
-  const historyCondition = eq(visits.status, 'finished');
-
-  const historyList = await db.select({
+  // Filtré strictement par cabinet médical (Multi-Tenancy)
+  const historyList = await db
+    .select({
       id: visits.id,
       amountToPay: visits.amountToPay,
       status: visits.status,
@@ -25,11 +25,11 @@ export default async function HistoryPage() {
       disease: visits.disease,
       diagnosis: visits.diagnosis,
       patient: patients,
-      createdAt: visits.createdAt
+      createdAt: visits.createdAt,
     })
     .from(visits)
     .innerJoin(patients, eq(visits.patientId, patients.id))
-    .where(historyCondition)
+    .where(and(eq(visits.clinicId, clinicId), eq(visits.status, "finished")))
     .orderBy(desc(visits.createdAt))
     .limit(200);
 

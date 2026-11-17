@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { visits, patients } from "@/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { getClinicSettings } from "@/actions/settings";
+import { getTenantClinicId } from "@/lib/tenant";
 import PaymentButton from "@/components/PaymentButton";
 import { redirect } from "next/navigation";
 import { MotionDiv } from "@/components/MotionWrapper";
@@ -19,9 +20,10 @@ export default async function PaymentsPage() {
     redirect("/dashboard/queue");
   }
 
+  const clinicId = await getTenantClinicId();
   const settings = await getClinicSettings();
 
-  // Tous les paiements en attente
+  // Tous les paiements en attente strictement pour ce cabinet
   const toPayList = await db.select({
       id: visits.id,
       amountToPay: visits.amountToPay,
@@ -30,7 +32,7 @@ export default async function PaymentsPage() {
     })
     .from(visits)
     .innerJoin(patients, eq(visits.patientId, patients.id))
-    .where(and(eq(visits.status, 'finished'), eq(visits.paymentStatus, 'pending')))
+    .where(and(eq(visits.clinicId, clinicId), eq(visits.status, 'finished'), eq(visits.paymentStatus, 'pending')))
     .orderBy(asc(visits.createdAt));
 
   // Total à encaisser
