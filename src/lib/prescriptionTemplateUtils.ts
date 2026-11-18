@@ -147,7 +147,8 @@ export function downloadFilledPrescriptionPdf(params: {
     year: "numeric",
   });
 
-  const city = settings?.city || "Casablanca";
+  const city = settings?.city?.trim() || "";
+  const formattedPlaceDate = city ? `${city}, le ${dateStr}` : `Le ${dateStr}`;
 
   if (templateUrl) {
     // 1. Fond = Template personnalisé du médecin (Photo ou PDF converti)
@@ -174,7 +175,7 @@ export function downloadFilledPrescriptionPdf(params: {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(Math.max(8, basePt - 1.5));
       doc.setTextColor(51, 65, 85);
-      doc.text(`${city}, le ${dateStr}`, px, py + 5.5);
+      doc.text(formattedPlaceDate, px, py + 5.5);
     }
 
     // 3. Liste des médicaments remplie dans la zone dédiée
@@ -209,53 +210,72 @@ export function downloadFilledPrescriptionPdf(params: {
     });
   } else {
     // Modèle standard officiel MonCabinet
-    const doctorName = settings?.doctorName || "Dr. Praticien";
-    const specialty = settings?.specialty || "Médecine Générale";
-    const clinicName = settings?.clinicName || "Cabinet Médical";
-    const address = settings?.address || "";
-    const phone = settings?.phone || "";
-    const orderNumber = settings?.orderNumber || "";
+    const doctorName = settings?.doctorName?.trim() || "";
+    const specialty = settings?.specialty?.trim() || "";
+    const clinicName = settings?.clinicName?.trim() || "Cabinet Médical";
+    const address = settings?.address?.trim() || "";
+    const phone = settings?.phone?.trim() || "";
+    const orderNumber = settings?.orderNumber?.trim() || "";
+    const locationLine = [address, city].filter(Boolean).join(", ");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(15, 23, 42);
-    doc.text(doctorName.toUpperCase(), 16, 20);
+    doc.text((doctorName || clinicName).toUpperCase(), 16, 20);
 
-    doc.setFontSize(10.5);
-    doc.setTextColor(2, 132, 199);
-    doc.text(specialty, 16, 26);
+    let headerY = 26;
+    if (specialty) {
+      doc.setFontSize(10.5);
+      doc.setTextColor(2, 132, 199);
+      doc.text(specialty, 16, headerY);
+      headerY += 5;
+    }
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text(clinicName, 16, 31);
-    if (address) doc.text(`${address}, ${city}`, 16, 35.5);
-    if (phone) doc.text(`Tél : ${phone}`, 16, 40);
-    if (orderNumber) doc.text(orderNumber, 16, 44.5);
+    if (doctorName && clinicName && clinicName !== doctorName) {
+      doc.text(clinicName, 16, headerY);
+      headerY += 4.5;
+    }
+    if (locationLine) {
+      doc.text(locationLine, 16, headerY);
+      headerY += 4.5;
+    }
+    if (phone) {
+      doc.text(`Tél : ${phone}`, 16, headerY);
+      headerY += 4.5;
+    }
+    if (orderNumber) {
+      doc.text(orderNumber, 16, headerY);
+      headerY += 4.5;
+    }
 
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text(`${city}, le ${dateStr}`, pageW - 16, 20, { align: "right" });
+    doc.text(formattedPlaceDate, pageW - 16, 20, { align: "right" });
 
+    const dividerY = Math.max(46, headerY + 2);
     doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(0.5);
-    doc.line(16, 49, pageW - 16, 49);
+    doc.line(16, dividerY, pageW - 16, dividerY);
 
     // Cartouche patient
+    const boxY = dividerY + 6;
     doc.setFillColor(248, 250, 252);
-    doc.roundedRect(16, 55, pageW - 32, 18, 3, 3, "F");
+    doc.roundedRect(16, boxY, pageW - 32, 18, 3, 3, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text(`Patient(e) : ${patient.lastName.toUpperCase()} ${patient.firstName}`, 21, 63);
+    doc.text(`Patient(e) : ${patient.lastName.toUpperCase()} ${patient.firstName}`, 21, boxY + 8);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
-    doc.text(`${patient.age} ans${patient.cin ? ` • CIN : ${patient.cin}` : ""}`, 21, 69);
+    doc.text(`${patient.age} ans${patient.cin ? ` • CIN : ${patient.cin}` : ""}`, 21, boxY + 14);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
-    doc.text("ORDONNANCE", pageW / 2, 86, { align: "center" });
+    doc.text("ORDONNANCE", pageW / 2, boxY + 31, { align: "center" });
 
-    let y = 98;
+    let y = boxY + 43;
     medicines.forEach((med, i) => {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);

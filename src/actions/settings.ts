@@ -30,14 +30,14 @@ async function buildDefaultSettingsForClinic(clinicId: number) {
   return {
     clinicId,
     clinicName: c?.name || "Cabinet Médical",
-    doctorName: d?.name ? (d.name.toLowerCase().startsWith("dr") ? d.name : `Dr. ${d.name}`) : "Dr. Praticien",
+    doctorName: d?.name ? (d.name.toLowerCase().startsWith("dr") ? d.name : `Dr. ${d.name}`) : "",
     specialty: "Médecine Générale",
-    phone: c?.phone || d?.phone || "05 22 00 00 00",
-    email: d?.email || "contact@cabinet.ma",
-    address: c?.address || "Adresse du cabinet",
-    city: c?.city || "Casablanca",
-    orderNumber: "INPE: 123456789 • Ordre: 9876",
-    taxId: "ICE: 001234567000089 • IF: 12345678",
+    phone: c?.phone || d?.phone || "",
+    email: d?.email || "",
+    address: c?.address || "",
+    city: c?.city || "",
+    orderNumber: "",
+    taxId: "",
     defaultFee: "250.00",
     consultationFields: DEFAULT_CONSULTATION_FIELDS,
     prescriptionTemplateUrl: null as string | null,
@@ -87,14 +87,14 @@ export async function getClinicSettings(targetClinicId?: number) {
       id: clinicId,
       clinicId,
       clinicName: "Cabinet Médical",
-      doctorName: "Dr. Praticien",
+      doctorName: "",
       specialty: "Médecine Générale",
-      phone: "05 22 00 00 00",
-      email: "contact@cabinet.ma",
-      address: "Adresse du cabinet",
-      city: "Casablanca",
-      orderNumber: "INPE: 123456789 • Ordre: 9876",
-      taxId: "ICE: 001234567000089 • IF: 12345678",
+      phone: "",
+      email: "",
+      address: "",
+      city: "",
+      orderNumber: "",
+      taxId: "",
       defaultFee: "250.00",
       consultationFields: DEFAULT_CONSULTATION_FIELDS,
       prescriptionTemplateUrl: null,
@@ -164,8 +164,21 @@ export async function updateClinicSettings(formData: FormData) {
       });
     }
 
+    // Synchroniser aussi la table clinics (nom, ville, adresse, téléphone)
+    await db
+      .update(clinics)
+      .set({
+        name: clinicName || "Cabinet Médical",
+        city: city || "",
+        address: address || null,
+        phone: phone || null,
+      })
+      .where(eq(clinics.id, clinicId));
+
     revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/stats");
+    revalidatePath("/dashboard/payments");
     return { success: true };
   } catch (error) {
     console.error("Erreur mise à jour paramètres:", error);

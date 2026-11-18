@@ -2,9 +2,20 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
+export type ClinicInfo = {
+  clinicName?: string | null;
+  doctorName?: string | null;
+  specialty?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  orderNumber?: string | null;
+  taxId?: string | null;
+};
 
 export type VisitData = {
   id: number;
@@ -22,7 +33,17 @@ export type VisitData = {
   status?: string;
 };
 
-export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
+function formatPdfNumber(value: number): string {
+  return value.toLocaleString('fr-FR').replace(/[\u00A0\u202F]/g, ' ');
+}
+
+export default function StatsCharts({
+  rawVisits,
+  clinicInfo,
+}: {
+  rawVisits: VisitData[];
+  clinicInfo?: ClinicInfo | null;
+}) {
   // Déterminer la période initiale : si aucune visite cette semaine, ouvrir sur 'all' pour afficher l'historique complet
   const initialPeriod = useMemo<'day' | 'week' | 'month' | 'all'>(() => {
     const now = new Date();
@@ -316,13 +337,28 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
       const pageHeight = doc.internal.pageSize.getHeight();
 
       // Bandeau supérieur
+      const clinicTitle = clinicInfo?.clinicName?.trim() || "Cabinet Médical";
+      const doctorName = clinicInfo?.doctorName?.trim() || "";
+      const specialty = clinicInfo?.specialty?.trim() || "";
+      const addressCity = [clinicInfo?.address?.trim(), clinicInfo?.city?.trim()]
+        .filter(Boolean)
+        .join(", ");
+      const contactParts = [
+        clinicInfo?.phone?.trim() ? `Tél : ${clinicInfo.phone.trim()}` : "",
+        clinicInfo?.email?.trim() || "",
+      ].filter(Boolean);
+      const fiscalParts = [
+        clinicInfo?.orderNumber?.trim() || "",
+        clinicInfo?.taxId?.trim() || "",
+      ].filter(Boolean);
+
       doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, pageWidth, 24, 'F');
       doc.setFillColor(13, 148, 136);
       doc.rect(0, 24, pageWidth, 2, 'F');
 
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(14);
+      doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
       doc.text("MONCABINET", 14, 15);
 
@@ -331,19 +367,40 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
       doc.setTextColor(203, 213, 225);
       doc.text("RELEVÉ D'ACTIVITÉ & FACTURATION CABINET", pageWidth - 14, 15, { align: 'right' });
 
-      // En-tête cabinet
-      const startY = 36;
+      // En-tête cabinet (100% dynamique depuis les paramètres du cabinet)
+      const startY = 35;
       doc.setTextColor(15, 23, 42);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text("Cabinet Médical Dr. Amine NAHLI", 14, startY);
+      const titleLines = doc.splitTextToSize(clinicTitle, 100);
+      doc.text(titleLines, 14, startY);
 
+      let infoY = startY + titleLines.length * 4.5 + 0.5;
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(71, 85, 105);
-      doc.text("Médecine Générale & Soins Cliniques", 14, startY + 5);
-      doc.text("Boulevard d'Anfa, Casablanca, Maroc", 14, startY + 10);
-      doc.text("Tél : +212 5 22 00 00 00 | IF : 40182910 | ICE : 002910293000041", 14, startY + 15);
+
+      const doctorSpecLine = [doctorName, specialty].filter(Boolean).join(" • ");
+      if (doctorSpecLine) {
+        const lines = doc.splitTextToSize(doctorSpecLine, 100);
+        doc.text(lines, 14, infoY);
+        infoY += lines.length * 4.2;
+      }
+      if (addressCity) {
+        const lines = doc.splitTextToSize(addressCity, 100);
+        doc.text(lines, 14, infoY);
+        infoY += lines.length * 4.2;
+      }
+      if (contactParts.length > 0) {
+        const lines = doc.splitTextToSize(contactParts.join(" | "), 100);
+        doc.text(lines, 14, infoY);
+        infoY += lines.length * 4.2;
+      }
+      if (fiscalParts.length > 0) {
+        const lines = doc.splitTextToSize(fiscalParts.join(" | "), 100);
+        doc.text(lines, 14, infoY);
+        infoY += lines.length * 4.2;
+      }
 
       // Cartouche Facture
       const periodLabelMap: Record<string, string> = {
@@ -373,7 +430,7 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
       doc.text(`Total Actes : ${statsSummary.totalVisits} consultation(s)`, invoiceBoxX + 4, startY + 19);
 
       // 3 Blocs KPI
-      const kpiY = startY + 28;
+      const kpiY = Math.max(startY + 28, infoY + 4);
       const colW = (pageWidth - 28 - 8) / 3;
 
       doc.setFillColor(241, 245, 249);
@@ -394,7 +451,7 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
       doc.text("TOTAL NET ENCAISSÉ", 18 + colW + 4, kpiY + 4.5);
       doc.setFontSize(10.5);
       doc.setTextColor(4, 120, 87);
-      doc.text(`${statsSummary.totalCollected.toLocaleString('fr-FR')} DH`, 18 + colW + 4, kpiY + 11);
+      doc.text(`${formatPdfNumber(statsSummary.totalCollected)} DH`, 18 + colW + 4, kpiY + 11);
 
       doc.setFillColor(240, 249, 255);
       doc.roundedRect(14 + (colW + 4) * 2, kpiY, colW, 14, 2, 2, 'F');
@@ -404,7 +461,7 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
       doc.text("TARIF MOYEN / ACTE", 18 + (colW + 4) * 2, kpiY + 4.5);
       doc.setFontSize(10.5);
       doc.setTextColor(3, 105, 161);
-      doc.text(`${statsSummary.averageFee} DH`, 18 + (colW + 4) * 2, kpiY + 11);
+      doc.text(`${formatPdfNumber(statsSummary.averageFee)} DH`, 18 + (colW + 4) * 2, kpiY + 11);
 
       // Tableau des prestations
       const tableData = filteredVisits.map((v, idx) => {
@@ -415,7 +472,7 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
         const ageStr = v.patientAge ? `${v.patientAge} ans` : "-";
         const motiveStr = v.disease || "Consultation standard";
         const isPaid = v.paymentStatus === 'paid';
-        const amountStr = v.amountToPay > 0 ? `${v.amountToPay.toLocaleString('fr-FR')} DH` : "0 DH (Exonéré)";
+        const amountStr = v.amountToPay > 0 ? `${formatPdfNumber(v.amountToPay)} DH` : "0 DH (Exonéré)";
 
         return [
           String(idx + 1).padStart(2, '0'),
@@ -441,7 +498,7 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
               styles: { halign: "right", fontStyle: "bold", fontSize: 8.5, textColor: [15, 23, 42] },
             },
             {
-              content: `${statsSummary.totalCollected.toLocaleString("fr-FR")} DH`,
+              content: `${formatPdfNumber(statsSummary.totalCollected)} DH`,
               styles: { halign: "right", fontStyle: "bold", fontSize: 9, textColor: [5, 150, 105] },
             },
           ],
@@ -485,7 +542,7 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
       doc.text("Arrêté le présent relevé financier à la somme de :", 14, bottomY);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(15, 23, 42);
-      doc.text(`${statsSummary.totalCollected.toLocaleString('fr-FR')} Dirhams Marocains.`, 14, bottomY + 5);
+      doc.text(`${formatPdfNumber(statsSummary.totalCollected)} Dirhams Marocains.`, 14, bottomY + 5);
 
       const stampX = pageWidth - 65;
       doc.setDrawColor(203, 213, 225);
@@ -509,24 +566,23 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
   };
 
   return (
-    <div className="space-y-8">
-      
+    <div className="space-y-6">
       {/* 1. Barre de Contrôle des Périodes & Export */}
-      <div className="bg-white p-3 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="grid grid-cols-2 sm:flex bg-slate-100 p-1 rounded-lg border border-slate-200/80 w-full sm:w-auto gap-1">
           {[
             { id: 'day', label: "Aujourd'hui" },
-            { id: 'week', label: "7 derniers jours" },
+            { id: 'week', label: "7 jours" },
             { id: 'month', label: "Ce mois" },
-            { id: 'all', label: "Tout l'historique" }
+            { id: 'all', label: "Tout" }
           ].map(p => (
             <button
               key={p.id}
               type="button"
               onClick={() => setPeriod(p.id as any)}
-              className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                period === p.id 
-                  ? 'bg-white text-sky-700 shadow-xs' 
+              className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
+                period === p.id
+                  ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -534,168 +590,125 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
             </button>
           ))}
         </div>
-        
-        <motion.button 
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+
+        <button
           type="button"
-          onClick={exportPDF} 
+          onClick={exportPDF}
           disabled={isExporting}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-medium text-xs transition disabled:opacity-50 cursor-pointer"
         >
-          <span className="material-symbols-outlined text-base">{isExporting ? 'hourglass_empty' : 'receipt_long'}</span>
-          <span>{isExporting ? 'Génération...' : 'Télécharger le Bilan PDF'}</span>
-        </motion.button>
+          <span className="material-symbols-outlined text-[16px]">
+            {isExporting ? 'hourglass_empty' : 'picture_as_pdf'}
+          </span>
+          <span>{isExporting ? 'Génération...' : 'Exporter le bilan PDF'}</span>
+        </button>
       </div>
 
-      <div ref={printRef} className="space-y-8">
-        
-        {/* 2. Cartes KPIs Exécutives (4 Indicateurs) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          {/* Total Encaissé */}
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-2xl">payments</span>
-            </div>
-            <div>
-              <p className="text-slate-400 font-bold text-[11px] uppercase tracking-wider">Total Encaissé</p>
-              <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">
-                {statsSummary.totalCollected.toLocaleString('fr-FR')} <span className="text-sm font-semibold text-emerald-600">DH</span>
-              </h3>
-            </div>
-          </motion.div>
+      <div ref={printRef} className="space-y-6">
+        {/* 2. Bandeau KPI unifié (2x2 sur mobile, 4x1 sur desktop) */}
+        <div className="bg-slate-200/80 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden grid grid-cols-2 lg:grid-cols-4 gap-px">
+          <div className="bg-white p-4 sm:p-5">
+            <p className="text-xs font-medium text-slate-500">Total encaissé</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
+              {statsSummary.totalCollected.toLocaleString('fr-FR')}{" "}
+              <span className="text-xs font-normal text-slate-500">DH</span>
+            </p>
+          </div>
 
-          {/* Nombre de Consultations */}
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-2xl">medical_services</span>
-            </div>
-            <div>
-              <p className="text-slate-400 font-bold text-[11px] uppercase tracking-wider">Actes Réalisés</p>
-              <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">
-                {statsSummary.totalVisits} <span className="text-sm font-normal text-slate-400">patient{statsSummary.totalVisits > 1 ? 's' : ''}</span>
-              </h3>
-            </div>
-          </motion.div>
+          <div className="bg-white p-4 sm:p-5">
+            <p className="text-xs font-medium text-slate-500">Consultations</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
+              {statsSummary.totalVisits}
+            </p>
+          </div>
 
-          {/* Tarif Moyen */}
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-2xl">trending_up</span>
-            </div>
-            <div>
-              <p className="text-slate-400 font-bold text-[11px] uppercase tracking-wider">Moyenne / Acte</p>
-              <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">
-                {statsSummary.averageFee} <span className="text-sm font-semibold text-indigo-600">DH</span>
-              </h3>
-            </div>
-          </motion.div>
+          <div className="bg-white p-4 sm:p-5">
+            <p className="text-xs font-medium text-slate-500">Tarif moyen</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
+              {statsSummary.averageFee}{" "}
+              <span className="text-xs font-normal text-slate-500">DH</span>
+            </p>
+          </div>
 
-          {/* Taux de Recouvrement */}
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-2xl">verified</span>
-            </div>
-            <div>
-              <p className="text-slate-400 font-bold text-[11px] uppercase tracking-wider">Taux de Règlement</p>
-              <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">
-                {statsSummary.paymentRate}%
-              </h3>
-            </div>
-          </motion.div>
-
+          <div className="bg-white p-4 sm:p-5">
+            <p className="text-xs font-medium text-slate-500">Taux de règlement</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
+              {statsSummary.paymentRate}%
+            </p>
+          </div>
         </div>
 
         {/* 3. Graphiques d'Activité & de Pathologie */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Graphique 1 : Évolution Temporelle Réelle */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Évolution du Chiffre d&apos;Affaires</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Progression journalière des encaissements sur la période.</p>
+                <h2 className="text-sm font-semibold text-slate-900">Évolution des encaissements</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Recettes perçues sur la période.</p>
               </div>
-              <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 text-xs font-bold">
-                {statsSummary.totalCollected} DH
+              <span className="text-xs font-semibold text-slate-700 tabular-nums">
+                {statsSummary.totalCollected.toLocaleString('fr-FR')} DH
               </span>
             </div>
-            <div className="w-full h-72">
+            <div className="w-full h-64 sm:h-72">
               <ReactECharts option={revenueTimelineOptions} style={{ height: '100%', width: '100%' }} />
             </div>
-          </motion.div>
+          </div>
 
-          {/* Graphique 2 : Motifs Cliniques & Pathologies */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Motifs & Diagnostics Cliniques</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Fréquence des pathologies et consultations reçues.</p>
-              </div>
-              <span className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold">
-                Pathologies
-              </span>
+          <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold text-slate-900">Motifs & pathologies</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Fréquence des consultations reçues.</p>
             </div>
-            <div className="w-full h-72">
+            <div className="w-full h-64 sm:h-72">
               <ReactECharts option={diseaseDistributionOptions} style={{ height: '100%', width: '100%' }} />
             </div>
-          </motion.div>
-
+          </div>
         </div>
 
         {/* 4. Démographie des Patients (Âge) */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs max-w-2xl mx-auto">
-          <div className="text-center mb-4">
-            <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Répartition des Patients par Tranche d&apos;Âge</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Profil démographique des patients examinés.</p>
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] max-w-2xl mx-auto">
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold text-slate-900">Répartition par tranche d&apos;âge</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Profil démographique des patients examinés.</p>
           </div>
-          <div className="w-full h-64">
+          <div className="w-full h-60">
             <ReactECharts option={ageOptions} style={{ height: '100%', width: '100%' }} />
           </div>
-        </motion.div>
+        </div>
 
-        {/* 5. Journal d'Audit Transparent (Tableau Vérifiable des Consultations) */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
-                <span className="material-symbols-outlined text-lg">receipt</span>
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                  Registre des Consultations de la Période ({filteredVisits.length})
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">Vérification détaillée de chaque enregistrement pris en compte.</p>
-              </div>
+        {/* 5. Registre détaillé des consultations */}
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                Détail des consultations ({filteredVisits.length})
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">Enregistrements inclus dans cette période.</p>
             </div>
-            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-              {filteredVisits.length} consultation{filteredVisits.length > 1 ? 's' : ''}
-            </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-400 uppercase font-bold tracking-wider text-[10px]">
+            <table className="w-full text-left text-xs min-w-[600px]">
+              <thead className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-medium text-[11px]">
                 <tr>
-                  <th className="py-3.5 px-6">Patient</th>
-                  <th className="py-3.5 px-4">Âge</th>
-                  <th className="py-3.5 px-4">Date & Heure</th>
-                  <th className="py-3.5 px-4">Motif / Pathologie</th>
-                  <th className="py-3.5 px-4 text-center">Règlement</th>
-                  <th className="py-3.5 px-6 text-right">Montant</th>
+                  <th className="py-3 px-5">Patient</th>
+                  <th className="py-3 px-4">Âge</th>
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Motif</th>
+                  <th className="py-3 px-4">Statut</th>
+                  <th className="py-3 px-5 text-right">Montant</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredVisits.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={6} className="py-10 text-center text-slate-500">
                       Aucune consultation trouvée pour cette période.
                     </td>
                   </tr>
                 ) : (
                   filteredVisits.map((visit) => {
-                    const initials = `${visit.patientFirstName?.[0] || ""}${visit.patientLastName?.[0] || ""}`.toUpperCase();
                     const d = new Date(visit.createdAt);
                     const dateFormatted = d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
                     const timeFormatted = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -703,42 +716,36 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
 
                     return (
                       <tr key={visit.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3.5 px-6 font-bold text-slate-900 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
-                            {initials || "P"}
-                          </div>
-                          <span>{visit.patientLastName} {visit.patientFirstName}</span>
+                        <td className="py-3 px-5 font-medium text-slate-900">
+                          {visit.patientLastName} {visit.patientFirstName}
                         </td>
-                        <td className="py-3.5 px-4 text-slate-600 font-medium">
-                          {visit.patientAge ? `${visit.patientAge} ans` : "-"}
+                        <td className="py-3 px-4 text-slate-600 tabular-nums">
+                          {visit.patientAge ? `${visit.patientAge} ans` : "—"}
                         </td>
-                        <td className="py-3.5 px-4 text-slate-500">
-                          {dateFormatted} à {timeFormatted}
+                        <td className="py-3 px-4 text-slate-500 tabular-nums">
+                          {dateFormatted} · {timeFormatted}
                         </td>
-                        <td className="py-3.5 px-4 text-slate-700 font-medium">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px]">
-                            {visit.disease || "Consultation standard"}
+                        <td className="py-3 px-4 text-slate-700">
+                          {visit.disease || "Consultation"}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 font-medium ${
+                              isPaid ? "text-emerald-700" : "text-amber-700"
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                isPaid ? "bg-emerald-500" : "bg-amber-500"
+                              }`}
+                            />
+                            {isPaid ? "Payé" : "En attente"}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-center">
-                          {isPaid ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                              Payé
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold uppercase tracking-wider">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                              En attente
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-6 text-right font-extrabold text-slate-900">
-                          {visit.amountToPay > 0 ? (
-                            <span>{visit.amountToPay.toLocaleString('fr-FR')} DH</span>
-                          ) : (
-                            <span className="text-slate-400 font-medium text-[11px]">0 DH (Exonéré)</span>
-                          )}
+                        <td className="py-3 px-5 text-right font-semibold text-slate-900 tabular-nums">
+                          {visit.amountToPay > 0
+                            ? `${visit.amountToPay.toLocaleString('fr-FR')} DH`
+                            : "0 DH"}
                         </td>
                       </tr>
                     );
@@ -748,7 +755,6 @@ export default function StatsCharts({ rawVisits }: { rawVisits: VisitData[] }) {
             </table>
           </div>
         </div>
-
       </div>
     </div>
   );

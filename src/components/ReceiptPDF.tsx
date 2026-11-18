@@ -34,20 +34,28 @@ export default function ReceiptPDF({
 }: ReceiptPDFProps) {
   if (!patient) return null;
 
-  const doctorName = settings?.doctorName || "Dr. Amine Vance";
-  const specialty = settings?.specialty || "Médecine Générale";
-  const clinicName = settings?.clinicName || "Cabinet Médical";
-  const address = settings?.address || "120 Boulevard d'Anfa";
-  const city = settings?.city || "Casablanca";
-  const phone = settings?.phone || "05 22 45 67 89";
-  const taxId = settings?.taxId || "ICE: 002938475000012 • IF: 45091823";
-  const orderNumber = settings?.orderNumber || "INPE: 045812903 • Ordre: 14209";
+  const doctorName = settings?.doctorName?.trim() || "";
+  const specialty = settings?.specialty?.trim() || "";
+  const clinicName = settings?.clinicName?.trim() || "Cabinet Médical";
+  const address = settings?.address?.trim() || "";
+  const city = settings?.city?.trim() || "";
+  const phone = settings?.phone?.trim() || "";
+  const taxId = settings?.taxId?.trim() || "";
+  const orderNumber = settings?.orderNumber?.trim() || "";
 
   const dateStr = date.toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
+  const formattedPlaceDate = city ? `${city}, le ${dateStr}` : `Le ${dateStr}`;
+  const addressPhoneLine = [
+    [address, city].filter(Boolean).join(", "),
+    phone ? `Tél : ${phone}` : "",
+  ]
+    .filter(Boolean)
+    .join(" • ");
+  const certifierName = doctorName || clinicName;
 
   const methodLabel: Record<string, string> = {
     cash: "Espèces",
@@ -63,23 +71,27 @@ export default function ReceiptPDF({
       <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
         <div>
           <h1 className="text-2xl font-black uppercase text-slate-950 font-serif">
-            {doctorName}
+            {doctorName || clinicName}
           </h1>
-          <p className="text-sm font-bold text-teal-800">
-            {specialty}
-          </p>
-          <p className="text-xs text-slate-600 font-medium">
-            {clinicName}
-          </p>
+          {specialty && (
+            <p className="text-sm font-bold text-teal-800">
+              {specialty}
+            </p>
+          )}
+          {doctorName && clinicName && clinicName !== doctorName && (
+            <p className="text-xs text-slate-600 font-medium">
+              {clinicName}
+            </p>
+          )}
           <div className="text-[11px] text-slate-500 pt-1 space-y-0.5">
-            <p>{address}, {city} • Tél : {phone}</p>
+            {addressPhoneLine && <p>{addressPhoneLine}</p>}
             {orderNumber && <p className="font-mono text-[10px] text-slate-400">{orderNumber}</p>}
             {taxId && <p className="font-mono text-[10px] text-slate-400 font-bold">{taxId}</p>}
           </div>
         </div>
 
         <div className="text-right text-xs space-y-1">
-          <p className="text-slate-800 font-bold">{city}, le {dateStr}</p>
+          <p className="text-slate-800 font-bold">{formattedPlaceDate}</p>
           <p className="font-mono text-[11px] font-bold text-slate-600">
             Reçu N° : REC-{String(visitId).padStart(5, "0")}
           </p>
@@ -159,7 +171,7 @@ export default function ReceiptPDF({
 
       {/* Mentions de certification */}
       <p className="text-xs text-slate-600 italic mb-12">
-        Je soussigné(e), {doctorName}, certifie avoir reçu de Monsieur/Madame {patient.lastName} {patient.firstName} la somme de {amount} Dirhams au titre des soins médicaux dispensés ce jour.
+        Je soussigné(e), {certifierName}, certifie avoir reçu de Monsieur/Madame {patient.lastName} {patient.firstName} la somme de {amount} Dirhams au titre des soins médicaux dispensés ce jour.
       </p>
 
       {/* Cachet et signature */}

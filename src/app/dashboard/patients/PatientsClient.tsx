@@ -279,74 +279,84 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
               className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              initial={{ opacity: 0, scale: 0.98, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col border border-slate-100"
+              exit={{ opacity: 0, scale: 0.98, y: 8 }}
+              className="relative z-10 bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90dvh] overflow-hidden flex flex-col border border-slate-200"
             >
-              {/* Header Dossier */}
-              <div className="p-6 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-sky-600 text-white flex items-center justify-center font-black text-lg">
-                    {selectedPatient.firstName[0]}{selectedPatient.lastName[0]}
+              {/* Header Dossier sobre */}
+              <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center font-semibold text-sm shrink-0">
+                    {selectedPatient.firstName[0]}
+                    {selectedPatient.lastName[0]}
                   </div>
-                  <div>
-                    <h2 className="text-xl font-black text-slate-900">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold text-slate-900 truncate">
                       {selectedPatient.lastName} {selectedPatient.firstName}
                     </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Dossier Patient #{selectedPatient.id} • {selectedPatient.age} ans {selectedPatient.cin ? `• CIN: ${selectedPatient.cin}` : ""}
+                    <p className="text-xs text-slate-500">
+                      {selectedPatient.age} ans • Tél. {selectedPatient.phone}
+                      {selectedPatient.cin ? ` • CIN ${selectedPatient.cin}` : ""}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedPatient(null)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer shrink-0"
                 >
-                  <span className="material-symbols-outlined">close</span>
+                  <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
               {/* Contenu Scrollable */}
-              <div className="p-6 overflow-y-auto space-y-6">
-                {/* Antécédents & Infos Cliniques */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                      Groupe Sanguin & Mutuelle
-                    </span>
-                    <p className="text-xs font-bold text-slate-800">
-                      {selectedPatient.bloodGroup || "Non renseigné"} • {selectedPatient.mutuelle || "Aucune"}
+              <div className="p-5 overflow-y-auto space-y-5">
+                {/* Fiche Synthèse compacte */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="px-3.5 py-2.5 rounded-lg border border-slate-200/80 bg-slate-50/50">
+                    <span className="text-[11px] text-slate-500 block">Groupe sanguin & mutuelle</span>
+                    <p className="font-semibold text-slate-900 mt-0.5">
+                      {selectedPatient.bloodGroup || "—"} • {selectedPatient.mutuelle || "Sans mutuelle"}
                     </p>
                   </div>
-                  <div className="p-4 bg-red-50/70 rounded-2xl border border-red-200/60">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 block mb-1 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">warning</span>
-                      Allergies Connues
+                  <div
+                    className={`px-3.5 py-2.5 rounded-lg border-l-[3px] border ${
+                      selectedPatient.allergies
+                        ? "border-red-200 border-l-red-600 bg-red-50/40"
+                        : "border-slate-200/80 border-l-slate-300 bg-slate-50/50"
+                    }`}
+                  >
+                    <span className={`text-[11px] font-medium block ${selectedPatient.allergies ? "text-red-700" : "text-slate-500"}`}>
+                      Allergies
                     </span>
-                    <p className="text-xs font-bold text-red-900">
-                      {selectedPatient.allergies || "Aucune allergie signalée"}
+                    <p className={`mt-0.5 ${selectedPatient.allergies ? "font-semibold text-red-950" : "text-slate-500"}`}>
+                      {selectedPatient.allergies || "Aucune signalée"}
                     </p>
                   </div>
-                  <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200/60">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block mb-1">
-                      Antécédents Majeurs
+                  <div
+                    className={`px-3.5 py-2.5 rounded-lg border-l-[3px] border ${
+                      selectedPatient.antecedents
+                        ? "border-amber-200 border-l-amber-500 bg-amber-50/40"
+                        : "border-slate-200/80 border-l-slate-300 bg-slate-50/50"
+                    }`}
+                  >
+                    <span className={`text-[11px] font-medium block ${selectedPatient.antecedents ? "text-amber-800" : "text-slate-500"}`}>
+                      Antécédents
                     </span>
-                    <p className="text-xs font-bold text-amber-900">
-                      {selectedPatient.antecedents || "Aucun antécédent majeur"}
+                    <p className={`mt-0.5 ${selectedPatient.antecedents ? "font-semibold text-amber-950" : "text-slate-500"}`}>
+                      {selectedPatient.antecedents || "Aucun enregistré"}
                     </p>
                   </div>
                 </div>
 
-                {/* Historique des Consultations */}
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sky-600 text-lg">history</span>
-                    Historique Médical des Consultations ({selectedPatient.visits.length})
+                {/* Historique des Consultations structuré */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Consultations ({selectedPatient.visits.length})
                   </h3>
 
                   {selectedPatient.visits.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic py-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <p className="text-xs text-slate-500 py-8 text-center rounded-lg border border-dashed border-slate-200">
                       Aucune consultation passée pour ce patient.
                     </p>
                   ) : (
@@ -354,7 +364,7 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                       {selectedPatient.visits.map((v) => {
                         const d = new Date(v.date);
                         const dateFormatted = d.toLocaleDateString("fr-FR", {
-                          weekday: "long",
+                          weekday: "short",
                           day: "numeric",
                           month: "long",
                           year: "numeric",
@@ -363,8 +373,6 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                           hour: "2-digit",
                           minute: "2-digit",
                         });
-                        const hasVitals =
-                          v.bloodPressure || v.heartRate || v.temperature || v.weight || v.height;
                         const bmiVal =
                           v.weight && v.height && parseFloat(v.height) > 0
                             ? (
@@ -372,87 +380,75 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                                 Math.pow(parseFloat(v.height) / 100, 2)
                               ).toFixed(1)
                             : null;
+                        const vitalsList = [
+                          v.bloodPressure ? { label: "Tension", val: v.bloodPressure } : null,
+                          v.heartRate ? { label: "Pouls", val: `${v.heartRate} bpm` } : null,
+                          v.temperature ? { label: "Temp.", val: `${v.temperature} °C` } : null,
+                          v.weight ? { label: "Poids", val: `${v.weight} kg` } : null,
+                          v.height ? { label: "Taille", val: `${v.height} cm` } : null,
+                          bmiVal ? { label: "IMC", val: bmiVal } : null,
+                        ].filter(Boolean) as { label: string; val: string }[];
                         const meds = v.medicines || [];
 
                         return (
                           <div
                             key={v.id}
-                            className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-3"
+                            className="rounded-xl border border-slate-200/90 bg-white overflow-hidden divide-y divide-slate-100"
                           >
-                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 text-xs">
-                              <span className="font-extrabold text-slate-900 flex items-center gap-2 capitalize">
-                                <span className="material-symbols-outlined text-sm text-indigo-600">
-                                  calendar_today
-                                </span>
-                                {dateFormatted} à {timeFormatted}
+                            <div className="px-4 py-2.5 bg-slate-50/90 flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <span className="font-semibold text-slate-900 capitalize">
+                                {dateFormatted} · {timeFormatted}
                               </span>
-                              <span className="font-bold text-slate-700">
-                                {v.amountToPay ? `${v.amountToPay} DH` : "Sans frais"} (
-                                {v.paymentStatus === "paid" ? "Payé" : "En attente"})
+                              <span className="text-slate-600 tabular-nums font-medium">
+                                {v.amountToPay ? `${v.amountToPay} DH` : "0 DH"} •{" "}
+                                <span className={v.paymentStatus === "paid" ? "text-emerald-700" : "text-amber-700"}>
+                                  {v.paymentStatus === "paid" ? "Payé" : "En attente"}
+                                </span>
                               </span>
                             </div>
 
-                            {hasVitals && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {v.bloodPressure && (
-                                  <span className="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-100 text-[11px] font-bold text-sky-900">
-                                    TA : {v.bloodPressure}
-                                  </span>
+                            {vitalsList.length > 0 && (
+                              <div className="px-4 py-2.5 flex flex-wrap gap-x-5 gap-y-1.5">
+                                {vitalsList.map((vt) => (
+                                  <div key={vt.label}>
+                                    <span className="block text-[10px] text-slate-400">{vt.label}</span>
+                                    <span className="text-xs font-semibold text-slate-900 tabular-nums">
+                                      {vt.val}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {(v.disease || v.diagnosis || v.notes) && (
+                              <div className="px-4 py-3 space-y-2 text-xs">
+                                {v.disease && (
+                                  <p>
+                                    <span className="text-slate-400 mr-1.5">Motif :</span>
+                                    <span className="font-medium text-slate-900">{v.disease}</span>
+                                  </p>
                                 )}
-                                {v.heartRate && (
-                                  <span className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-100 text-[11px] font-bold text-rose-900">
-                                    Pouls : {v.heartRate} bpm
-                                  </span>
+                                {v.diagnosis && (
+                                  <p className="whitespace-pre-line text-slate-700">
+                                    <span className="text-slate-400 mr-1.5">Diagnostic :</span>
+                                    {v.diagnosis}
+                                  </p>
                                 )}
-                                {v.temperature && (
-                                  <span className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-100 text-[11px] font-bold text-amber-900">
-                                    Temp : {v.temperature} °C
-                                  </span>
-                                )}
-                                {v.weight && (
-                                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-bold text-slate-800">
-                                    Poids : {v.weight} kg
-                                  </span>
-                                )}
-                                {v.height && (
-                                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-bold text-slate-800">
-                                    Taille : {v.height} cm
-                                  </span>
-                                )}
-                                {bmiVal && (
-                                  <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-[11px] font-extrabold text-indigo-800">
-                                    IMC : {bmiVal}
-                                  </span>
+                                {v.notes && (
+                                  <p className="whitespace-pre-line text-slate-600">
+                                    <span className="text-slate-400 mr-1.5">Notes :</span>
+                                    {v.notes}
+                                  </p>
                                 )}
                               </div>
                             )}
 
-                            {v.disease && (
-                              <p className="text-xs text-slate-600">
-                                <span className="font-bold text-slate-800">Motif / Maladie :</span>{" "}
-                                {v.disease}
-                              </p>
-                            )}
-
-                            {v.diagnosis && (
-                              <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 whitespace-pre-line">
-                                <span className="font-bold text-slate-900">Diagnostic :</span>{" "}
-                                {v.diagnosis}
-                              </p>
-                            )}
-
-                            {v.notes && (
-                              <p className="text-xs text-slate-600 bg-sky-50/40 p-2.5 rounded-xl border border-sky-100 whitespace-pre-line">
-                                <span className="font-bold text-sky-900">Notes :</span> {v.notes}
-                              </p>
-                            )}
-
                             {v.customData && v.customData.length > 0 && (
-                              <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="px-4 py-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                                 {v.customData.map((cf, cIdx) => (
-                                  <div key={`${cf.id}-${cIdx}`} className="text-xs">
-                                    <span className="font-bold text-indigo-900">{cf.label} : </span>
-                                    <span className="text-slate-700">
+                                  <div key={`${cf.id}-${cIdx}`}>
+                                    <span className="text-slate-400">{cf.label} : </span>
+                                    <span className="font-medium text-slate-900">
                                       {cf.value}
                                       {cf.unit ? ` ${cf.unit}` : ""}
                                     </span>
@@ -462,19 +458,21 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                             )}
 
                             {meds.length > 0 && (
-                              <div className="bg-teal-50/40 border border-teal-100 rounded-xl p-3 space-y-1.5">
-                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-teal-800 flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-xs">medication</span>
-                                  Ordonnance ({meds.length})
-                                </p>
-                                {meds.map((m, idx) => (
-                                  <div key={idx} className="text-xs text-slate-800">
-                                    <span className="font-bold">• {m.name}</span>
-                                    {m.instructions && (
-                                      <span className="text-slate-600"> — {m.instructions}</span>
-                                    )}
-                                  </div>
-                                ))}
+                              <div className="px-4 py-2.5 bg-slate-50/40 space-y-1 text-xs">
+                                <p className="font-semibold text-slate-700">Ordonnance ({meds.length})</p>
+                                <ol className="space-y-1">
+                                  {meds.map((m, idx) => (
+                                    <li key={idx} className="flex items-baseline gap-1.5">
+                                      <span className="text-slate-400 font-mono text-[11px]">
+                                        {String(idx + 1).padStart(2, "0")}.
+                                      </span>
+                                      <span className="font-medium text-slate-900">{m.name}</span>
+                                      {m.instructions && (
+                                        <span className="text-slate-500">— {m.instructions}</span>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ol>
                               </div>
                             )}
                           </div>
@@ -486,11 +484,11 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
               </div>
 
               {/* Footer */}
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <div className="px-5 py-3.5 border-t border-slate-200/80 bg-slate-50/70 flex justify-end">
                 <button
                   type="button"
                   onClick={() => setSelectedPatient(null)}
-                  className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition"
+                  className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition cursor-pointer"
                 >
                   Fermer
                 </button>

@@ -39,13 +39,13 @@ interface SettingsClientProps {
   };
 }
 
-const FIELD_TYPE_LABELS: Record<ConsultationFieldType, { label: string; icon: string }> = {
-  text: { label: "Texte court", icon: "short_text" },
-  textarea: { label: "Texte long", icon: "notes" },
-  number: { label: "Nombre / Mesure", icon: "123" },
-  select: { label: "Liste de sélection", icon: "arrow_drop_down_circle" },
-  checkbox: { label: "Case à cocher (Oui/Non)", icon: "check_box" },
-  date: { label: "Date", icon: "calendar_today" },
+const FIELD_TYPE_LABELS: Record<ConsultationFieldType, string> = {
+  text: "Texte court",
+  textarea: "Texte long",
+  number: "Nombre",
+  select: "Liste de choix",
+  checkbox: "Oui / Non",
+  date: "Date",
 };
 
 export default function SettingsClient({ role, initialSettings }: SettingsClientProps) {
@@ -54,9 +54,6 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
-  // ========================================================
-  // STATE : CONSTRUCTEUR DE CASES CONSULTATION (FORM BUILDER)
-  // ========================================================
   const [fields, setFields] = useState<ConsultationFieldConfig[]>(
     initialSettings.consultationFields?.length > 0
       ? initialSettings.consultationFields
@@ -82,9 +79,6 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
     required: false,
   });
 
-  // ========================================================
-  // STATE : TEMPLATE D'ORDONNANCE PERSONNALISÉ (PHOTO / PDF)
-  // ========================================================
   const [templateUrl, setTemplateUrl] = useState<string | null>(
     initialSettings.prescriptionTemplateUrl || null
   );
@@ -102,7 +96,6 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
     setTimeout(() => setToast(null), 3500);
   }
 
-  // 1. Sauvegarde infos générales du cabinet
   async function handleSaveGeneral(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
@@ -110,13 +103,12 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
     const res = await updateClinicSettings(formData);
     setIsLoading(false);
     if (res.success) {
-      showToast("Coordonnées du cabinet mises à jour avec succès !");
+      showToast("Coordonnées du cabinet enregistrées");
     } else {
       showToast(res.error || "Erreur lors de la sauvegarde.", "error");
     }
   }
 
-  // 2. Gestion des cases consultation
   function handleAddField(e: React.FormEvent) {
     e.preventDefault();
     if (!newField.label.trim()) {
@@ -133,7 +125,7 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
         : undefined;
 
     if (newField.type === "select" && (!parsedOptions || parsedOptions.length < 2)) {
-      showToast("Une liste de sélection doit contenir au moins 2 choix (séparés par des virgules).", "error");
+      showToast("Ajoutez au moins 2 choix séparés par des virgules.", "error");
       return;
     }
 
@@ -159,7 +151,7 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
       required: false,
     });
     setShowAddForm(false);
-    showToast(`Case "${created.label}" ajoutée. Cliquez sur "Enregistrer mes cases" pour valider.`);
+    showToast(`Case « ${created.label} » ajoutée — pensez à enregistrer.`);
   }
 
   function handleUpdateField(id: string, patch: Partial<ConsultationFieldConfig>) {
@@ -168,7 +160,7 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
 
   function handleDeleteField(id: string) {
     if (fields.length <= 1) {
-      showToast("Vous devez conserver au moins une case dans le formulaire.", "error");
+      showToast("Conservez au moins une case dans la fiche.", "error");
       return;
     }
     setFields((prev) => prev.filter((f) => f.id !== id));
@@ -193,13 +185,12 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
     setIsLoading(false);
     if (res.success) {
       setEditingFieldId(null);
-      showToast("Fiche consultation personnalisée enregistrée !");
+      showToast("Cases de consultation enregistrées");
     } else {
       showToast(res.error || "Erreur lors de l'enregistrement.", "error");
     }
   }
 
-  // 3. Upload & sauvegarde Template d'ordonnance (Photo ou PDF)
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -209,7 +200,7 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
       const dataUrl = await convertFileToTemplateImage(file);
       setTemplateUrl(dataUrl);
       setTemplateName(file.name);
-      showToast(`Modèle "${file.name}" chargé ! Ajustez la position puis enregistrez.`);
+      showToast(`Modèle « ${file.name} » importé — ajustez puis enregistrez.`);
     } catch (err: any) {
       showToast(err?.message || "Impossible de traiter ce fichier.", "error");
     } finally {
@@ -227,9 +218,9 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
     });
     setIsLoading(false);
     if (res.success) {
-      showToast("Template d'ordonnance enregistré avec succès !");
+      showToast("Template d'ordonnance enregistré");
     } else {
-      showToast(res.error || "Erreur lors de la sauvegarde du template.", "error");
+      showToast(res.error || "Erreur lors de la sauvegarde.", "error");
     }
   }
 
@@ -245,7 +236,7 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
     });
     setIsLoading(false);
     if (res.success) {
-      showToast("Modèle personnalisé supprimé. Retour à l'ordonnance standard MonCabinet.");
+      showToast("Modèle standard MonCabinet rétabli");
     }
   }
 
@@ -283,22 +274,23 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
     year: "numeric",
   });
 
+  const inputCls =
+    "w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 transition";
+
   return (
     <div className="space-y-6">
-      {/* Toast Notification */}
+      {/* Toast discret */}
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full shadow-lg text-xs font-bold flex items-center gap-2 border ${
-              toast.type === "error"
-                ? "bg-red-600 text-white border-red-500"
-                : "bg-slate-900 text-white border-slate-700"
+            exit={{ opacity: 0, y: -12 }}
+            className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-xs font-medium flex items-center gap-2 ${
+              toast.type === "error" ? "bg-red-600 text-white" : "bg-slate-900 text-white"
             }`}
           >
-            <span className="material-symbols-outlined text-base">
+            <span className="material-symbols-outlined text-[16px]">
               {toast.type === "error" ? "error" : "check_circle"}
             </span>
             <span>{toast.msg}</span>
@@ -306,18 +298,18 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
         )}
       </AnimatePresence>
 
-      {/* NAVIGATION DES ONGLETS PARAMÈTRES (SOBRE À SOULIGNEMENT) */}
-      <div className="border-b border-slate-200/90 flex overflow-x-auto gap-2">
+      {/* Onglets sobres à soulignement */}
+      <div className="border-b border-slate-200/90 flex overflow-x-auto gap-1">
         <button
           type="button"
           onClick={() => setActiveTab("general")}
-          className={`flex items-center gap-2 pb-3 px-3 text-sm font-medium border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+          className={`flex items-center gap-2 pb-3 px-3 text-xs sm:text-[13px] border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
             activeTab === "general"
               ? "border-slate-900 text-slate-900 font-semibold"
-              : "border-transparent text-slate-500 hover:text-slate-800"
+              : "border-transparent text-slate-500 font-medium hover:text-slate-800"
           }`}
         >
-          <span className="material-symbols-outlined text-[18px]">business</span>
+          <span className="material-symbols-outlined text-[17px]">business</span>
           <span>Infos du cabinet</span>
         </button>
 
@@ -326,15 +318,15 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
             <button
               type="button"
               onClick={() => setActiveTab("fields")}
-              className={`flex items-center gap-2 pb-3 px-3 text-sm font-medium border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 pb-3 px-3 text-xs sm:text-[13px] border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
                 activeTab === "fields"
                   ? "border-slate-900 text-slate-900 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  : "border-transparent text-slate-500 font-medium hover:text-slate-800"
               }`}
             >
-              <span className="material-symbols-outlined text-[18px]">dynamic_form</span>
+              <span className="material-symbols-outlined text-[17px]">dynamic_form</span>
               <span>Cases fiche patient</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
+              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
                 {fields.length}
               </span>
             </button>
@@ -342,13 +334,13 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
             <button
               type="button"
               onClick={() => setActiveTab("template")}
-              className={`flex items-center gap-2 pb-3 px-3 text-sm font-medium border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 pb-3 px-3 text-xs sm:text-[13px] border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
                 activeTab === "template"
                   ? "border-slate-900 text-slate-900 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  : "border-transparent text-slate-500 font-medium hover:text-slate-800"
               }`}
             >
-              <span className="material-symbols-outlined text-[18px]">description</span>
+              <span className="material-symbols-outlined text-[17px]">description</span>
               <span>Template d'ordonnance</span>
               {templateUrl && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
             </button>
@@ -357,329 +349,272 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
       </div>
 
       {/* ============================================================
-          ONGLET 1 : COORDONNÉES & IDENTITÉ DU CABINET
+          ONGLET 1 : COORDONNÉES DU CABINET
          ============================================================ */}
       {activeTab === "general" && (
-        <form onSubmit={handleSaveGeneral} className="space-y-6">
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-xs space-y-5">
-            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-              <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                <span className="material-symbols-outlined text-xl">medical_information</span>
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">En-tête & Identité du Praticien</h2>
-                <p className="text-xs text-slate-500">
-                  Ces informations figurent sur vos ordonnances standard et quittances imprimées.
-                </p>
-              </div>
+        <form
+          onSubmit={handleSaveGeneral}
+          className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] divide-y divide-slate-200/80"
+        >
+          <div className="p-5 sm:p-6 space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Identité du praticien</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Affichée sur les quittances et sur le modèle d'ordonnance standard.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Nom du Médecin Praticien *
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Nom du médecin *
                 </label>
                 <input
                   type="text"
                   name="doctorName"
                   defaultValue={initialSettings.doctorName}
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none transition-all"
+                  className={inputCls}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Spécialité Médicale *
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Spécialité médicale *
                 </label>
                 <input
                   type="text"
                   name="specialty"
                   defaultValue={initialSettings.specialty}
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none transition-all"
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Nom du cabinet *
+                </label>
+                <input
+                  type="text"
+                  name="clinicName"
+                  defaultValue={initialSettings.clinicName}
+                  required
+                  className={inputCls}
                 />
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                Nom du Cabinet ou de la Clinique *
-              </label>
-              <input
-                type="text"
-                name="clinicName"
-                defaultValue={initialSettings.clinicName}
-                required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none transition-all"
-              />
-            </div>
           </div>
 
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-xs space-y-5">
-            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
-                <span className="material-symbols-outlined text-xl">location_on</span>
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Coordonnées & Facturation</h2>
-                <p className="text-xs text-slate-500">
-                  Adresse, contacts, mentions légales (INPE / ICE) et tarif par défaut.
-                </p>
-              </div>
+          <div className="p-5 sm:p-6 space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Coordonnées & facturation</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Contacts, adresse, identifiants professionnels et tarif par défaut.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Téléphone *
-                </label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Téléphone *</label>
                 <input
                   type="text"
                   name="phone"
                   defaultValue={initialSettings.phone}
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:border-teal-500 focus:outline-none"
+                  className={inputCls}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Email Professionnel *
-                </label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Email *</label>
                 <input
                   type="email"
                   name="email"
                   defaultValue={initialSettings.email}
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:border-teal-500 focus:outline-none"
+                  className={inputCls}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Adresse Complète *
-                </label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Adresse *</label>
                 <input
                   type="text"
                   name="address"
                   defaultValue={initialSettings.address}
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:border-teal-500 focus:outline-none"
+                  className={inputCls}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Ville *
-                </label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Ville *</label>
                 <input
                   type="text"
                   name="city"
                   defaultValue={initialSettings.city}
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:border-teal-500 focus:outline-none"
+                  className={inputCls}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-medium text-slate-700 mb-1">
                   INPE / N° Ordre
                 </label>
                 <input
                   type="text"
                   name="orderNumber"
                   defaultValue={initialSettings.orderNumber || ""}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:border-teal-500 focus:outline-none"
+                  className={inputCls}
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                  Identifiants Fiscaux (ICE / IF)
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Identifiants fiscaux (ICE / IF)
                 </label>
                 <input
                   type="text"
                   name="taxId"
                   defaultValue={initialSettings.taxId || ""}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold focus:bg-white focus:border-teal-500 focus:outline-none"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Tarif consultation par défaut (DH)
+                </label>
+                <input
+                  type="number"
+                  step="10"
+                  name="defaultFee"
+                  defaultValue={
+                    initialSettings.defaultFee ? String(parseFloat(initialSettings.defaultFee)) : "250"
+                  }
+                  className={`${inputCls} tabular-nums font-semibold`}
                 />
               </div>
             </div>
+          </div>
 
-            <div className="max-w-xs">
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                Tarif Consultation par Défaut (DH)
-              </label>
-              <input
-                type="number"
-                step="10"
-                name="defaultFee"
-                defaultValue={initialSettings.defaultFee ? String(parseFloat(initialSettings.defaultFee)) : "250"}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-sm font-extrabold text-slate-900 focus:bg-white focus:border-teal-500 focus:outline-none"
-              />
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 flex justify-end">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer disabled:opacity-60"
-              >
-                <span className="material-symbols-outlined text-base">save</span>
-                <span>{isLoading ? "Enregistrement..." : "Enregistrer les coordonnées"}</span>
-              </button>
-            </div>
+          <div className="px-5 sm:px-6 py-4 bg-slate-50/70 flex justify-end rounded-b-xl">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition cursor-pointer disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-[16px]">save</span>
+              <span>{isLoading ? "Enregistrement..." : "Enregistrer"}</span>
+            </button>
           </div>
         </form>
       )}
 
       {/* ============================================================
-          ONGLET 2 : PERSONNALISATION DES CASES DE LA FICHE CONSULTATION
+          ONGLET 2 : CONSTRUCTEUR DE CASES FICHE CONSULTATION
          ============================================================ */}
       {activeTab === "fields" && isDoctor && (
-        <div className="space-y-6">
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-2xl">dynamic_form</span>
-                </div>
-                <div>
-                  <h2 className="text-base font-extrabold text-slate-900">
-                    Cases à remplir pendant la Consultation
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Ajoutez, modifiez, réorganisez ou supprimez les cases selon votre spécialité (texte, nombre, liste de sélection, oui/non, date).
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm((v) => !v)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-base">
-                    {showAddForm ? "close" : "add_circle"}
-                  </span>
-                  <span>{showAddForm ? "Fermer" : "Ajouter une case"}</span>
-                </button>
-              </div>
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                Cases de la fiche consultation ({fields.length})
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Modifiez l'ordre, supprimez ou ajoutez des champs adaptés à votre spécialité.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowAddForm((v) => !v)}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition cursor-pointer self-start sm:self-center"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {showAddForm ? "close" : "add"}
+              </span>
+              <span>{showAddForm ? "Fermer" : "Ajouter une case"}</span>
+            </button>
+          </div>
 
-            {/* FORMULAIRE D'AJOUT D'UNE NOUVELLE CASE */}
-            <AnimatePresence>
-              {showAddForm && (
-                <motion.form
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  onSubmit={handleAddField}
-                  className="p-5 rounded-2xl border-2 border-sky-200 bg-sky-50/40 space-y-4"
-                >
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-sky-900 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-base text-sky-600">add_box</span>
-                    Créer une nouvelle case personnalisée
-                  </h3>
+          {/* Formulaire d'ajout */}
+          <AnimatePresence>
+            {showAddForm && (
+              <motion.form
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onSubmit={handleAddField}
+                className="p-5 bg-slate-50 border-b border-slate-200/80 space-y-4"
+              >
+                <p className="text-xs font-semibold text-slate-900">Nouvelle case</p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Nom *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newField.label}
+                      onChange={(e) => setNewField((p) => ({ ...p, label: e.target.value }))}
+                      placeholder="Ex: Glycémie, Douleur..."
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
+                    <select
+                      value={newField.type}
+                      onChange={(e) =>
+                        setNewField((p) => ({
+                          ...p,
+                          type: e.target.value as ConsultationFieldType,
+                        }))
+                      }
+                      className={inputCls}
+                    >
+                      <option value="text">Texte court</option>
+                      <option value="textarea">Texte long</option>
+                      <option value="number">Nombre / Mesure</option>
+                      <option value="select">Liste de sélection</option>
+                      <option value="checkbox">Case Oui / Non</option>
+                      <option value="date">Date</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Section</label>
+                    <select
+                      value={newField.section}
+                      onChange={(e) =>
+                        setNewField((p) => ({
+                          ...p,
+                          section: e.target.value as "vitals" | "clinical",
+                        }))
+                      }
+                      className={inputCls}
+                    >
+                      <option value="vitals">Constantes & mesures</option>
+                      <option value="clinical">Examen clinique</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(newField.type === "number" || newField.type === "text") && (
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Nom de la case *
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Unité (optionnel)
                       </label>
                       <input
                         type="text"
-                        required
-                        value={newField.label}
-                        onChange={(e) => setNewField((p) => ({ ...p, label: e.target.value }))}
-                        placeholder="Ex: Glycémie, Acuité visuelle, Degré douleur..."
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-sky-500"
+                        value={newField.unit}
+                        onChange={(e) => setNewField((p) => ({ ...p, unit: e.target.value }))}
+                        placeholder="Ex: g/L, %, mmHg"
+                        className={inputCls}
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Type de champ *
-                      </label>
-                      <select
-                        value={newField.type}
-                        onChange={(e) =>
-                          setNewField((p) => ({
-                            ...p,
-                            type: e.target.value as ConsultationFieldType,
-                          }))
-                        }
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-sky-500"
-                      >
-                        <option value="text">Texte court</option>
-                        <option value="textarea">Zone de texte long</option>
-                        <option value="number">Nombre / Mesure</option>
-                        <option value="select">Liste de sélection (Choix)</option>
-                        <option value="checkbox">Case à cocher (Oui / Non)</option>
-                        <option value="date">Date</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Emplacement dans la fiche
-                      </label>
-                      <select
-                        value={newField.section}
-                        onChange={(e) =>
-                          setNewField((p) => ({
-                            ...p,
-                            section: e.target.value as "vitals" | "clinical",
-                          }))
-                        }
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-sky-500"
-                      >
-                        <option value="vitals">Bloc Constantes / Mesures (compact)</option>
-                        <option value="clinical">Bloc Examen Clinique (large)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {(newField.type === "number" || newField.type === "text") && (
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Unité (Optionnel)
-                        </label>
-                        <input
-                          type="text"
-                          value={newField.unit}
-                          onChange={(e) => setNewField((p) => ({ ...p, unit: e.target.value }))}
-                          placeholder="Ex: g/L, %, mmHg, kg..."
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-sky-500"
-                        />
-                      </div>
-                    )}
-
-                    {newField.type !== "checkbox" && newField.type !== "select" && newField.type !== "date" && (
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Texte d'exemple (Placeholder)
-                        </label>
-                        <input
-                          type="text"
-                          value={newField.placeholder}
-                          onChange={(e) =>
-                            setNewField((p) => ({ ...p, placeholder: e.target.value }))
-                          }
-                          placeholder="Ex: Saisir la valeur..."
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-sky-500"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {newField.type === "select" && (
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Choix de la liste de sélection (séparés par des virgules) *
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Choix de la liste (séparés par des virgules) *
                       </label>
                       <input
                         type="text"
@@ -688,315 +623,255 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                         onChange={(e) =>
                           setNewField((p) => ({ ...p, optionsText: e.target.value }))
                         }
-                        placeholder="Ex: Léger, Modéré, Sévère, Critique"
-                        className="w-full px-3 py-2 rounded-xl border border-sky-300 bg-white text-xs font-semibold focus:outline-none focus:border-sky-600"
+                        placeholder="Ex: Léger, Modéré, Sévère"
+                        className={inputCls}
                       />
                     </div>
                   )}
+                </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                    <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newField.required}
-                        onChange={(e) =>
-                          setNewField((p) => ({ ...p, required: e.target.checked }))
-                        }
-                        className="w-4 h-4 rounded text-sky-600"
-                      />
-                      <span>Rendre cette case obligatoire</span>
-                    </label>
-
-                    <button
-                      type="submit"
-                      className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-sm">add</span>
-                      <span>Ajouter à la fiche</span>
-                    </button>
-                  </div>
-                </motion.form>
-              )}
-            </AnimatePresence>
-
-            {/* LISTE DES CASES CONFIGURÉES */}
-            <div className="space-y-3">
-              {fields.map((field, index) => {
-                const isEditing = editingFieldId === field.id;
-                const typeInfo = FIELD_TYPE_LABELS[field.type] || FIELD_TYPE_LABELS.text;
-
-                return (
-                  <div
-                    key={field.id}
-                    className={`rounded-2xl border transition-all ${
-                      isEditing
-                        ? "border-sky-300 bg-sky-50/30 p-4 shadow-xs"
-                        : "border-slate-200/90 bg-white p-3.5 hover:border-slate-300"
-                    }`}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newField.required}
+                      onChange={(e) => setNewField((p) => ({ ...p, required: e.target.checked }))}
+                      className="w-4 h-4 rounded text-slate-900"
+                    />
+                    <span>Champ obligatoire</span>
+                  </label>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => handleMoveField(index, -1)}
-                            disabled={index === 0}
-                            className="w-6 h-5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center disabled:opacity-30 cursor-pointer"
-                            title="Monter"
-                          >
-                            <span className="material-symbols-outlined text-sm">keyboard_arrow_up</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleMoveField(index, 1)}
-                            disabled={index === fields.length - 1}
-                            className="w-6 h-5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center disabled:opacity-30 cursor-pointer"
-                            title="Descendre"
-                          >
-                            <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
-                          </button>
-                        </div>
+                    Ajouter à la liste
+                  </button>
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
 
-                        <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-lg">{typeInfo.icon}</span>
-                        </div>
+          {/* Liste propre en lignes séparées */}
+          <div className="divide-y divide-slate-100">
+            {fields.map((field, index) => {
+              const isEditing = editingFieldId === field.id;
 
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-xs font-extrabold text-slate-900">
-                              {field.label}
-                              {field.unit ? ` (${field.unit})` : ""}
-                            </p>
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
-                              {typeInfo.label}
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                field.section === "vitals"
-                                  ? "bg-sky-50 text-sky-700"
-                                  : "bg-indigo-50 text-indigo-700"
-                              }`}
-                            >
-                              {field.section === "vitals" ? "Constantes" : "Examen Clinique"}
-                            </span>
-                            {field.required && (
-                              <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-bold">
-                                Obligatoire
-                              </span>
-                            )}
-                          </div>
-                          {field.type === "select" && field.options && field.options.length > 0 && (
-                            <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                              Choix : {field.options.join(" • ")}
-                            </p>
-                          )}
-                        </div>
+              return (
+                <div key={field.id} className={isEditing ? "bg-slate-50/70 p-4 sm:px-5" : "px-4 sm:px-5 py-3.5 hover:bg-slate-50/50 transition"}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveField(index, -1)}
+                          disabled={index === 0}
+                          className="w-6 h-6 rounded hover:bg-slate-200/70 text-slate-400 hover:text-slate-800 flex items-center justify-center disabled:opacity-25 cursor-pointer"
+                          title="Monter"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">arrow_upward</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveField(index, 1)}
+                          disabled={index === fields.length - 1}
+                          className="w-6 h-6 rounded hover:bg-slate-200/70 text-slate-400 hover:text-slate-800 flex items-center justify-center disabled:opacity-25 cursor-pointer"
+                          title="Descendre"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
+                        </button>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setEditingFieldId(isEditing ? null : field.id)}
-                          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition cursor-pointer ${
-                            isEditing
-                              ? "bg-sky-600 text-white border-sky-600"
-                              : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-sm">
-                            {isEditing ? "check" : "edit"}
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-slate-900">
+                            {field.label}
+                            {field.unit ? <span className="text-slate-400"> ({field.unit})</span> : ""}
                           </span>
-                          <span>{isEditing ? "OK" : "Modifier"}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteField(field.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 text-[11px] font-bold transition cursor-pointer"
-                          title="Supprimer cette case"
-                        >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                        </button>
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                            {FIELD_TYPE_LABELS[field.type]}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            • {field.section === "vitals" ? "Constantes" : "Examen"}
+                          </span>
+                          {field.required && (
+                            <span className="text-[11px] text-red-600 font-medium">• Obligatoire</span>
+                          )}
+                        </div>
+                        {field.type === "select" && field.options && field.options.length > 0 && (
+                          <p className="text-xs text-slate-500 mt-0.5 truncate">
+                            Choix : {field.options.join(", ")}
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    {/* ÉDITEUR INLINE DE LA CASE */}
-                    {isEditing && (
-                      <div className="mt-4 pt-4 border-t border-sky-200/70 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                            Nom de la case
-                          </label>
-                          <input
-                            type="text"
-                            value={field.label}
-                            onChange={(e) => handleUpdateField(field.id, { label: e.target.value })}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                            Type
-                          </label>
-                          <select
-                            value={field.type}
-                            onChange={(e) =>
-                              handleUpdateField(field.id, {
-                                type: e.target.value as ConsultationFieldType,
-                                options:
-                                  e.target.value === "select" && (!field.options || field.options.length === 0)
-                                    ? ["Option 1", "Option 2"]
-                                    : field.options,
-                              })
-                            }
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
-                          >
-                            <option value="text">Texte court</option>
-                            <option value="textarea">Texte long</option>
-                            <option value="number">Nombre / Mesure</option>
-                            <option value="select">Liste de sélection</option>
-                            <option value="checkbox">Case à cocher (Oui/Non)</option>
-                            <option value="date">Date</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                            Section
-                          </label>
-                          <select
-                            value={field.section}
-                            onChange={(e) =>
-                              handleUpdateField(field.id, {
-                                section: e.target.value as "vitals" | "clinical",
-                              })
-                            }
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
-                          >
-                            <option value="vitals">Constantes / Mesures</option>
-                            <option value="clinical">Examen Clinique</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                            Unité (ex: mmHg, g/L)
-                          </label>
-                          <input
-                            type="text"
-                            value={field.unit || ""}
-                            onChange={(e) => handleUpdateField(field.id, { unit: e.target.value })}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                            Placeholder / Exemple
-                          </label>
-                          <input
-                            type="text"
-                            value={field.placeholder || ""}
-                            onChange={(e) =>
-                              handleUpdateField(field.id, { placeholder: e.target.value })
-                            }
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
-                          />
-                        </div>
-
-                        <div className="flex items-end pb-1.5">
-                          <label className="inline-flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(field.required)}
-                              onChange={(e) =>
-                                handleUpdateField(field.id, { required: e.target.checked })
-                              }
-                              className="w-4 h-4 rounded text-sky-600"
-                            />
-                            <span>Champ obligatoire</span>
-                          </label>
-                        </div>
-
-                        {field.type === "select" && (
-                          <div className="sm:col-span-3">
-                            <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                              Options de la liste de sélection (séparées par des virgules)
-                            </label>
-                            <input
-                              type="text"
-                              value={(field.options || []).join(", ")}
-                              onChange={(e) =>
-                                handleUpdateField(field.id, {
-                                  options: e.target.value
-                                    .split(",")
-                                    .map((s) => s.trim())
-                                    .filter(Boolean),
-                                })
-                              }
-                              className="w-full px-3 py-2 rounded-xl border border-sky-300 bg-white font-semibold"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center justify-end gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditingFieldId(isEditing ? null : field.id)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium cursor-pointer"
+                      >
+                        {isEditing ? "Terminer" : "Modifier"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteField(field.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                        title="Supprimer"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
 
-            {/* BARRE D'ACTIONS BAS */}
-            <div className="pt-5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setFields(DEFAULT_CONSULTATION_FIELDS);
-                  setEditingFieldId(null);
-                  showToast("Cases par défaut restaurées. Cliquez sur Enregistrer pour valider.");
-                }}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-sm">restart_alt</span>
-                <span>Réinitialiser par défaut</span>
-              </button>
+                  {isEditing && (
+                    <div className="mt-4 pt-4 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <label className="block font-medium text-slate-600 mb-1">Nom</label>
+                        <input
+                          type="text"
+                          value={field.label}
+                          onChange={(e) => handleUpdateField(field.id, { label: e.target.value })}
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-medium text-slate-600 mb-1">Type</label>
+                        <select
+                          value={field.type}
+                          onChange={(e) =>
+                            handleUpdateField(field.id, {
+                              type: e.target.value as ConsultationFieldType,
+                              options:
+                                e.target.value === "select" && (!field.options || field.options.length === 0)
+                                  ? ["Option 1", "Option 2"]
+                                  : field.options,
+                            })
+                          }
+                          className={inputCls}
+                        >
+                          <option value="text">Texte court</option>
+                          <option value="textarea">Texte long</option>
+                          <option value="number">Nombre</option>
+                          <option value="select">Liste de choix</option>
+                          <option value="checkbox">Oui / Non</option>
+                          <option value="date">Date</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-medium text-slate-600 mb-1">Section</label>
+                        <select
+                          value={field.section}
+                          onChange={(e) =>
+                            handleUpdateField(field.id, {
+                              section: e.target.value as "vitals" | "clinical",
+                            })
+                          }
+                          className={inputCls}
+                        >
+                          <option value="vitals">Constantes & mesures</option>
+                          <option value="clinical">Examen clinique</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-medium text-slate-600 mb-1">Unité</label>
+                        <input
+                          type="text"
+                          value={field.unit || ""}
+                          onChange={(e) => handleUpdateField(field.id, { unit: e.target.value })}
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-medium text-slate-600 mb-1">Exemple (placeholder)</label>
+                        <input
+                          type="text"
+                          value={field.placeholder || ""}
+                          onChange={(e) =>
+                            handleUpdateField(field.id, { placeholder: e.target.value })
+                          }
+                          className={inputCls}
+                        />
+                      </div>
+                      <div className="flex items-end pb-2">
+                        <label className="inline-flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(field.required)}
+                            onChange={(e) =>
+                              handleUpdateField(field.id, { required: e.target.checked })
+                            }
+                            className="w-4 h-4 rounded text-slate-900"
+                          />
+                          <span>Obligatoire</span>
+                        </label>
+                      </div>
+                      {field.type === "select" && (
+                        <div className="sm:col-span-3">
+                          <label className="block font-medium text-slate-600 mb-1">
+                            Choix de la liste (séparés par des virgules)
+                          </label>
+                          <input
+                            type="text"
+                            value={(field.options || []).join(", ")}
+                            onChange={(e) =>
+                              handleUpdateField(field.id, {
+                                options: e.target.value
+                                  .split(",")
+                                  .map((s) => s.trim())
+                                  .filter(Boolean),
+                              })
+                            }
+                            className={inputCls}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-              <button
-                type="button"
-                onClick={handleSaveFields}
-                disabled={isLoading}
-                className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold uppercase tracking-wider shadow-xs transition cursor-pointer disabled:opacity-60"
-              >
-                <span className="material-symbols-outlined text-base">save</span>
-                <span>{isLoading ? "Enregistrement..." : "Enregistrer mes cases"}</span>
-              </button>
-            </div>
+          <div className="px-5 py-4 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setFields(DEFAULT_CONSULTATION_FIELDS);
+                setEditingFieldId(null);
+                showToast("Cases par défaut rétablies — cliquez sur Enregistrer.");
+              }}
+              className="px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium transition cursor-pointer"
+            >
+              Rétablir par défaut
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveFields}
+              disabled={isLoading}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition cursor-pointer disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-[16px]">save</span>
+              <span>{isLoading ? "Enregistrement..." : "Enregistrer mes cases"}</span>
+            </button>
           </div>
         </div>
       )}
 
       {/* ============================================================
-          ONGLET 3 : TEMPLATE D'ORDONNANCE PERSONNALISÉ (PHOTO OU PDF)
+          ONGLET 3 : TEMPLATE D'ORDONNANCE (PHOTO OU PDF)
          ============================================================ */}
       {activeTab === "template" && isDoctor && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* COLONNE GAUCHE : UPLOAD & RÉGLAGES DE POSITION */}
-          <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-6">
-            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-xl">upload_file</span>
-              </div>
-              <div>
-                <h2 className="text-base font-extrabold text-slate-900">
-                  Modèle d'Ordonnance
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Importez votre propre papier à en-tête (Photo ou PDF).
-                </p>
-              </div>
+          <div className="lg:col-span-5 bg-white p-5 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] space-y-5">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Votre modèle d'ordonnance</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Importez votre papier à en-tête (Photo PNG/JPG ou PDF). Les ordonnances s'y rempliront automatiquement.
+              </p>
             </div>
 
-            {/* Zone d'upload */}
             <div>
               <input
                 ref={fileInputRef}
@@ -1009,40 +884,35 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isConvertingFile}
-                className="w-full p-6 rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50/40 hover:bg-teal-50 transition flex flex-col items-center justify-center gap-2 text-center cursor-pointer disabled:opacity-60"
+                className="w-full p-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-100/70 transition flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer disabled:opacity-60"
               >
-                <span className="material-symbols-outlined text-3xl text-teal-600">
-                  {isConvertingFile ? "hourglass_top" : "cloud_upload"}
+                <span className="material-symbols-outlined text-2xl text-slate-500">
+                  {isConvertingFile ? "hourglass_top" : "upload_file"}
                 </span>
-                <p className="text-xs font-extrabold text-slate-900">
+                <p className="text-xs font-semibold text-slate-900">
                   {isConvertingFile
-                    ? "Conversion du modèle en haute qualité..."
+                    ? "Conversion en cours..."
                     : templateUrl
-                    ? "Changer le template (Photo ou PDF)"
-                    : "Importer votre template (Photo PNG/JPG ou PDF)"}
+                    ? "Remplacer le fichier (Photo ou PDF)"
+                    : "Choisir une photo ou un PDF"}
                 </p>
-                <p className="text-[11px] text-slate-500">
-                  {templateName ? `Fichier actuel : ${templateName}` : "Scan de votre ordonnance papier, Canva, Word exporté en PDF..."}
-                </p>
+                {templateName && (
+                  <p className="text-[11px] text-slate-500 truncate max-w-full">{templateName}</p>
+                )}
               </button>
             </div>
 
-            {/* Réglages visuels de calage du texte */}
             {templateUrl && (
-              <div className="space-y-4 pt-2 border-t border-slate-100 text-xs">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                  Calage du texte sur votre template
-                </p>
-
+              <div className="space-y-4 pt-3 border-t border-slate-100 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-700">Format papier</span>
+                  <span className="font-medium text-slate-700">Format papier</span>
                   <div className="flex gap-1.5">
                     {(["A4", "A5"] as const).map((fmt) => (
                       <button
                         key={fmt}
                         type="button"
                         onClick={() => setLayout((l) => ({ ...l, paperSize: fmt }))}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold border cursor-pointer ${
+                        className={`px-3 py-1 rounded-md text-xs font-medium border cursor-pointer ${
                           layout.paperSize === fmt
                             ? "bg-slate-900 text-white border-slate-900"
                             : "bg-white text-slate-600 border-slate-200"
@@ -1054,24 +924,24 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                   </div>
                 </div>
 
-                <label className="flex items-center justify-between cursor-pointer py-1">
-                  <span className="font-bold text-slate-700">Afficher Nom Patient & Date</span>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="font-medium text-slate-700">Afficher patient & date</span>
                   <input
                     type="checkbox"
                     checked={layout.showPatientInfo}
                     onChange={(e) =>
                       setLayout((l) => ({ ...l, showPatientInfo: e.target.checked }))
                     }
-                    className="w-4 h-4 rounded text-teal-600"
+                    className="w-4 h-4 rounded text-slate-900"
                   />
                 </label>
 
                 {layout.showPatientInfo && (
-                  <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <div className="grid grid-cols-2 gap-3 pt-1">
                     <div>
-                      <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
-                        <span>Patient Haut</span>
-                        <span>{layout.patientTop}%</span>
+                      <div className="flex justify-between text-[11px] text-slate-600 mb-1">
+                        <span>Patient (haut)</span>
+                        <span className="tabular-nums">{layout.patientTop}%</span>
                       </div>
                       <input
                         type="range"
@@ -1081,13 +951,13 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                         onChange={(e) =>
                           setLayout((l) => ({ ...l, patientTop: Number(e.target.value) }))
                         }
-                        className="w-full accent-teal-600"
+                        className="w-full accent-slate-900"
                       />
                     </div>
                     <div>
-                      <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
-                        <span>Patient Gauche</span>
-                        <span>{layout.patientLeft}%</span>
+                      <div className="flex justify-between text-[11px] text-slate-600 mb-1">
+                        <span>Patient (gauche)</span>
+                        <span className="tabular-nums">{layout.patientLeft}%</span>
                       </div>
                       <input
                         type="range"
@@ -1097,17 +967,17 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                         onChange={(e) =>
                           setLayout((l) => ({ ...l, patientLeft: Number(e.target.value) }))
                         }
-                        className="w-full accent-teal-600"
+                        className="w-full accent-slate-900"
                       />
                     </div>
                   </div>
                 )}
 
-                <div className="space-y-3 p-3 rounded-xl bg-slate-50 border border-slate-200/70">
+                <div className="space-y-3 pt-2 border-t border-slate-100">
                   <div>
-                    <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
-                      <span>Début des médicaments (Haut)</span>
-                      <span>{layout.medsTop}%</span>
+                    <div className="flex justify-between text-[11px] text-slate-600 mb-1">
+                      <span>Zone médicaments (haut)</span>
+                      <span className="tabular-nums">{layout.medsTop}%</span>
                     </div>
                     <input
                       type="range"
@@ -1117,15 +987,15 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                       onChange={(e) =>
                         setLayout((l) => ({ ...l, medsTop: Number(e.target.value) }))
                       }
-                      className="w-full accent-teal-600"
+                      className="w-full accent-slate-900"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
-                        <span>Marge Gauche</span>
-                        <span>{layout.medsLeft}%</span>
+                      <div className="flex justify-between text-[11px] text-slate-600 mb-1">
+                        <span>Marge gauche</span>
+                        <span className="tabular-nums">{layout.medsLeft}%</span>
                       </div>
                       <input
                         type="range"
@@ -1135,14 +1005,13 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                         onChange={(e) =>
                           setLayout((l) => ({ ...l, medsLeft: Number(e.target.value) }))
                         }
-                        className="w-full accent-teal-600"
+                        className="w-full accent-slate-900"
                       />
                     </div>
-
                     <div>
-                      <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
-                        <span>Marge Droite</span>
-                        <span>{layout.medsRight}%</span>
+                      <div className="flex justify-between text-[11px] text-slate-600 mb-1">
+                        <span>Marge droite</span>
+                        <span className="tabular-nums">{layout.medsRight}%</span>
                       </div>
                       <input
                         type="range"
@@ -1152,15 +1021,15 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                         onChange={(e) =>
                           setLayout((l) => ({ ...l, medsRight: Number(e.target.value) }))
                         }
-                        className="w-full accent-teal-600"
+                        className="w-full accent-slate-900"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
+                    <div className="flex justify-between text-[11px] text-slate-600 mb-1">
                       <span>Taille du texte</span>
-                      <span>{layout.fontSize} px</span>
+                      <span className="tabular-nums">{layout.fontSize} px</span>
                     </div>
                     <input
                       type="range"
@@ -1170,23 +1039,21 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                       onChange={(e) =>
                         setLayout((l) => ({ ...l, fontSize: Number(e.target.value) }))
                       }
-                      className="w-full accent-teal-600"
+                      className="w-full accent-slate-900"
                     />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Boutons d'action */}
-            <div className="space-y-2.5 pt-2">
+            <div className="space-y-2 pt-2">
               <button
                 type="button"
                 onClick={handleSaveTemplate}
                 disabled={isLoading}
-                className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold uppercase tracking-wider shadow-xs transition cursor-pointer disabled:opacity-60"
+                className="w-full py-2.5 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition cursor-pointer disabled:opacity-60"
               >
-                <span className="material-symbols-outlined text-base">save</span>
-                <span>{isLoading ? "Enregistrement..." : "Enregistrer ce template"}</span>
+                {isLoading ? "Enregistrement..." : "Enregistrer ce template"}
               </button>
 
               {templateUrl && (
@@ -1194,44 +1061,34 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                   <button
                     type="button"
                     onClick={handleTestDownloadPdf}
-                    className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer"
+                    className="py-2 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-medium transition cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
-                    <span>Tester PDF</span>
+                    Tester PDF
                   </button>
-
                   <button
                     type="button"
                     onClick={handleRemoveTemplate}
                     disabled={isLoading}
-                    className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-bold transition cursor-pointer"
+                    className="py-2 px-3 rounded-lg border border-red-200 bg-white hover:bg-red-50 text-red-600 text-xs font-medium transition cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">delete</span>
-                    <span>Supprimer</span>
+                    Supprimer
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* COLONNE DROITE : APERÇU EN DIRECT DU RENDU FINAL */}
-          <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+          {/* Aperçu en direct */}
+          <div className="lg:col-span-7 bg-white p-5 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-900">
-                  Aperçu en direct de l'ordonnance remplie
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Voici exactement comment vos médicaments seront placés sur votre feuille.
-                </p>
-              </div>
-              <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-extrabold uppercase">
-                {templateUrl ? `Template ${layout.paperSize}` : "Modèle Standard"}
+              <h3 className="text-sm font-semibold text-slate-900">Aperçu en direct</h3>
+              <span className="text-xs text-slate-500">
+                {templateUrl ? `Format ${layout.paperSize}` : "Modèle standard"}
               </span>
             </div>
 
             {templateUrl ? (
-              <div className="w-full max-w-[480px] mx-auto relative rounded-2xl border border-slate-300 shadow-lg overflow-hidden bg-white aspect-[210/297]">
+              <div className="w-full max-w-[460px] mx-auto relative rounded-lg border border-slate-300 shadow-sm overflow-hidden bg-white aspect-[210/297]">
                 <img
                   src={templateUrl}
                   alt="Aperçu du modèle d'ordonnance"
@@ -1248,13 +1105,13 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                     }}
                   >
                     <p
-                      className="font-extrabold uppercase leading-tight"
+                      className="font-bold uppercase leading-tight"
                       style={{ fontSize: `${Math.max(8, layout.fontSize * 0.68)}px` }}
                     >
                       Patient(e) : BENALI AHMED (42 ans)
                     </p>
                     <p
-                      className="text-slate-700 font-medium"
+                      className="text-slate-700"
                       style={{ fontSize: `${Math.max(7, (layout.fontSize - 2) * 0.68)}px` }}
                     >
                       {initialSettings.city}, le {demoDateStr}
@@ -1272,7 +1129,7 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                 >
                   <div>
                     <p
-                      className="font-extrabold uppercase leading-snug"
+                      className="font-bold uppercase leading-snug"
                       style={{ fontSize: `${Math.max(8, (layout.fontSize + 1) * 0.68)}px` }}
                     >
                       01. AMOXICILLINE 1G CP
@@ -1286,7 +1143,7 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                   </div>
                   <div>
                     <p
-                      className="font-extrabold uppercase leading-snug"
+                      className="font-bold uppercase leading-snug"
                       style={{ fontSize: `${Math.max(8, (layout.fontSize + 1) * 0.68)}px` }}
                     >
                       02. DOLIPRANE 1000MG CP
@@ -1301,15 +1158,10 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
                 </div>
               </div>
             ) : (
-              <div className="p-12 rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-center space-y-2">
-                <span className="material-symbols-outlined text-4xl text-slate-300">
-                  description
-                </span>
-                <p className="text-xs font-bold text-slate-700">
-                  Aucun template personnalisé importé pour le moment
-                </p>
-                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                  Par défaut, MonCabinet génère automatiquement une ordonnance officielle propre avec les coordonnées de votre cabinet. Importez votre propre photo ou PDF à gauche pour la remplacer.
+              <div className="py-16 px-6 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-center">
+                <p className="text-sm font-medium text-slate-700">Aucun modèle personnalisé importé</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                  Par défaut, MonCabinet utilise une ordonnance officielle propre avec les coordonnées de votre cabinet. Importez une photo ou un PDF à gauche pour utiliser votre propre modèle.
                 </p>
               </div>
             )}

@@ -303,7 +303,7 @@ export async function activateClinicFromRequest(request: typeof onboardingReques
     });
   }
 
-  // 4. Paramètres par défaut de la clinique
+  // 4. Paramètres par défaut de la clinique (uniquement les vraies informations saisies)
   await db.insert(clinicSettings).values({
     clinicId: newClinic.id,
     clinicName: request.clinicName,
@@ -312,9 +312,9 @@ export async function activateClinicFromRequest(request: typeof onboardingReques
     phone: request.doctorPhone,
     email: request.doctorEmail,
     city: request.clinicCity,
-    address: request.clinicAddress || "Adresse du cabinet",
-    orderNumber: `INPE: ${crypto.randomInt(100000000, 999999999)}`,
-    taxId: `IF: ${crypto.randomInt(10000000, 99999999)}`,
+    address: request.clinicAddress || "",
+    orderNumber: "",
+    taxId: "",
     defaultFee: "250.00",
   });
 

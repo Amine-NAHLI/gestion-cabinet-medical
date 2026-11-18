@@ -19,10 +19,14 @@ interface PaymentButtonProps {
 }
 
 export default function PaymentButton({ visitId, initialAmount, patient, settings }: PaymentButtonProps) {
+  const defaultClinicFee = settings?.defaultFee
+    ? String(parseFloat(String(settings.defaultFee)))
+    : "250";
   const [isLoading, setIsLoading] = useState(false);
-  const [amount, setAmount] = useState<string>(initialAmount ? String(initialAmount) : "250");
+  const [amount, setAmount] = useState<string>(initialAmount ? String(initialAmount) : defaultClinicFee);
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   async function handlePayment() {
     const finalAmount = initialAmount ? parseFloat(initialAmount) : parseFloat(amount);
@@ -44,7 +48,15 @@ export default function PaymentButton({ visitId, initialAmount, patient, setting
   }
 
   function handlePrintReceipt() {
-    window.print();
+    setIsPrinting(true);
+    const cleanup = () => {
+      setIsPrinting(false);
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    setTimeout(() => {
+      window.print();
+    }, 120);
   }
 
   return (
@@ -105,15 +117,17 @@ export default function PaymentButton({ visitId, initialAmount, patient, setting
         </button>
       )}
 
-      {/* Impression Invisible Reçu */}
-      <ReceiptPDF
-        patient={patient}
-        amount={initialAmount || amount}
-        paymentMethod={paymentMethod}
-        date={new Date()}
-        visitId={visitId}
-        settings={settings}
-      />
+      {/* Impression Invisible Reçu (monté uniquement pour le patient sélectionné) */}
+      {isPrinting && (
+        <ReceiptPDF
+          patient={patient}
+          amount={initialAmount || amount}
+          paymentMethod={paymentMethod}
+          date={new Date()}
+          visitId={visitId}
+          settings={settings}
+        />
+      )}
     </div>
   );
 }

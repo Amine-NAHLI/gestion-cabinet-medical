@@ -37,20 +37,25 @@ export default function PrescriptionPDF({
 }: PrescriptionPDFProps) {
   if (!patient) return null;
 
-  const doctorName = settings?.doctorName || "Dr. Praticien";
-  const specialty = settings?.specialty || "Médecine Générale";
-  const clinicName = settings?.clinicName || "Cabinet Médical";
-  const address = settings?.address || "120 Boulevard d'Anfa";
-  const city = settings?.city || "Casablanca";
-  const phone = settings?.phone || "05 22 45 67 89";
-  const email = settings?.email || "contact@moncabinet.ma";
-  const orderNumber = settings?.orderNumber || "INPE: 045812903 • Ordre: 14209";
+  const doctorName = settings?.doctorName?.trim() || "";
+  const specialty = settings?.specialty?.trim() || "";
+  const clinicName = settings?.clinicName?.trim() || "Cabinet Médical";
+  const address = settings?.address?.trim() || "";
+  const city = settings?.city?.trim() || "";
+  const phone = settings?.phone?.trim() || "";
+  const email = settings?.email?.trim() || "";
+  const orderNumber = settings?.orderNumber?.trim() || "";
 
   const dateStr = date.toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
+  const formattedPlaceDate = city ? `${city}, le ${dateStr}` : `Le ${dateStr}`;
+  const locationLine = [address, city].filter(Boolean).join(", ");
+  const contactLine = [phone ? `Tél : ${phone}` : "", email ? `Email : ${email}` : ""]
+    .filter(Boolean)
+    .join(" • ");
 
   const templateUrl = settings?.prescriptionTemplateUrl || null;
   const layout: PrescriptionTemplateLayout = {
@@ -92,7 +97,7 @@ export default function PrescriptionPDF({
               className="text-slate-700 font-medium mt-0.5"
               style={{ fontSize: `${Math.max(11, layout.fontSize - 2)}px` }}
             >
-              {city}, le {dateStr}
+              {formattedPlaceDate}
             </p>
           </div>
         )}
@@ -144,23 +149,27 @@ export default function PrescriptionPDF({
       <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
         <div className="text-left space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-wider text-slate-950 font-serif">
-            {doctorName}
+            {doctorName || clinicName}
           </h1>
-          <p className="text-sm font-bold text-sky-800 tracking-wide">
-            {specialty}
-          </p>
-          <p className="text-xs font-semibold text-slate-600">
-            {clinicName}
-          </p>
+          {specialty && (
+            <p className="text-sm font-bold text-sky-800 tracking-wide">
+              {specialty}
+            </p>
+          )}
+          {doctorName && clinicName && clinicName !== doctorName && (
+            <p className="text-xs font-semibold text-slate-600">
+              {clinicName}
+            </p>
+          )}
           <div className="text-[11px] text-slate-500 font-medium pt-1 space-y-0.5">
-            <p>{address}, {city}</p>
-            <p>Tél : {phone} • Email : {email}</p>
+            {locationLine && <p>{locationLine}</p>}
+            {contactLine && <p>{contactLine}</p>}
             {orderNumber && <p className="font-mono text-[10px] text-slate-400">{orderNumber}</p>}
           </div>
         </div>
 
         <div className="text-right text-xs font-medium text-slate-600 space-y-1">
-          <p className="text-slate-800 font-bold">{city}, le {dateStr}</p>
+          <p className="text-slate-800 font-bold">{formattedPlaceDate}</p>
           <span className="inline-block px-3 py-1 bg-slate-100 rounded-md font-mono text-[10px] text-slate-600 uppercase">
             Document Médical Officiel
           </span>

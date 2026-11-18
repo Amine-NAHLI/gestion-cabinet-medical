@@ -2,12 +2,14 @@ import { db } from "@/db";
 import { visits, patients } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getTenantClinicId } from "@/lib/tenant";
+import { getClinicSettings } from "@/actions/settings";
 import StatsCharts from "./StatsCharts";
 
 export const dynamic = "force-dynamic";
 
 export default async function StatsPage() {
   const clinicId = await getTenantClinicId();
+  const settings = await getClinicSettings(clinicId);
 
   // Récupérer toutes les consultations terminées pour ce cabinet
   const allVisits = await db
@@ -38,6 +40,18 @@ export default async function StatsPage() {
     paidAt: v.paidAt ? v.paidAt.toISOString() : null,
   }));
 
+  const clinicInfo = {
+    clinicName: settings?.clinicName || "",
+    doctorName: settings?.doctorName || "",
+    specialty: settings?.specialty || "",
+    phone: settings?.phone || "",
+    email: settings?.email || "",
+    address: settings?.address || "",
+    city: settings?.city || "",
+    orderNumber: settings?.orderNumber || "",
+    taxId: settings?.taxId || "",
+  };
+
   return (
     <div className="space-y-6 pb-8">
       <div>
@@ -45,7 +59,7 @@ export default async function StatsPage() {
         <p className="text-slate-500 text-sm mt-0.5">Activité clinique, recettes et répartition des consultations.</p>
       </div>
 
-      <StatsCharts rawVisits={clientVisits} />
+      <StatsCharts rawVisits={clientVisits} clinicInfo={clinicInfo} />
     </div>
   );
 }
