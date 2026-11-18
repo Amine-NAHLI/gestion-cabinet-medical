@@ -27,8 +27,16 @@ interface PatientWithHistory {
     diagnosis: string | null;
     notes: string | null;
     status: string;
+    bloodPressure?: string | null;
+    heartRate?: number | null;
+    temperature?: string | null;
+    weight?: string | null;
+    height?: string | null;
     amountToPay: string | null;
     paymentStatus: string;
+    paymentMethod?: string | null;
+    customData?: { id: string; label: string; value: string; unit?: string }[];
+    medicines?: { name: string; instructions: string }[];
   }[];
 }
 
@@ -346,43 +354,130 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                   ) : (
                     <div className="space-y-3">
                       {selectedPatient.visits.map((v) => {
-                        const dateFormatted = new Date(v.date).toLocaleDateString("fr-FR", {
+                        const d = new Date(v.date);
+                        const dateFormatted = d.toLocaleDateString("fr-FR", {
+                          weekday: "long",
                           day: "numeric",
                           month: "long",
                           year: "numeric",
                         });
+                        const timeFormatted = d.toLocaleTimeString("fr-FR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                        const hasVitals =
+                          v.bloodPressure || v.heartRate || v.temperature || v.weight || v.height;
+                        const bmiVal =
+                          v.weight && v.height && parseFloat(v.height) > 0
+                            ? (
+                                parseFloat(v.weight) /
+                                Math.pow(parseFloat(v.height) / 100, 2)
+                              ).toFixed(1)
+                            : null;
+                        const meds = v.medicines || [];
 
                         return (
                           <div
                             key={v.id}
-                            className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-2"
+                            className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-3"
                           >
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-slate-900 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-sm text-slate-400">calendar_today</span>
-                                {dateFormatted}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 text-xs">
+                              <span className="font-extrabold text-slate-900 flex items-center gap-2 capitalize">
+                                <span className="material-symbols-outlined text-sm text-indigo-600">
+                                  calendar_today
+                                </span>
+                                {dateFormatted} à {timeFormatted}
                               </span>
                               <span className="font-bold text-slate-700">
-                                {v.amountToPay ? `${v.amountToPay} DH` : "Sans frais"} ({v.paymentStatus === 'paid' ? 'Payé' : 'En attente'})
+                                {v.amountToPay ? `${v.amountToPay} DH` : "Sans frais"} (
+                                {v.paymentStatus === "paid" ? "Payé" : "En attente"})
                               </span>
                             </div>
 
+                            {hasVitals && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {v.bloodPressure && (
+                                  <span className="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-100 text-[11px] font-bold text-sky-900">
+                                    TA : {v.bloodPressure}
+                                  </span>
+                                )}
+                                {v.heartRate && (
+                                  <span className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-100 text-[11px] font-bold text-rose-900">
+                                    Pouls : {v.heartRate} bpm
+                                  </span>
+                                )}
+                                {v.temperature && (
+                                  <span className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-100 text-[11px] font-bold text-amber-900">
+                                    Temp : {v.temperature} °C
+                                  </span>
+                                )}
+                                {v.weight && (
+                                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-bold text-slate-800">
+                                    Poids : {v.weight} kg
+                                  </span>
+                                )}
+                                {v.height && (
+                                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-bold text-slate-800">
+                                    Taille : {v.height} cm
+                                  </span>
+                                )}
+                                {bmiVal && (
+                                  <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-[11px] font-extrabold text-indigo-800">
+                                    IMC : {bmiVal}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
                             {v.disease && (
                               <p className="text-xs text-slate-600">
-                                <span className="font-bold text-slate-800">Motif :</span> {v.disease}
+                                <span className="font-bold text-slate-800">Motif / Maladie :</span>{" "}
+                                {v.disease}
                               </p>
                             )}
 
                             {v.diagnosis && (
-                              <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                <span className="font-bold text-slate-900">Diagnostic :</span> {v.diagnosis}
+                              <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 whitespace-pre-line">
+                                <span className="font-bold text-slate-900">Diagnostic :</span>{" "}
+                                {v.diagnosis}
                               </p>
                             )}
 
                             {v.notes && (
-                              <p className="text-[11px] text-slate-500 italic">
-                                Notes : {v.notes}
+                              <p className="text-xs text-slate-600 bg-sky-50/40 p-2.5 rounded-xl border border-sky-100 whitespace-pre-line">
+                                <span className="font-bold text-sky-900">Notes :</span> {v.notes}
                               </p>
+                            )}
+
+                            {v.customData && v.customData.length > 0 && (
+                              <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {v.customData.map((cf, cIdx) => (
+                                  <div key={`${cf.id}-${cIdx}`} className="text-xs">
+                                    <span className="font-bold text-indigo-900">{cf.label} : </span>
+                                    <span className="text-slate-700">
+                                      {cf.value}
+                                      {cf.unit ? ` ${cf.unit}` : ""}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {meds.length > 0 && (
+                              <div className="bg-teal-50/40 border border-teal-100 rounded-xl p-3 space-y-1.5">
+                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-teal-800 flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-xs">medication</span>
+                                  Ordonnance ({meds.length})
+                                </p>
+                                {meds.map((m, idx) => (
+                                  <div key={idx} className="text-xs text-slate-800">
+                                    <span className="font-bold">• {m.name}</span>
+                                    {m.instructions && (
+                                      <span className="text-slate-600"> — {m.instructions}</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             )}
                           </div>
                         );

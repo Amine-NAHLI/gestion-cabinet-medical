@@ -2,12 +2,6 @@ import "dotenv/config";
 import { db } from "../db";
 import { users, clinics, onboardingRequests } from "../db/schema";
 import { registerClinic, verifyOtpCode } from "../actions/onboarding";
-import {
-  adminApproveRequest,
-  adminUpdateUserPassword,
-  adminToggleUserStatus,
-  adminToggleClinicStatus,
-} from "../actions/admin";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 

@@ -16,13 +16,36 @@ export async function registerClinic(data: {
   clinicName: string;
   clinicCity: string;
   clinicAddress?: string;
-  assistantName?: string;
-  assistantEmail?: string;
-  assistantPassword?: string;
+  assistantName: string;
+  assistantEmail: string;
+  assistantPassword: string;
 }) {
   try {
     const cleanDoctorEmail = data.doctorEmail.trim().toLowerCase();
-    const cleanAssistantEmail = data.assistantEmail?.trim().toLowerCase();
+    const cleanAssistantEmail = data.assistantEmail?.trim().toLowerCase() || "";
+    const cleanAssistantName = data.assistantName?.trim() || "";
+    const cleanAssistantPassword = data.assistantPassword?.trim() || "";
+
+    // 0. Validation obligatoire du compte Assistante avec le Médecin
+    if (!cleanAssistantName || !cleanAssistantEmail || !cleanAssistantPassword) {
+      return {
+        error: "La création du compte Assistante (nom, email et mot de passe) est obligatoire avec le compte Médecin.",
+      };
+    }
+
+    if (data.doctorPassword.trim().length < 6) {
+      return { error: "Le mot de passe du médecin doit contenir au moins 6 caractères." };
+    }
+
+    if (cleanAssistantPassword.length < 6) {
+      return { error: "Le mot de passe de l'assistante doit contenir au moins 6 caractères." };
+    }
+
+    if (cleanAssistantEmail === cleanDoctorEmail) {
+      return {
+        error: "L'adresse email de l'assistante doit être différente de celle du médecin.",
+      };
+    }
 
     // 1. Vérifier si l'email du médecin existe déjà dans les utilisateurs actifs
     const existingUser = await db
@@ -35,17 +58,15 @@ export async function registerClinic(data: {
       return { error: "Un compte praticien existe déjà avec cet email." };
     }
 
-    // Si assistante renseignée, vérifier son email
-    if (cleanAssistantEmail) {
-      const existingAssistant = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, cleanAssistantEmail))
-        .limit(1);
+    // Vérifier l'email de l'assistante
+    const existingAssistant = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, cleanAssistantEmail))
+      .limit(1);
 
-      if (existingAssistant.length > 0) {
-        return { error: "Cet email d'assistante est déjà attribué à un autre compte." };
-      }
+    if (existingAssistant.length > 0) {
+      return { error: "Cet email d'assistante est déjà attribué à un autre compte." };
     }
 
     // 2. Générer le code OTP sécurisé à 6 chiffres
@@ -54,10 +75,8 @@ export async function registerClinic(data: {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     // 3. Hasher les mots de passe
-    const doctorPasswordHash = await bcrypt.hash(data.doctorPassword, 10);
-    const assistantPasswordHash = data.assistantPassword
-      ? await bcrypt.hash(data.assistantPassword, 10)
-      : null;
+    const doctorPasswordHash = await bcrypt.hash(data.doctorPassword.trim(), 10);
+    const assistantPasswordHash = await bcrypt.hash(cleanAssistantPassword, 10);
 
     // 4. Insérer dans la table des demandes
     const [insertedRequest] = await db
@@ -71,8 +90,8 @@ export async function registerClinic(data: {
         doctorPassword: doctorPasswordHash,
         doctorPhone: data.doctorPhone.trim(),
         specialty: data.specialty.trim(),
-        assistantName: data.assistantName?.trim() || null,
-        assistantEmail: cleanAssistantEmail || null,
+        assistantName: cleanAssistantName,
+        assistantEmail: cleanAssistantEmail,
         assistantPassword: assistantPasswordHash,
         otpCode,
         expiresAt,
@@ -89,7 +108,7 @@ export async function registerClinic(data: {
       specialty: data.specialty.trim(),
       clinicName: data.clinicName.trim(),
       clinicCity: data.clinicCity.trim(),
-      assistantName: data.assistantName?.trim(),
+      assistantName: cleanAssistantName,
       assistantEmail: cleanAssistantEmail,
       otpCode,
       requestId: insertedRequest.id,

@@ -14,14 +14,34 @@ export async function updateMedicalNotes(visitId: number, formData: FormData) {
 
   const clinicId = await getTenantClinicId();
 
-  const disease = (formData.get("disease") as string || "").trim() || null;
-  const diagnosis = (formData.get("diagnosis") as string || "").trim() || null;
-  const notes = (formData.get("notes") as string || "").trim() || null;
-  const bloodPressure = (formData.get("bloodPressure") as string || "").trim() || null;
-  const heartRate = parseInt(formData.get("heartRate") as string) || null;
-  const temperature = formData.get("temperature") as string || null;
-  const weight = formData.get("weight") as string || null;
-  const height = formData.get("height") as string || null;
+  const parseNumericStr = (val: FormDataEntryValue | null) => {
+    const cleaned = ((val as string) || "").trim().replace(",", ".");
+    if (!cleaned || isNaN(Number(cleaned))) return null;
+    return cleaned;
+  };
+
+  const disease = ((formData.get("disease") as string) || "").trim() || null;
+  const diagnosis = ((formData.get("diagnosis") as string) || "").trim() || null;
+  const notes = ((formData.get("notes") as string) || "").trim() || null;
+  const bloodPressure = ((formData.get("bloodPressure") as string) || "").trim() || null;
+  const heartRateRaw = parseInt(((formData.get("heartRate") as string) || "").trim(), 10);
+  const heartRate = !isNaN(heartRateRaw) ? heartRateRaw : null;
+  const temperature = parseNumericStr(formData.get("temperature"));
+  const weight = parseNumericStr(formData.get("weight"));
+  const height = parseNumericStr(formData.get("height"));
+
+  let customData: unknown = null;
+  const customDataRaw = formData.get("customData") as string | null;
+  if (customDataRaw) {
+    try {
+      const parsed = JSON.parse(customDataRaw);
+      if (Array.isArray(parsed)) {
+        customData = parsed;
+      }
+    } catch {
+      customData = null;
+    }
+  }
 
   try {
     await db
@@ -35,10 +55,12 @@ export async function updateMedicalNotes(visitId: number, formData: FormData) {
         temperature,
         weight,
         height,
+        customData,
       })
       .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)));
-    
+
     revalidatePath(`/dashboard/consultation/${visitId}`);
+    revalidatePath("/dashboard/patients");
     return { success: true };
   } catch (error) {
     console.error("Erreur mise à jour notes médicales:", error);

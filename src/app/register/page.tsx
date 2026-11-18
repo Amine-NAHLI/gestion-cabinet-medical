@@ -22,25 +22,35 @@ export default function RegisterPage() {
     clinicName: "",
     clinicCity: "Casablanca",
     clinicAddress: "",
-    hasAssistant: true,
     assistantName: "",
     assistantEmail: "",
     assistantPassword: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    if (type === "checkbox") {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({ ...prev, [name]: checked }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!formData.assistantName.trim() || !formData.assistantEmail.trim() || !formData.assistantPassword.trim()) {
+      setError("Veuillez renseigner toutes les informations du compte Assistante (obligatoire).");
+      return;
+    }
+
+    if (formData.doctorEmail.trim().toLowerCase() === formData.assistantEmail.trim().toLowerCase()) {
+      setError("L'email de l'assistante doit être différent de celui du médecin.");
+      return;
+    }
+
+    if (formData.doctorPassword.trim().length < 6 || formData.assistantPassword.trim().length < 6) {
+      setError("Les mots de passe du médecin et de l'assistante doivent contenir au moins 6 caractères.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -53,9 +63,9 @@ export default function RegisterPage() {
         clinicName: formData.clinicName,
         clinicCity: formData.clinicCity,
         clinicAddress: formData.clinicAddress,
-        assistantName: formData.hasAssistant ? formData.assistantName : undefined,
-        assistantEmail: formData.hasAssistant ? formData.assistantEmail : undefined,
-        assistantPassword: formData.hasAssistant ? formData.assistantPassword : undefined,
+        assistantName: formData.assistantName,
+        assistantEmail: formData.assistantEmail,
+        assistantPassword: formData.assistantPassword,
       };
 
       const res: any = await registerClinic(payload);
@@ -288,7 +298,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Section 3 : Assistante Médicale */}
+          {/* Section 3 : Assistante Médicale (Obligatoire) */}
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-xl shadow-slate-900/[0.03]">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -301,69 +311,62 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  name="hasAssistant"
-                  checked={formData.hasAssistant}
-                  onChange={handleChange}
-                  className="w-4 h-4 rounded text-slate-900 border-slate-300 focus:ring-0 cursor-pointer"
-                />
-                <span className="text-xs font-semibold text-slate-700">Créer ce compte</span>
-              </label>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200/80 text-[10px] font-bold uppercase tracking-wider text-purple-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                Obligatoire
+              </span>
             </div>
 
-            {formData.hasAssistant && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="assistantName">
-                    Nom de l'assistante <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="assistantName"
-                    type="text"
-                    name="assistantName"
-                    required={formData.hasAssistant}
-                    placeholder="Salma Kabbaj"
-                    value={formData.assistantName}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition shadow-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="assistantEmail">
-                    Email de connexion <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="assistantEmail"
-                    type="email"
-                    name="assistantEmail"
-                    required={formData.hasAssistant}
-                    placeholder="assistante@cabinet.ma"
-                    value={formData.assistantEmail}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition shadow-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="assistantPassword">
-                    Mot de passe <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="assistantPassword"
-                    type="password"
-                    name="assistantPassword"
-                    required={formData.hasAssistant}
-                    placeholder="••••••••"
-                    value={formData.assistantPassword}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition shadow-xs"
-                  />
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="assistantName">
+                  Nom de l'assistante <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="assistantName"
+                  type="text"
+                  name="assistantName"
+                  required
+                  placeholder="Salma Kabbaj"
+                  value={formData.assistantName}
+                  onChange={handleChange}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition shadow-xs"
+                />
               </div>
-            )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="assistantEmail">
+                  Email de connexion <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="assistantEmail"
+                  type="email"
+                  name="assistantEmail"
+                  required
+                  placeholder="assistante@cabinet.ma"
+                  value={formData.assistantEmail}
+                  onChange={handleChange}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition shadow-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5" htmlFor="assistantPassword">
+                  Mot de passe <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="assistantPassword"
+                  type="password"
+                  name="assistantPassword"
+                  required
+                  minLength={6}
+                  placeholder="•••••••• (min. 6 car.)"
+                  value={formData.assistantPassword}
+                  onChange={handleChange}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition shadow-xs"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Bouton de Soumission */}

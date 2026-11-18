@@ -1,3 +1,8 @@
+import {
+  PrescriptionTemplateLayout,
+  DEFAULT_PRESCRIPTION_LAYOUT,
+} from "@/lib/consultationConfig";
+
 interface PrescriptionPDFProps {
   patient: {
     firstName: string;
@@ -19,6 +24,8 @@ interface PrescriptionPDFProps {
     city?: string;
     orderNumber?: string | null;
     taxId?: string | null;
+    prescriptionTemplateUrl?: string | null;
+    prescriptionTemplateLayout?: PrescriptionTemplateLayout | null;
   } | null;
 }
 
@@ -30,7 +37,7 @@ export default function PrescriptionPDF({
 }: PrescriptionPDFProps) {
   if (!patient) return null;
 
-  const doctorName = settings?.doctorName || "Dr. Amine Vance";
+  const doctorName = settings?.doctorName || "Dr. Praticien";
   const specialty = settings?.specialty || "Médecine Générale";
   const clinicName = settings?.clinicName || "Cabinet Médical";
   const address = settings?.address || "120 Boulevard d'Anfa";
@@ -45,6 +52,92 @@ export default function PrescriptionPDF({
     year: "numeric",
   });
 
+  const templateUrl = settings?.prescriptionTemplateUrl || null;
+  const layout: PrescriptionTemplateLayout = {
+    ...DEFAULT_PRESCRIPTION_LAYOUT,
+    ...(settings?.prescriptionTemplateLayout || {}),
+  };
+
+  // MODE 1 : TEMPLATE PERSONNALISÉ DU MÉDECIN (PHOTO OU PDF)
+  if (templateUrl) {
+    return (
+      <div
+        className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[99999] w-full h-screen overflow-hidden"
+        style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+      >
+        {/* Image de fond plein cadre */}
+        <img
+          src={templateUrl}
+          alt="Modèle d'ordonnance du cabinet"
+          className="absolute inset-0 w-full h-full object-fill"
+        />
+
+        {/* Bloc Patient & Date calé sur le template */}
+        {layout.showPatientInfo && (
+          <div
+            className="absolute z-10 text-slate-900"
+            style={{
+              top: `${layout.patientTop}%`,
+              left: `${layout.patientLeft}%`,
+              right: `${layout.medsRight}%`,
+            }}
+          >
+            <p
+              className="font-extrabold uppercase tracking-tight text-slate-950"
+              style={{ fontSize: `${layout.fontSize}px` }}
+            >
+              Patient(e) : {patient.lastName} {patient.firstName} ({patient.age} ans)
+            </p>
+            <p
+              className="text-slate-700 font-medium mt-0.5"
+              style={{ fontSize: `${Math.max(11, layout.fontSize - 2)}px` }}
+            >
+              {city}, le {dateStr}
+            </p>
+          </div>
+        )}
+
+        {/* Zone Médicaments remplie directement sur le template */}
+        <div
+          className="absolute z-10 space-y-4 text-slate-900"
+          style={{
+            top: `${layout.medsTop}%`,
+            left: `${layout.medsLeft}%`,
+            right: `${layout.medsRight}%`,
+          }}
+        >
+          {medicines.map((med, i) => (
+            <div key={i} className="flex gap-3 items-start">
+              <span
+                className="font-bold font-mono text-slate-500 shrink-0"
+                style={{ fontSize: `${Math.max(11, layout.fontSize - 1)}px` }}
+              >
+                {String(i + 1).padStart(2, "0")}.
+              </span>
+              <div className="flex-1">
+                <p
+                  className="font-extrabold uppercase text-slate-950 leading-snug"
+                  style={{ fontSize: `${layout.fontSize + 1}px` }}
+                >
+                  {med.name}
+                </p>
+                {med.instructions && (
+                  <p
+                    className="italic text-slate-700 mt-0.5 pl-2 border-l-2 border-slate-300"
+                    style={{ fontSize: `${Math.max(11, layout.fontSize - 1)}px` }}
+                  >
+                    {med.instructions}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // MODE 2 : MODÈLE STANDARD OFFICIEL MONCABINET
   return (
     <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[99999] p-12 text-slate-900 w-full min-h-screen">
       {/* En-tête Médical Professionnel */}

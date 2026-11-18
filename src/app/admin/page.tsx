@@ -5,6 +5,8 @@ import { getAdminDashboardData } from "@/actions/admin";
 import AdminDashboardClient from "./AdminDashboardClient";
 import AdminSpecialLoginForm from "./AdminSpecialLoginForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
 

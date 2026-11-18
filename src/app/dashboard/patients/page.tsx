@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
-import { patients, visits } from "@/db/schema";
+import { patients, visits, prescriptions } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { getTenantClinicId } from "@/lib/tenant";
 import PatientsClient from "./PatientsClient";
@@ -9,23 +9,36 @@ import PatientsClient from "./PatientsClient";
 export const dynamic = "force-dynamic";
 
 export default async function PatientsPage() {
-  const session = await getServerSession(authOptions);
+  await getServerSession(authOptions);
   const clinicId = await getTenantClinicId();
 
-  // Récupérer les patients et visites strictement de ce cabinet
-  const allPatients = await db
-    .select()
-    .from(patients)
-    .where(eq(patients.clinicId, clinicId))
-    .orderBy(desc(patients.createdAt));
+  // Récupérer patients, visites et ordonnances strictement de ce cabinet
+  const [allPatients, allVisits, allPrescriptions] = await Promise.all([
+    db
+      .select()
+      .from(patients)
+      .where(eq(patients.clinicId, clinicId))
+      .orderBy(desc(patients.createdAt)),
+    db
+      .select()
+      .from(visits)
+      .where(eq(visits.clinicId, clinicId))
+      .orderBy(desc(visits.createdAt)),
+    db
+      .select()
+      .from(prescriptions)
+      .where(eq(prescriptions.clinicId, clinicId)),
+  ]);
 
-  const allVisits = await db
-    .select()
-    .from(visits)
-    .where(eq(visits.clinicId, clinicId))
-    .orderBy(desc(visits.createdAt));
+  const prescriptionsByVisit = new Map<number, { name: string; instructions: string }[]>();
+  for (const pr of allPrescriptions) {
+    prescriptionsByVisit.set(
+      pr.visitId,
+      Array.isArray(pr.medicines) ? (pr.medicines as { name: string; instructions: string }[]) : []
+    );
+  }
 
-  // Regrouper l'historique par patient
+  // Regrouper l'historique détaillé par patient
   const patientsWithVisits = allPatients.map((p) => {
     const patientVisits = allVisits
       .filter((v) => v.patientId === p.id)
@@ -36,8 +49,16 @@ export default async function PatientsPage() {
         diagnosis: v.diagnosis,
         notes: v.notes,
         status: v.status,
-        amountToPay: v.amountToPay as string | null,
+        bloodPressure: v.bloodPressure,
+        heartRate: v.heartRate,
+        temperature: v.temperature ? String(v.temperature) : null,
+        weight: v.weight ? String(v.weight) : null,
+        height: v.height ? String(v.height) : null,
+        amountToPay: v.amountToPay ? String(v.amountToPay) : null,
         paymentStatus: v.paymentStatus,
+        paymentMethod: v.paymentMethod,
+        customData: Array.isArray(v.customData) ? v.customData : [],
+        medicines: prescriptionsByVisit.get(v.id) || [],
       }));
 
     return {

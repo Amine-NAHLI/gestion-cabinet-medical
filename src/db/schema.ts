@@ -63,6 +63,10 @@ export const clinicSettings = pgTable("clinic_settings", {
   orderNumber: text("order_number").default("INPE: 123456789 • Ordre: 9876"),
   taxId: text("tax_id").default("ICE: 001234567000089 • IF: 12345678"),
   defaultFee: decimal("default_fee", { precision: 10, scale: 2 }).default("250.00"),
+  consultationFields: json("consultation_fields"), // Custom doctor form builder fields
+  prescriptionTemplateUrl: text("prescription_template_url"), // Uploaded photo/PDF rendered as data URL
+  prescriptionTemplateName: text("prescription_template_name"), // Original file name
+  prescriptionTemplateLayout: json("prescription_template_layout"), // Calibration coordinates & paper size
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -104,6 +108,7 @@ export const visits = pgTable("visits", {
   temperature: decimal("temperature", { precision: 4, scale: 1 }), // e.g. 37.2 °C
   weight: decimal("weight", { precision: 5, scale: 1 }), // e.g. 70.5 kg
   height: decimal("height", { precision: 5, scale: 1 }), // e.g. 175 cm
+  customData: json("custom_data"), // Custom doctor consultation fields snapshot
   
   // Financial Info (filled by doctor, received by assistant)
   amountToPay: decimal("amount_to_pay", { precision: 10, scale: 2 }),
