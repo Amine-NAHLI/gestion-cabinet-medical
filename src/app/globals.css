@@ -18,6 +18,17 @@
 
   body {
     overscroll-behavior: none;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Éviter le zoom automatique sur iOS Safari lors du focus des champs */
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 }
 

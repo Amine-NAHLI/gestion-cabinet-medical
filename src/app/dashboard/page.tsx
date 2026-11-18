@@ -85,29 +85,29 @@ export default async function DashboardIndex() {
           </div>
         </div>
 
-        {/* Bandeau métriques unifié */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-slate-200/80">
-          <div className="p-5">
+        {/* Bandeau métriques unifié (2x2 parfait sur mobile, 4x1 sur desktop) */}
+        <div className="bg-slate-200/80 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden grid grid-cols-2 lg:grid-cols-4 gap-px">
+          <div className="bg-white p-4 sm:p-5">
             <p className="text-xs font-medium text-slate-500">En salle d'attente</p>
-            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
               {waitingVisits.length}
             </p>
           </div>
-          <div className="p-5">
-            <p className="text-xs font-medium text-slate-500">Prêt chez le médecin</p>
-            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+          <div className="bg-white p-4 sm:p-5">
+            <p className="text-xs font-medium text-slate-500">Chez le médecin</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
               {readyVisits.length}
             </p>
           </div>
-          <div className="p-5">
-            <p className="text-xs font-medium text-slate-500">Consultations terminées</p>
-            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+          <div className="bg-white p-4 sm:p-5">
+            <p className="text-xs font-medium text-slate-500">Terminées</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
               {finishedVisits.length}
             </p>
           </div>
-          <div className="p-5">
-            <p className="text-xs font-medium text-slate-500">Rendez-vous du jour</p>
-            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+          <div className="bg-white p-4 sm:p-5">
+            <p className="text-xs font-medium text-slate-500">RDV du jour</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
               {todayAppointmentsCount}
             </p>
           </div>
@@ -115,7 +115,7 @@ export default async function DashboardIndex() {
 
         {/* Flux du jour */}
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between gap-4">
+          <div className="px-4 sm:px-5 py-4 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-slate-900">Patients du jour</h2>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -124,7 +124,7 @@ export default async function DashboardIndex() {
                   : "Tous les encaissements sont à jour"}
               </p>
             </div>
-            <div className="flex items-center gap-3 text-xs font-medium">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
               <Link href="/dashboard/queue" className="text-slate-700 hover:text-slate-900 underline underline-offset-4">
                 Gérer la file
               </Link>
@@ -143,7 +143,7 @@ export default async function DashboardIndex() {
             <div className="py-12 px-6 text-center">
               <p className="text-sm font-medium text-slate-700">Aucun patient enregistré aujourd'hui</p>
               <p className="text-xs text-slate-500 mt-1">
-                Utilisez « Admission Patient » pour enregistrer la première arrivée.
+                Utilisez « Nouvelle admission » pour enregistrer la première arrivée.
               </p>
             </div>
           ) : (
@@ -159,18 +159,18 @@ export default async function DashboardIndex() {
                 return (
                   <div
                     key={v.id}
-                    className="px-5 py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 transition-colors"
+                    className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 hover:bg-slate-50/70 transition-colors"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">
                         {v.patient.lastName} {v.patient.firstName}
                       </p>
                       <p className="text-xs text-slate-500 tabular-nums">
-                        Arrivée à {formatTime(v.createdAt)} • {v.patient.age} ans • {v.patient.phone}
+                        {formatTime(v.createdAt)} • {v.patient.age} ans • {v.patient.phone}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                       <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${statusInfo.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`} />
                         {statusInfo.label}
@@ -220,31 +220,31 @@ export default async function DashboardIndex() {
         </Link>
       </div>
 
-      {/* Bandeau métriques unifié */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-slate-200/80">
-        <div className="p-5">
+      {/* Bandeau métriques unifié (2x2 parfait sur mobile, 4x1 sur desktop) */}
+      <div className="bg-slate-200/80 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden grid grid-cols-2 lg:grid-cols-4 gap-px">
+        <div className="bg-white p-4 sm:p-5">
           <p className="text-xs font-medium text-slate-500">En salle d'attente</p>
-          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
             {waitingVisits.length}
           </p>
         </div>
-        <div className="p-5">
-          <p className="text-xs font-medium text-slate-500">Consultations terminées</p>
-          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+        <div className="bg-white p-4 sm:p-5">
+          <p className="text-xs font-medium text-slate-500">Terminées</p>
+          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
             {finishedVisits.length}
           </p>
         </div>
-        <div className="p-5">
-          <p className="text-xs font-medium text-slate-500">Rendez-vous du jour</p>
-          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+        <div className="bg-white p-4 sm:p-5">
+          <p className="text-xs font-medium text-slate-500">RDV du jour</p>
+          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
             {todayAppointmentsCount}
           </p>
         </div>
-        <div className="p-5">
+        <div className="bg-white p-4 sm:p-5">
           <p className="text-xs font-medium text-slate-500">Recettes du jour</p>
-          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
             {revenueToday.toLocaleString("fr-FR")}{" "}
-            <span className="text-sm font-normal text-slate-500">DH</span>
+            <span className="text-xs font-normal text-slate-500">DH</span>
           </p>
         </div>
       </div>

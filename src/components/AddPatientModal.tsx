@@ -240,8 +240,8 @@ export default function AddPatientModal() {
 
               {/* ONGLET 2 : NOUVEAU PATIENT */}
               {tab === "new" && (
-                <form onSubmit={handleSubmitNew} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                  <div className="grid grid-cols-2 gap-3.5">
+                <form onSubmit={handleSubmitNew} className="p-4 sm:p-6 space-y-4 max-h-[75dvh] overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">Nom de famille *</label>
                       <input 
@@ -264,7 +264,7 @@ export default function AddPatientModal() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">Téléphone *</label>
                       <input 
@@ -289,7 +289,7 @@ export default function AddPatientModal() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">CIN</label>
                       <input 

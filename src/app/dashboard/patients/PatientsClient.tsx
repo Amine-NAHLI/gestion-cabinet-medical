@@ -181,47 +181,45 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
               return (
                 <div
                   key={patient.id}
-                  className="p-4 sm:p-5 hover:bg-slate-50/80 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                  className="p-4 sm:p-5 hover:bg-slate-50/70 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 group"
                 >
                   {/* Left: Info */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 text-sky-700 flex items-center justify-center font-bold text-sm tracking-wider shadow-xs">
+                  <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center font-semibold text-xs sm:text-sm shrink-0">
                       {initials}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-slate-900 text-sm group-hover:text-sky-700 transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <h3 className="font-semibold text-slate-900 text-sm truncate">
                           {patient.lastName} {patient.firstName}
                         </h3>
                         {patient.cin && (
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-[10px] font-bold">
+                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[10px]">
                             {patient.cin}
                           </span>
                         )}
                         {patient.bloodGroup && (
-                          <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-black border border-red-200/50">
+                          <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 text-[10px] font-semibold border border-rose-200/60">
                             {patient.bloodGroup}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-500 mt-1 font-medium">
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 mt-1">
                         <span>{patient.age} ans</span>
                         <span>•</span>
-                        <span>Tél : {patient.phone}</span>
+                        <span className="tabular-nums">{patient.phone}</span>
                         {patient.mutuelle && (
                           <>
                             <span>•</span>
-                            <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 font-bold text-[10px]">
-                              {patient.mutuelle}
-                            </span>
+                            <span className="text-slate-700 font-medium">{patient.mutuelle}</span>
                           </>
                         )}
                         {patient.allergies && (
                           <>
                             <span>•</span>
-                            <span className="text-amber-600 text-[11px] font-semibold flex items-center gap-1" title={patient.allergies}>
-                              <span className="material-symbols-outlined text-xs">warning</span>
+                            <span className="text-red-700 text-[11px] font-medium inline-flex items-center gap-0.5" title={patient.allergies}>
+                              <span className="material-symbols-outlined text-[13px]">warning</span>
                               Allergies
                             </span>
                           </>
@@ -230,35 +228,35 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                     </div>
                   </div>
 
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-2 self-end sm:self-center">
+                  {/* Right: Actions (pleine largeur et faciles à cliquer sur mobile) */}
+                  <div className="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                     <button
                       type="button"
                       onClick={() => setSelectedPatient(patient)}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                      className="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs font-medium transition inline-flex items-center gap-1.5 cursor-pointer"
                       title="Consulter le dossier médical complet"
                     >
-                      <span className="material-symbols-outlined text-base">clinical_notes</span>
+                      <span className="material-symbols-outlined text-[16px]">clinical_notes</span>
                       <span>Dossier</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setEditingPatient(patient)}
-                      className="p-1.5 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
+                      className="p-2 sm:p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition cursor-pointer shrink-0"
                       title="Modifier les coordonnées"
                     >
-                      <span className="material-symbols-outlined text-base">edit</span>
+                      <span className="material-symbols-outlined text-[16px]">edit</span>
                     </button>
 
                     <button
                       type="button"
                       disabled={loadingId === patient.id}
                       onClick={() => handleAdmit(patient.id)}
-                      className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold uppercase tracking-wider transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                      className="flex-1 sm:flex-none justify-center px-3.5 py-2 sm:py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition inline-flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                       title="Placer immédiatement en file d'attente pour aujourd'hui"
                     >
-                      <span className="material-symbols-outlined text-base">queue</span>
+                      <span className="material-symbols-outlined text-[16px]">queue</span>
                       <span>{loadingId === patient.id ? "Admission..." : "Admettre"}</span>
                     </button>
                   </div>

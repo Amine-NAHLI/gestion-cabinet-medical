@@ -114,22 +114,22 @@ export default async function QueuePage() {
               {readyList.map(visit => {
                 const initials = `${visit.patient.firstName[0] || ""}${visit.patient.lastName[0] || ""}`.toUpperCase();
                 return (
-                  <div key={visit.id} className="bg-emerald-50/60 border border-emerald-200/80 p-4.5 rounded-2xl flex items-center justify-between">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
+                  <div key={visit.id} className="bg-white border border-emerald-200 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center font-semibold text-xs shrink-0">
                         {initials}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-slate-900 text-sm truncate">
                           {visit.patient.lastName} {visit.patient.firstName}
                         </h3>
-                        <p className="text-xs text-emerald-700 font-medium mt-0.5 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          En cours de prise en charge par le praticien
+                        <p className="text-xs text-emerald-700 mt-0.5 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          <span>En cours avec le médecin</span>
                         </p>
                       </div>
                     </div>
-                    <span className="text-xs font-semibold text-emerald-800 bg-white/80 border border-emerald-200 px-3 py-1 rounded-full shadow-xs">
+                    <span className="text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md self-start sm:self-center shrink-0">
                       En cabinet
                     </span>
                   </div>
@@ -165,61 +165,58 @@ export default async function QueuePage() {
                 const initials = `${visit.patient.firstName[0] || ""}${visit.patient.lastName[0] || ""}`.toUpperCase();
                 const arrivalTime = visit.createdAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                 return (
-                  <MotionDiv
+                  <div
                     key={visit.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.04 }}
-                    className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-slate-300 hover:shadow-sm transition-all group"
+                    className="bg-white p-4 sm:p-5 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:border-slate-300 transition"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-xs font-mono">
-                        #{String(index + 1).padStart(2, "0")}
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-semibold text-xs tabular-nums shrink-0 mt-0.5 sm:mt-0">
+                        {index + 1}
                       </div>
-                      <div className="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-sm">
+                      <div className="hidden sm:flex w-10 h-10 rounded-lg bg-slate-100 border border-slate-200/70 text-slate-700 items-center justify-center font-semibold text-xs shrink-0">
                         {initials}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2.5">
-                          <h3 className="font-bold text-slate-900 text-base group-hover:text-sky-700 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate">
                             {visit.patient.lastName} {visit.patient.firstName}
                           </h3>
                           {visit.isAppointment && (
-                            <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200/60 text-indigo-700 text-[10px] font-bold rounded-md uppercase tracking-wide">
-                              Rendez-vous
+                            <span className="px-2 py-0.5 bg-sky-50 border border-sky-200/70 text-sky-700 text-[10px] font-semibold rounded-md">
+                              RDV
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs text-slate-400">schedule</span>
-                            Arrivé(e) à {arrivalTime}
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 mt-1">
+                          <span className="inline-flex items-center gap-1 tabular-nums">
+                            <span className="material-symbols-outlined text-[14px] text-slate-400">schedule</span>
+                            {arrivalTime}
                           </span>
                           <span>•</span>
                           <span>{visit.patient.age} ans</span>
                           {visit.patient.phone && (
                             <>
                               <span>•</span>
-                              <span>{visit.patient.phone}</span>
+                              <span className="tabular-nums">{visit.patient.phone}</span>
                             </>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                       {role === 'assistant' ? (
                         <>
                           <SendToDoctorButton visitId={visit.id} />
                           <CancelVisitButton visitId={visit.id} />
                         </>
                       ) : (
-                        <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold">
-                          En file d'attente
+                        <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-medium">
+                          En attente
                         </span>
                       )}
                     </div>
-                  </MotionDiv>
+                  </div>
                 );
               })}
             </div>

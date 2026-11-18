@@ -88,51 +88,48 @@ export default async function PaymentsPage() {
                 });
 
                 return (
-                  <MotionDiv
+                  <div
                     key={visit.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.04 }}
-                    className="p-5 rounded-2xl border border-emerald-100/80 bg-gradient-to-r from-emerald-50/30 via-white to-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-emerald-300/80 hover:shadow-xs transition-all group"
+                    className="p-4 sm:p-5 rounded-xl border border-slate-200/90 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:border-slate-300 transition"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm tracking-wider shadow-xs shadow-emerald-600/30">
+                    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center font-semibold text-xs shrink-0">
                         {initials}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-slate-900 text-base group-hover:text-emerald-700 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate">
                             {visit.patient.lastName} {visit.patient.firstName}
                           </h3>
                           {visit.patient.cin && (
-                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
+                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[10px]">
                               {visit.patient.cin}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs text-slate-400">calendar_today</span>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 mt-1">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px] text-slate-400">calendar_today</span>
                             {visitDate}
                           </span>
                           <span>•</span>
                           <span>
-                            Tarif consultation :{" "}
-                            <span className="font-bold text-slate-900 font-mono">
+                            Tarif :{" "}
+                            <span className="font-semibold text-slate-900 tabular-nums">
                               {visit.amountToPay ? `${visit.amountToPay} DH` : "À définir"}
                             </span>
                           </span>
                           {visit.patient.mutuelle && (
                             <>
                               <span>•</span>
-                              <span className="text-teal-700 font-bold">{visit.patient.mutuelle}</span>
+                              <span className="text-slate-700 font-medium">{visit.patient.mutuelle}</span>
                             </>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end">
+                    <div className="flex items-center justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                       <PaymentButton 
                         visitId={visit.id} 
                         initialAmount={visit.amountToPay as string | null} 
@@ -140,7 +137,7 @@ export default async function PaymentsPage() {
                         settings={settings}
                       />
                     </div>
-                  </MotionDiv>
+                  </div>
                 );
               })}
             </div>

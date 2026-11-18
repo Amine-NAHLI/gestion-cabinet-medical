@@ -274,28 +274,32 @@ export default function DashboardShell({
 
       {/* ZONE PRINCIPALE */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200/80 h-14 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 h-14 px-3.5 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden w-8 h-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center cursor-pointer shrink-0"
+              className="lg:hidden w-9 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center cursor-pointer shrink-0 active:bg-slate-100"
               aria-label="Ouvrir le menu"
             >
-              <span className="material-symbols-outlined text-[19px]">menu</span>
+              <span className="material-symbols-outlined text-[20px]">menu</span>
             </button>
 
-            <span className="text-xs font-medium text-slate-500 capitalize truncate hidden sm:inline">
+            <span className="lg:hidden font-semibold text-sm text-slate-900 truncate">
+              {clinicName}
+            </span>
+
+            <span className="text-xs font-medium text-slate-500 capitalize truncate hidden lg:inline">
               {todayStr}
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <RealtimeSync role={role} />
           </div>
         </header>
 
-        <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7">
+        <main className="flex-1 max-w-6xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-7">
           {children}
         </main>
       </div>

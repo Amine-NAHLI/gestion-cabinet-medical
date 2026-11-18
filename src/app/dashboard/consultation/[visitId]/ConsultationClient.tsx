@@ -954,36 +954,36 @@ export default function ConsultationClient({
               Ajouter une ligne
             </button>
 
-            <div className="flex flex-wrap justify-end items-center gap-2.5 border-t border-slate-100 pt-6">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-end items-center gap-2.5 border-t border-slate-100 pt-5">
               <button 
                 type="button"
                 onClick={() => setActiveTab('cloture')} 
-                className="px-4 py-2.5 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                className="px-3.5 py-2.5 text-slate-600 font-medium text-xs hover:bg-slate-100 rounded-lg border border-slate-200 sm:border-transparent transition cursor-pointer text-center"
               >
-                Passer sans ordonnance
+                Sans ordonnance
               </button>
               <button 
                 type="button"
                 onClick={() => handleSavePrescription("none")} 
-                className="px-4 py-2.5 text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+                className="px-3.5 py-2.5 text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg font-medium text-xs transition cursor-pointer text-center"
               >
                 Enregistrer
               </button>
               <button 
                 type="button"
                 onClick={() => handleSavePrescription("pdf")} 
-                className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg font-medium text-xs transition cursor-pointer"
               >
-                <span className="material-symbols-outlined text-base">picture_as_pdf</span>
-                Télécharger PDF
+                <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                <span>Télécharger PDF</span>
               </button>
               <button 
                 type="button"
                 onClick={() => handleSavePrescription("print")} 
-                className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-500 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow-xs hover:shadow-md hover:shadow-sky-600/25 transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 bg-sky-700 hover:bg-sky-600 text-white px-4 py-2.5 rounded-lg font-medium text-xs transition cursor-pointer"
               >
-                <span className="material-symbols-outlined text-base">print</span>
-                Imprimer
+                <span className="material-symbols-outlined text-[16px]">print</span>
+                <span>Imprimer</span>
               </button>
             </div>
           </div>

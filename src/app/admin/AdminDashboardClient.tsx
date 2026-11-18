@@ -383,7 +383,7 @@ export default function AdminDashboardClient({
       </AnimatePresence>
 
       {/* CONTENU PRINCIPAL */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-8 space-y-8">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-3.5 sm:px-6 py-5 sm:py-8 space-y-6">
         {/* ============================================================
             PAGE 1 : STATISTIQUES GLOBALES DE LA PLATEFORME
            ============================================================ */}
@@ -977,15 +977,15 @@ export default function AdminDashboardClient({
                     return (
                       <div
                         key={req.id}
-                        className="bg-white rounded-3xl border-2 border-amber-200/90 p-6 shadow-sm space-y-5"
+                        className="bg-white rounded-xl border border-amber-300/90 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] space-y-4"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-extrabold uppercase tracking-wider mb-2">
-                              <span className="material-symbols-outlined text-xs">schedule</span>
-                              {isExpired ? "Code Expiré" : `Expire dans ${remaining}`}
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium mb-2">
+                              <span className="material-symbols-outlined text-[13px]">schedule</span>
+                              {isExpired ? "Code expiré" : `Expire dans ${remaining}`}
                             </span>
-                            <h3 className="font-extrabold text-slate-900 text-lg leading-tight">
+                            <h3 className="font-semibold text-slate-900 text-base leading-tight">
                               {req.clinicName}
                             </h3>
                             <p className="text-xs text-slate-500 mt-0.5">
@@ -994,11 +994,11 @@ export default function AdminDashboardClient({
                           </div>
 
                           {/* CODE OTP À 6 CHIFFRES */}
-                          <div className="text-center bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-sm shrink-0">
-                            <p className="text-[9px] uppercase tracking-widest text-sky-300 font-bold">
+                          <div className="text-center bg-slate-900 text-white px-4 py-2 rounded-xl shrink-0 self-start w-full sm:w-auto">
+                            <p className="text-[10px] uppercase tracking-wider text-slate-300 font-medium">
                               Code OTP
                             </p>
-                            <p className="text-2xl font-black tracking-[0.2em] font-mono mt-0.5">
+                            <p className="text-xl font-bold tracking-[0.2em] font-mono tabular-nums mt-0.5">
                               {req.otpCode}
                             </p>
                           </div>

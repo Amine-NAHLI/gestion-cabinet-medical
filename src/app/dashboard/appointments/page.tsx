@@ -82,63 +82,60 @@ export default async function AppointmentsPage() {
                 const isAdmitted = appt.status === 'admitted';
 
                 return (
-                  <MotionDiv 
+                  <div
                     key={appt.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.03 }}
-                    className={`p-5 sm:p-6 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${
+                    className={`p-4 sm:p-5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 ${
                       isAdmitted ? "bg-slate-50/40 opacity-75" : "hover:bg-slate-50/70"
                     }`}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
                       {/* Date & Time Block */}
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-b from-indigo-50 to-indigo-100/70 border border-indigo-200/80 flex flex-col items-center justify-center text-indigo-900 shadow-xs">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 leading-none">
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center text-slate-900 shrink-0">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 leading-none">
                           {monthName}
                         </span>
-                        <span className="text-lg font-black leading-tight">
+                        <span className="text-base sm:text-lg font-semibold leading-tight tabular-nums">
                           {dayNumber}
                         </span>
-                        <span className="text-[10px] font-mono font-bold text-indigo-700 leading-none">
+                        <span className="text-[10px] font-medium text-sky-700 tabular-nums leading-none">
                           {appt.time || "09:00"}
                         </span>
                       </div>
 
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-600">
+                      <div className="hidden sm:flex w-10 h-10 rounded-lg bg-slate-100 border border-slate-200/70 items-center justify-center font-semibold text-xs text-slate-600 shrink-0">
                         {initials}
                       </div>
 
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-slate-900 text-base group-hover:text-indigo-700 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate">
                             {appt.patient.lastName} {appt.patient.firstName}
                           </h3>
                           {appt.reason && (
-                            <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-200/50">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium">
                               {appt.reason}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 font-medium">
-                          <span className="capitalize font-semibold text-slate-700">{fullDate} à {appt.time || "09:00"}</span>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 mt-1">
+                          <span className="capitalize font-medium text-slate-700">{fullDate} à {appt.time || "09:00"}</span>
                           <span>•</span>
                           <span>{appt.patient.age} ans</span>
                           {appt.patient.phone && (
                             <>
                               <span>•</span>
-                              <span>Tél : {appt.patient.phone}</span>
+                              <span className="tabular-nums">{appt.patient.phone}</span>
                             </>
                           )}
                         </div>
                       </div>
                     </div>
                     
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                       {isAdmitted ? (
-                        <span className="px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-md text-xs font-medium inline-flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Admis au cabinet
+                          Admis
                         </span>
                       ) : (
                         <>
@@ -146,14 +143,14 @@ export default async function AppointmentsPage() {
                             <TransformAppointmentButton appointmentId={appt.id} patientId={appt.patient.id} />
                           )}
                           {role === 'doctor' && (
-                            <span className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200/70 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider">
+                            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium">
                               Confirmé
                             </span>
                           )}
                         </>
                       )}
                     </div>
-                  </MotionDiv>
+                  </div>
                 );
               })}
             </div>
