@@ -11,19 +11,15 @@ export default async function SettingsPage() {
   const settings = await getClinicSettings();
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-2">
-          <span className="material-symbols-outlined text-xs">tune</span>
-          Configuration du Cabinet
-        </div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-          Paramètres & Personnalisation
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+          Paramètres
         </h1>
         <p className="text-slate-500 text-sm mt-0.5">
           {role === "doctor"
-            ? "Configurez les informations du cabinet, personnalisez les cases de la fiche consultation et importez votre modèle d'ordonnance."
-            : "Gérez les coordonnées du cabinet, les mentions déontologiques et le tarif par défaut."}
+            ? "Coordonnées du cabinet, champs de la fiche consultation et modèle d'ordonnance."
+            : "Coordonnées du cabinet, mentions légales et tarif par défaut."}
         </p>
       </div>
 

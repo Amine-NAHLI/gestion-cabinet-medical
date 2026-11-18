@@ -2,7 +2,6 @@
 
 import { Suspense } from "react";
 import LoginForm from "@/components/LoginForm";
-import { motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 
 function ActivationBanner() {
@@ -12,55 +11,42 @@ function ActivationBanner() {
   if (!activated) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mb-5 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2.5"
-    >
-      <span className="material-symbols-outlined text-emerald-600 text-lg shrink-0">check_circle</span>
+    <div className="mb-5 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-start gap-2.5">
+      <span className="material-symbols-outlined text-emerald-600 text-[18px] shrink-0 mt-0.5">
+        check_circle
+      </span>
       <div>
-        <span className="font-bold block">Votre cabinet est désormais actif.</span>
-        <span>Connectez-vous ci-dessous pour accéder à vos dossiers.</span>
+        <span className="font-semibold block">Votre cabinet est actif.</span>
+        <span className="text-emerald-700">Connectez-vous ci-dessous pour accéder à votre espace.</span>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen w-full flex flex-col justify-between items-center p-4 sm:p-6 bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-800 font-sans selection:bg-slate-900 selection:text-white relative">
-      
-      {/* Ambient soft glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-64 bg-gradient-to-b from-sky-100/40 to-transparent blur-3xl pointer-events-none" />
+    <div className="min-h-screen w-full flex flex-col justify-between items-center px-4 py-8 sm:py-12 bg-[#F8F9FB] text-slate-900">
+      <div />
 
-      {/* Top spacing */}
-      <div className="pt-6 sm:pt-10" />
-
-      {/* Center Auth Container */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className="w-full max-w-[420px] relative z-10"
-      >
-        {/* Brand Header */}
+      <div className="w-full max-w-[400px]">
+        {/* En-tête sobre */}
         <div className="text-center mb-7">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-            Mon<span className="text-sky-600">Cabinet</span>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Mon<span className="text-sky-700">Cabinet</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
-            Système de Gestion Médicale pour Cabinets & Cliniques
+          <p className="text-xs text-slate-500 mt-1">
+            Gestion médicale pour cabinets et cliniques
           </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-7 sm:p-9 shadow-xl shadow-slate-900/[0.04]">
+        {/* Carte de connexion */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-7 sm:p-8 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
           <div className="mb-6">
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-              Connexion
+            <h2 className="text-base font-semibold text-slate-900">
+              Connexion à votre espace
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Entrez vos identifiants pour accéder à votre espace de travail.
+              Renseignez vos identifiants praticien ou secrétariat.
             </p>
           </div>
 
@@ -70,22 +56,11 @@ export default function LoginPage() {
 
           <LoginForm />
         </div>
-      </motion.div>
+      </div>
 
-      {/* Bottom Footer Info */}
-      <footer className="pt-8 pb-4 text-center relative z-10">
-        <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 font-medium">
-          <span className="flex items-center gap-1">
-            <span className="material-symbols-outlined text-xs text-emerald-600">lock</span>
-            Chiffrement SSL 256-bit
-          </span>
-          <span>•</span>
-          <span>Données de santé protégées</span>
-          <span>•</span>
-          <span>Support 24/7</span>
-        </div>
-        <p className="text-[10px] text-slate-300 mt-1">
-          © {new Date().getFullYear()} MonCabinet. Tous droits réservés.
+      <footer className="pt-8 text-center">
+        <p className="text-xs text-slate-400">
+          © {new Date().getFullYear()} MonCabinet — Connexion sécurisée SSL
         </p>
       </footer>
     </div>

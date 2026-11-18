@@ -321,58 +321,50 @@ export default function ConsultationClient({
   ];
 
   return (
-    <div className="bg-white rounded-3xl shadow-xs border border-slate-200/80 overflow-hidden relative">
+    <div className="bg-white rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] border border-slate-200/90 overflow-hidden relative">
       
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div 
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            exit={{ opacity: 0, y: -12 }}
             className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
           >
-            <div className="bg-slate-900/90 backdrop-blur-md text-white px-5 py-2.5 rounded-full shadow-lg flex items-center gap-2.5 border border-slate-700/60">
-              <span className="material-symbols-outlined text-teal-400 text-base">check_circle</span>
-              <span className="font-semibold text-xs tracking-wide">{toastMessage}</span>
+            <div className="bg-slate-900 text-white px-4 py-2 rounded-lg shadow-md flex items-center gap-2 text-xs font-medium">
+              <span className="material-symbols-outlined text-emerald-400 text-[16px]">check_circle</span>
+              <span>{toastMessage}</span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Bandeau d'accès rapide au Dossier Médical complet pour les patients déjà suivis */}
+      {/* Bandeau discret d'accès rapide au dossier existant */}
       {hasHistory && activeTab !== 'history' && (
-        <div className="px-6 py-3.5 bg-indigo-50/70 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="px-6 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <span className="material-symbols-outlined text-lg">history_edu</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-extrabold text-indigo-950">
-                Patient déjà présent dans l'historique ({pastVisits.length} visite{pastVisits.length > 1 ? "s" : ""} précédente{pastVisits.length > 1 ? "s" : ""})
-              </p>
-              <p className="text-[11px] text-indigo-700 truncate">
-                Dernière consultation le <strong>{formatShortDate(pastVisits[0].date)}</strong>
-                {pastVisits[0].disease ? ` • Motif : ${pastVisits[0].disease}` : ""}
-                {pastVisits[0].medicines.length > 0
-                  ? ` • ${pastVisits[0].medicines.length} médicament${pastVisits[0].medicines.length > 1 ? "s" : ""} prescrit${pastVisits[0].medicines.length > 1 ? "s" : ""}`
-                  : ""}
-              </p>
-            </div>
+            <span className="material-symbols-outlined text-[19px] text-slate-500 shrink-0">history_edu</span>
+            <p className="text-xs text-slate-600 truncate">
+              <strong className="font-semibold text-slate-900">
+                {pastVisits.length} consultation{pastVisits.length > 1 ? "s" : ""} antérieure{pastVisits.length > 1 ? "s" : ""}
+              </strong>{" "}
+              • Dernière le {formatShortDate(pastVisits[0].date)}
+              {pastVisits[0].disease ? ` (${pastVisits[0].disease})` : ""}
+            </p>
           </div>
           <button
             type="button"
             onClick={() => setActiveTab('history')}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition cursor-pointer shrink-0"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 text-xs font-medium transition cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-sm">visibility</span>
-            <span>Voir le dossier complet</span>
+            <span>Consulter l'historique</span>
           </button>
         </div>
       )}
 
-      {/* Modern Tabs Bar */}
-      <div className="flex flex-wrap sm:flex-nowrap border-b border-slate-100 bg-slate-50/40 p-2 gap-2">
+      {/* Onglets sobres à soulignement (style Doctolib / Linear) */}
+      <div className="flex overflow-x-auto border-b border-slate-200/80 px-4 sm:px-6 gap-1">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -380,24 +372,16 @@ export default function ConsultationClient({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+              className={`relative flex items-center gap-2 py-3.5 px-3 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2 -mb-px ${
                 isActive
-                  ? tab.id === 'history'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-white text-sky-700 shadow-xs border border-slate-200/80'
-                  : tab.id === 'history'
-                  ? 'bg-indigo-50/60 text-indigo-700 hover:bg-indigo-100/70 border border-indigo-200/60'
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                  ? "border-slate-900 text-slate-900 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              <span className="material-symbols-outlined text-base">{tab.icon}</span>
+              <span className="material-symbols-outlined text-[17px]">{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.badge !== undefined && (
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'
-                  }`}
-                >
+                <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold tabular-nums">
                   {tab.badge}
                 </span>
               )}

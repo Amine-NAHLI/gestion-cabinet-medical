@@ -32,16 +32,12 @@ export default async function AppointmentsPage() {
     .orderBy(asc(appointments.date));
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200/70 text-xs font-semibold text-indigo-800 mb-2">
-            <span className="material-symbols-outlined text-xs text-indigo-600">calendar_month</span>
-            Planning & Réservations
-          </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Rendez-vous programmés</h1>
-          <p className="text-slate-500 text-sm mt-1">Planification des consultations à venir et gestion du carnet du cabinet.</p>
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Rendez-vous</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Planning des consultations à venir.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -50,9 +46,9 @@ export default async function AppointmentsPage() {
       </div>
 
       {/* Main Container */}
-      <div className="bg-white rounded-3xl shadow-xs border border-slate-200/80 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2.5">
+      <div className="bg-white rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] border border-slate-200/90 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
             Carnet des rendez-vous ({appointmentsList.length})
           </h2>

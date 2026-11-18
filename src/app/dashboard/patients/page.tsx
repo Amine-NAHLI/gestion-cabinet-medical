@@ -80,17 +80,13 @@ export default async function PatientsPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-50 border border-sky-200/80 text-[11px] font-bold uppercase tracking-wider text-sky-700 mb-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-          Dossiers Patients Partagés
-        </div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-          Répertoire des Patients
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+          Patients
         </h1>
         <p className="text-slate-500 text-sm mt-0.5">
-          Consultation des fiches médicales, antécédents, allergies et historique complet des consultations.
+          Dossiers médicaux, antécédents, allergies et historique des consultations.
         </p>
       </div>
 

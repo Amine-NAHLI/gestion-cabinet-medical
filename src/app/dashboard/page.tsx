@@ -3,12 +3,11 @@ import { authOptions } from "@/lib/authOptions";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { visits, patients, appointments } from "@/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { getTenantClinicId } from "@/lib/tenant";
 import Link from "next/link";
 import AddPatientModal from "@/components/AddPatientModal";
 import AddAppointmentModal from "@/components/AddAppointmentModal";
-import { MotionDiv } from "@/components/MotionWrapper";
 
 export const dynamic = "force-dynamic";
 
@@ -21,283 +20,323 @@ export default async function DashboardIndex() {
   const role = (session?.user as any)?.role;
   const clinicId = await getTenantClinicId();
 
-  // Récupération strictement isolée par cabinet (Multi-Tenancy)
-  const allVisits = await db
-    .select({
-      id: visits.id,
-      status: visits.status,
-      createdAt: visits.createdAt,
-      amountToPay: visits.amountToPay,
-      patient: patients,
-    })
-    .from(visits)
-    .innerJoin(patients, eq(visits.patientId, patients.id))
-    .where(eq(visits.clinicId, clinicId))
-    .orderBy(desc(visits.createdAt));
+  const [allVisits, allAppointments] = await Promise.all([
+    db
+      .select({
+        id: visits.id,
+        status: visits.status,
+        paymentStatus: visits.paymentStatus,
+        createdAt: visits.createdAt,
+        amountToPay: visits.amountToPay,
+        patient: patients,
+      })
+      .from(visits)
+      .innerJoin(patients, eq(visits.patientId, patients.id))
+      .where(eq(visits.clinicId, clinicId))
+      .orderBy(desc(visits.createdAt)),
+    db.select().from(appointments).where(eq(appointments.clinicId, clinicId)),
+  ]);
 
-  const allAppointments = await db
-    .select()
-    .from(appointments)
-    .where(eq(appointments.clinicId, clinicId));
-
-  // Filtres pour aujourd'hui
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const todayVisits = allVisits.filter(v => v.createdAt >= today);
-  const waitingCount = todayVisits.filter(v => v.status === 'waiting').length;
-  const finishedCount = todayVisits.filter(v => v.status === 'finished').length;
-  const readyPatient = todayVisits.find(v => v.status === 'ready');
-  const revenueToday = todayVisits.reduce((acc, v) => acc + (v.amountToPay ? parseFloat(v.amountToPay as string) : 0), 0);
+  const todayVisits = allVisits.filter((v) => v.createdAt >= today && v.status !== "cancelled");
+  const waitingVisits = todayVisits.filter((v) => v.status === "waiting").reverse();
+  const readyVisits = todayVisits.filter((v) => v.status === "ready");
+  const finishedVisits = todayVisits.filter((v) => v.status === "finished");
+  const pendingPaymentsCount = finishedVisits.filter((v) => v.paymentStatus !== "paid").length;
+  const readyPatient = readyVisits[0];
 
-  const todayAppointmentsCount = allAppointments.filter(a => {
+  const revenueToday = todayVisits.reduce(
+    (acc, v) => acc + (v.amountToPay ? parseFloat(v.amountToPay as string) : 0),
+    0
+  );
+
+  const todayAppointmentsCount = allAppointments.filter((a) => {
+    if (a.status === "cancelled") return false;
     const d = new Date(a.date);
-    d.setHours(0,0,0,0);
+    d.setHours(0, 0, 0, 0);
     return d.getTime() === today.getTime();
   }).length;
 
-  if (role === 'assistant') {
+  const formatTime = (date: Date) =>
+    new Date(date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+  // ========================================================
+  // VUE ASSISTANTE / ACCUEIL
+  // ========================================================
+  if (role === "assistant") {
     return (
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-[11px] font-bold uppercase tracking-wider text-teal-700 mb-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-              Accueil & Administration
-            </div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              Gestion du Cabinet
+            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+              Tableau de bord
             </h1>
-            <p className="text-slate-500 text-sm mt-0.5">
-              Suivi en temps réel de la salle d'attente et des flux patients.
+            <p className="text-sm text-slate-500 mt-0.5">
+              Suivi des arrivées, consultations et encaissements du jour.
             </p>
           </div>
 
-          {/* Actions rapides */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <AddPatientModal />
             <AddAppointmentModal />
-            <Link
-              href="/dashboard/queue"
-              className="flex items-center gap-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider shadow-xs transition-all"
-            >
-              <span className="material-symbols-outlined text-base text-slate-500">queue</span>
-              <span>Salle d'attente</span>
-            </Link>
           </div>
         </div>
 
-        {/* Cartes de statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <MotionDiv
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            whileHover={{ y: -3 }}
-            className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between relative overflow-hidden"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-amber-50 border border-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl">chair</span>
-              </div>
-              <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200/60">
-                En attente
-              </span>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Patients en salle</p>
-              <h2 className="text-3xl font-black text-slate-900 mt-1">
-                {waitingCount} <span className="text-sm font-semibold text-slate-400">personne{waitingCount > 1 ? 's' : ''}</span>
-              </h2>
-            </div>
-          </MotionDiv>
+        {/* Bandeau métriques unifié */}
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-slate-200/80">
+          <div className="p-5">
+            <p className="text-xs font-medium text-slate-500">En salle d'attente</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+              {waitingVisits.length}
+            </p>
+          </div>
+          <div className="p-5">
+            <p className="text-xs font-medium text-slate-500">Prêt chez le médecin</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+              {readyVisits.length}
+            </p>
+          </div>
+          <div className="p-5">
+            <p className="text-xs font-medium text-slate-500">Consultations terminées</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+              {finishedVisits.length}
+            </p>
+          </div>
+          <div className="p-5">
+            <p className="text-xs font-medium text-slate-500">Rendez-vous du jour</p>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+              {todayAppointmentsCount}
+            </p>
+          </div>
+        </div>
 
-          <MotionDiv
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            whileHover={{ y: -3 }}
-            className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between relative overflow-hidden"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-teal-50 border border-teal-100 text-teal-600 rounded-2xl flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl">check_circle</span>
-              </div>
-              <span className="text-[11px] font-bold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200/60">
-                Aujourd'hui
-              </span>
-            </div>
+        {/* Flux du jour */}
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Consultations terminées</p>
-              <h2 className="text-3xl font-black text-slate-900 mt-1">
-                {finishedCount} <span className="text-sm font-semibold text-slate-400">dossier{finishedCount > 1 ? 's' : ''}</span>
-              </h2>
+              <h2 className="text-sm font-semibold text-slate-900">Patients du jour</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {pendingPaymentsCount > 0
+                  ? `${pendingPaymentsCount} paiement${pendingPaymentsCount > 1 ? "s" : ""} en attente d'encaissement`
+                  : "Tous les encaissements sont à jour"}
+              </p>
             </div>
-          </MotionDiv>
+            <div className="flex items-center gap-3 text-xs font-medium">
+              <Link href="/dashboard/queue" className="text-slate-700 hover:text-slate-900 underline underline-offset-4">
+                Gérer la file
+              </Link>
+              {pendingPaymentsCount > 0 && (
+                <Link
+                  href="/dashboard/payments"
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition"
+                >
+                  Encaisser ({pendingPaymentsCount})
+                </Link>
+              )}
+            </div>
+          </div>
 
-          <MotionDiv
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            whileHover={{ y: -3 }}
-            className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between relative overflow-hidden"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-sky-50 border border-sky-100 text-sky-600 rounded-2xl flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl">calendar_month</span>
-              </div>
-              <span className="text-[11px] font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-full border border-sky-200/60">
-                Planifié
-              </span>
+          {todayVisits.length === 0 ? (
+            <div className="py-12 px-6 text-center">
+              <p className="text-sm font-medium text-slate-700">Aucun patient enregistré aujourd'hui</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Utilisez « Admission Patient » pour enregistrer la première arrivée.
+              </p>
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Rendez-vous programmés</p>
-              <h2 className="text-3xl font-black text-slate-900 mt-1">
-                {todayAppointmentsCount} <span className="text-sm font-semibold text-slate-400">patient{todayAppointmentsCount > 1 ? 's' : ''}</span>
-              </h2>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {todayVisits.slice(0, 10).map((v) => {
+                const statusInfo =
+                  v.status === "ready"
+                    ? { label: "Chez le médecin", dot: "bg-emerald-500", text: "text-emerald-700" }
+                    : v.status === "waiting"
+                    ? { label: "En attente", dot: "bg-amber-500", text: "text-amber-700" }
+                    : { label: "Terminée", dot: "bg-slate-400", text: "text-slate-600" };
+
+                return (
+                  <div
+                    key={v.id}
+                    className="px-5 py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {v.patient.lastName} {v.patient.firstName}
+                      </p>
+                      <p className="text-xs text-slate-500 tabular-nums">
+                        Arrivée à {formatTime(v.createdAt)} • {v.patient.age} ans • {v.patient.phone}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-4 shrink-0">
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${statusInfo.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`} />
+                        {statusInfo.label}
+                      </span>
+
+                      {v.status === "finished" && v.amountToPay && (
+                        <span className="text-xs font-medium text-slate-700 tabular-nums">
+                          {parseFloat(v.amountToPay as string).toFixed(0)} DH
+                          <span className="text-slate-400 ml-1">
+                            ({v.paymentStatus === "paid" ? "Payé" : "À encaisser"})
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </MotionDiv>
+          )}
         </div>
       </div>
     );
   }
 
-  // Dashboard Docteur (Chic & Exécutif)
+  // ========================================================
+  // VUE MÉDECIN PRATICIEN
+  // ========================================================
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <div>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-50 border border-sky-200/80 text-[11px] font-bold uppercase tracking-wider text-sky-700 mb-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
-          Espace Praticien • Synthèse Clinique
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+            Tableau de bord
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Consultations en cours et activité clinique de la journée.
+          </p>
         </div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-          Cabinet Médical
-        </h1>
-        <p className="text-slate-500 text-sm mt-0.5">
-          Vue d'ensemble clinique et consultations de la journée.
-        </p>
+
+        <Link
+          href="/dashboard/queue"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-xs font-medium text-slate-700 hover:text-slate-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition self-start"
+        >
+          <span className="material-symbols-outlined text-[17px] text-slate-400">groups</span>
+          <span>Voir la salle d'attente</span>
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* Colonne Principale (Prochain patient) */}
-        <MotionDiv
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className="lg:col-span-2 space-y-4"
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Prochain Patient</h2>
+      {/* Bandeau métriques unifié */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-slate-200/80">
+        <div className="p-5">
+          <p className="text-xs font-medium text-slate-500">En salle d'attente</p>
+          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+            {waitingVisits.length}
+          </p>
+        </div>
+        <div className="p-5">
+          <p className="text-xs font-medium text-slate-500">Consultations terminées</p>
+          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+            {finishedVisits.length}
+          </p>
+        </div>
+        <div className="p-5">
+          <p className="text-xs font-medium text-slate-500">Rendez-vous du jour</p>
+          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+            {todayAppointmentsCount}
+          </p>
+        </div>
+        <div className="p-5">
+          <p className="text-xs font-medium text-slate-500">Recettes du jour</p>
+          <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1.5">
+            {revenueToday.toLocaleString("fr-FR")}{" "}
+            <span className="text-sm font-normal text-slate-500">DH</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Prochain Patient prêt en consultation */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">Patient prêt à recevoir</h2>
             {readyPatient && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/80">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Salle de consultation prête
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                En salle
               </span>
             )}
           </div>
-          
-          {readyPatient ? (
-            <div className="bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/60 border border-emerald-200/90 p-8 rounded-3xl shadow-sm relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-600" />
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl shadow-md shadow-emerald-600/20">
-                    {readyPatient.patient.firstName[0]}{readyPatient.patient.lastName[0]}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">
-                      {readyPatient.patient.lastName} {readyPatient.patient.firstName}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-1 font-medium">
-                      Patient envoyé par l'assistante • {readyPatient.patient.age ? `${readyPatient.patient.age} ans` : "Âge non précisé"}
-                    </p>
-                  </div>
-                </div>
 
-                <Link
-                  href={`/dashboard/consultation/${readyPatient.id}`}
-                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-7 py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md hover:shadow-lg active:scale-[0.99] cursor-pointer"
-                >
-                  <span>Démarrer la consultation</span>
-                  <span className="material-symbols-outlined text-lg">arrow_forward</span>
-                </Link>
+          {readyPatient ? (
+            <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center font-semibold text-base shrink-0">
+                  {readyPatient.patient.firstName[0]}
+                  {readyPatient.patient.lastName[0]}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {readyPatient.patient.lastName} {readyPatient.patient.firstName}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {readyPatient.patient.age} ans • Tél. {readyPatient.patient.phone}
+                    {readyPatient.patient.mutuelle ? ` • ${readyPatient.patient.mutuelle}` : ""}
+                  </p>
+                </div>
               </div>
+
+              <Link
+                href={`/dashboard/consultation/${readyPatient.id}`}
+                className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition shrink-0"
+              >
+                <span>Ouvrir la consultation</span>
+                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </Link>
             </div>
           ) : (
-            <div className="bg-white border border-slate-200/80 p-12 rounded-3xl text-center flex flex-col items-center justify-center shadow-xs">
-              <div className="w-14 h-14 bg-slate-50 border border-slate-200/60 rounded-2xl flex items-center justify-center text-slate-400 mb-3">
-                <span className="material-symbols-outlined text-2xl">check_circle</span>
-              </div>
-              <h3 className="text-lg font-bold text-slate-800">Aucun patient en attente directe</h3>
-              <p className="text-xs text-slate-500 max-w-xs mt-1">
-                L'assistante vous enverra le prochain patient dès qu'il sera prêt.
+            <div className="py-12 px-6 text-center">
+              <p className="text-sm font-medium text-slate-700">
+                Aucun patient appelé pour le moment
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Dès que votre assistante vous enverra le prochain patient, il apparaîtra ici automatiquement.
               </p>
             </div>
           )}
-        </MotionDiv>
+        </div>
 
-        {/* Colonne Latérale (Stats du Jour) */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold text-slate-900 tracking-tight">Activité du Jour</h2>
-          
-          <div className="space-y-3">
-            <MotionDiv
-              initial={{ opacity: 0, x: 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              whileHover={{ x: 2 }}
-              className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center border border-sky-100">
-                  <span className="material-symbols-outlined text-xl">clinical_notes</span>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500">Consultations effectuées</p>
-                  <h4 className="text-xl font-bold text-slate-900">{finishedCount}</h4>
-                </div>
-              </div>
-            </MotionDiv>
-
-            <MotionDiv
-              initial={{ opacity: 0, x: 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.15 }}
-              whileHover={{ x: 2 }}
-              className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center border border-emerald-100">
-                  <span className="material-symbols-outlined text-xl">payments</span>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500">Recettes perçues</p>
-                  <h4 className="text-xl font-bold text-emerald-700">
-                    {revenueToday.toLocaleString('fr-FR')} <span className="text-xs font-semibold text-slate-400">DH</span>
-                  </h4>
-                </div>
-              </div>
-            </MotionDiv>
-
-            <MotionDiv
-              initial={{ opacity: 0, x: 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              whileHover={{ x: 2 }}
-              className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center border border-amber-100">
-                  <span className="material-symbols-outlined text-xl">hourglass_empty</span>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500">En salle d'attente</p>
-                  <h4 className="text-xl font-bold text-slate-900">{waitingCount}</h4>
-                </div>
-              </div>
-            </MotionDiv>
+        {/* File d'attente en direct */}
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">
+              En attente ({waitingVisits.length})
+            </h2>
+            <Link href="/dashboard/queue" className="text-xs font-medium text-slate-500 hover:text-slate-900">
+              Tout voir
+            </Link>
           </div>
+
+          {waitingVisits.length === 0 ? (
+            <div className="py-10 px-5 text-center text-xs text-slate-500">
+              La salle d'attente est vide.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {waitingVisits.slice(0, 6).map((v, idx) => (
+                <div key={v.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-xs font-medium text-slate-400 tabular-nums w-4">
+                      {idx + 1}.
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {v.patient.lastName} {v.patient.firstName}
+                      </p>
+                      <p className="text-xs text-slate-500">{v.patient.age} ans</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-400 tabular-nums shrink-0">
+                    {formatTime(v.createdAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

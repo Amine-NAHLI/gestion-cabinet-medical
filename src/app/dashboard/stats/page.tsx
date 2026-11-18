@@ -39,16 +39,10 @@ export default async function StatsPage() {
   }));
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 border border-violet-200/80 text-[11px] font-bold uppercase tracking-wider text-violet-700 mb-2">
-            <span className="material-symbols-outlined text-xs">analytics</span>
-            Indicateurs & Performance Clinique
-          </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Statistiques & Analyse Financière</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Indicateurs de performance, facturation, répartition des pathologies et activité du cabinet.</p>
-        </div>
+    <div className="space-y-6 pb-8">
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Statistiques</h1>
+        <p className="text-slate-500 text-sm mt-0.5">Activité clinique, recettes et répartition des consultations.</p>
       </div>
 
       <StatsCharts rawVisits={clientVisits} />

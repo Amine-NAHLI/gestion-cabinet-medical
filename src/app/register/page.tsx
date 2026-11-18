@@ -83,40 +83,31 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 text-slate-800 font-sans selection:bg-slate-900 selection:text-white py-10 px-4 sm:px-6 relative">
-      
-      {/* Ambient background soft aura */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-72 bg-gradient-to-b from-sky-100/50 to-transparent blur-3xl pointer-events-none" />
-
-      <div className="max-w-3xl mx-auto relative z-10">
+    <div className="min-h-screen w-full bg-[#F8F9FB] text-slate-900 py-8 sm:py-12 px-4 sm:px-6">
+      <div className="max-w-2xl mx-auto">
         
         {/* Navigation retour */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-8 flex items-center justify-between">
           <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition"
           >
-            <span className="material-symbols-outlined text-sm">arrow_back</span>
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
             <span>Retour à la connexion</span>
           </Link>
 
-          <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Activation Médicale Sécurisée
+          <span className="text-sm font-semibold tracking-tight text-slate-900">
+            Mon<span className="text-sky-700">Cabinet</span>
           </span>
         </div>
 
-        {/* En-tête */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-50 border border-sky-200/80 text-sky-700 text-xs font-bold mb-3">
-            <span className="material-symbols-outlined text-sm">local_hospital</span>
-            MonCabinet • Inscription Praticien
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-            Créer votre Cabinet Médical
+        {/* En-tête sobre */}
+        <div className="mb-7">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Créer votre cabinet médical
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md mx-auto">
-            Renseignez les informations de votre pratique. Vous recevrez un code OTP à 6 chiffres pour activer votre cabinet en direct.
+          <p className="text-sm text-slate-500 mt-1">
+            Renseignez les informations du médecin, du cabinet et de l'assistante pour recevoir votre code d'activation.
           </p>
         </div>
 
@@ -124,30 +115,25 @@ export default function RegisterPage() {
         <AnimatePresence>
           {error && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2.5 shadow-xs"
+              exit={{ opacity: 0, y: -6 }}
+              className="mb-5 p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-center gap-2.5"
             >
-              <span className="material-symbols-outlined text-base text-red-500 shrink-0">error</span>
+              <span className="material-symbols-outlined text-base text-red-600 shrink-0">error</span>
               <span>{error}</span>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Formulaire Principal Multi-Section */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           
           {/* Section 1 : Praticien Titulaire */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-xl shadow-slate-900/[0.03]">
-            <div className="flex items-center gap-2.5 pb-4 mb-4 border-b border-slate-100">
-              <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                <span className="material-symbols-outlined text-lg">stethoscope</span>
-              </div>
-              <div>
-                <h2 className="font-bold text-sm text-slate-900">Médecin Praticien Titulaire</h2>
-                <p className="text-[11px] text-slate-500">Compte administrateur de votre cabinet médical</p>
-              </div>
+          <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+            <div className="pb-4 mb-4 border-b border-slate-100">
+              <h2 className="font-semibold text-sm text-slate-900">1. Médecin titulaire</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Compte principal du praticien</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -243,16 +229,11 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Section 2 : Le Cabinet & Ville avec Recherche Rapide */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-xl shadow-slate-900/[0.03]">
-            <div className="flex items-center gap-2.5 pb-4 mb-4 border-b border-slate-100">
-              <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
-                <span className="material-symbols-outlined text-lg">domain</span>
-              </div>
-              <div>
-                <h2 className="font-bold text-sm text-slate-900">Le Cabinet Médical</h2>
-                <p className="text-[11px] text-slate-500">Coordonnées et localisation au Maroc</p>
-              </div>
+          {/* Section 2 : Le Cabinet & Ville */}
+          <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+            <div className="pb-4 mb-4 border-b border-slate-100">
+              <h2 className="font-semibold text-sm text-slate-900">2. Coordonnées du cabinet</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Nom, ville et adresse au Maroc</p>
             </div>
 
             <div className="space-y-4">
@@ -299,20 +280,14 @@ export default function RegisterPage() {
           </div>
 
           {/* Section 3 : Assistante Médicale (Obligatoire) */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-xl shadow-slate-900/[0.03]">
+          <div className="bg-white rounded-xl border border-slate-200/90 p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-lg">assignment_ind</span>
-                </div>
-                <div>
-                  <h2 className="font-bold text-sm text-slate-900">Compte Assistante Médicale</h2>
-                  <p className="text-[11px] text-slate-500">Gestion de l'accueil, de la file d'attente et des règlements</p>
-                </div>
+              <div>
+                <h2 className="font-semibold text-sm text-slate-900">3. Compte assistante médicale</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Accueil, salle d'attente et encaissements</p>
               </div>
 
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200/80 text-[10px] font-bold uppercase tracking-wider text-purple-700">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+              <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium">
                 Obligatoire
               </span>
             </div>

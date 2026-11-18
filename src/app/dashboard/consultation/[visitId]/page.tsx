@@ -128,41 +128,39 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
   const isReturningPatient = pastVisits.length > 0;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Header avec infos patient + statut suivi / alertes médicales */}
-      <div className="bg-white p-6 rounded-3xl shadow-xs border border-slate-200/80 space-y-4">
+    <div className="space-y-5">
+      {/* Header sobre & clinique */}
+      <div className="bg-white p-5 sm:p-6 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] border border-slate-200/90 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-sky-600 text-white flex items-center justify-center text-xl font-bold tracking-wider shadow-xs shadow-sky-600/30 shrink-0">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center text-base font-semibold shrink-0">
               {initials}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
                   {visit.patients.lastName} {visit.patients.firstName}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-sky-50 border border-sky-200/70 text-sky-700 text-xs font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-medium tabular-nums">
                   Visite #{visit.visits.id}
                 </span>
                 {isReturningPatient ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold">
-                    <span className="material-symbols-outlined text-xs">history</span>
-                    Patient suivi • {pastVisits.length} visite{pastVisits.length > 1 ? "s" : ""} précédente
-                    {pastVisits.length > 1 ? "s" : ""}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 border border-sky-200/80 text-sky-800 text-xs font-medium">
+                    Patient suivi ({pastVisits.length})
                   </span>
                 ) : (
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-medium">
                     Nouveau patient
                   </span>
                 )}
                 {visit.patients.cin && (
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-bold">
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono text-xs">
                     {visit.patients.cin}
                   </span>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-500 font-medium mt-1.5">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
                 <span>{visit.patients.age} ans</span>
                 {visit.patients.gender && (
                   <>
@@ -171,11 +169,11 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
                   </>
                 )}
                 <span>•</span>
-                <span>Tél : {visit.patients.phone}</span>
+                <span>Tél. {visit.patients.phone}</span>
                 {visit.patients.bloodGroup && (
                   <>
                     <span>•</span>
-                    <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-extrabold text-[11px]">
+                    <span className="font-semibold text-rose-700">
                       Groupe {visit.patients.bloodGroup}
                     </span>
                   </>
@@ -183,9 +181,7 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
                 {visit.patients.mutuelle && (
                   <>
                     <span>•</span>
-                    <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-700 font-bold text-[11px]">
-                      {visit.patients.mutuelle}
-                    </span>
+                    <span className="font-medium text-slate-700">{visit.patients.mutuelle}</span>
                   </>
                 )}
               </div>
@@ -194,30 +190,30 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
 
           <Link
             href="/dashboard"
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 rounded-lg text-xs font-medium transition shrink-0"
           >
-            <span className="material-symbols-outlined text-base">arrow_back</span>
-            Retour au tableau
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            Retour
           </Link>
         </div>
 
-        {/* Bandeau d'alerte Allergies / Antécédents permanents (toujours visible pour le médecin) */}
+        {/* Alertes cliniques permanentes */}
         {(visit.patients.allergies || visit.patients.antecedents) && (
-          <div className="pt-3 border-t border-slate-100 flex flex-wrap gap-3">
+          <div className="pt-3 border-t border-slate-100 flex flex-wrap gap-2.5">
             {visit.patients.allergies && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold">
-                <span className="material-symbols-outlined text-sm text-red-600">warning</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200/80 text-red-900 text-xs">
+                <span className="material-symbols-outlined text-[15px] text-red-600">warning</span>
                 <span>
-                  <strong className="uppercase text-[10px] tracking-wider mr-1">Allergies :</strong>
+                  <strong className="font-semibold mr-1">Allergies :</strong>
                   {visit.patients.allergies}
                 </span>
               </div>
             )}
             {visit.patients.antecedents && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
-                <span className="material-symbols-outlined text-sm text-amber-600">medical_information</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-900 text-xs">
+                <span className="material-symbols-outlined text-[15px] text-amber-600">info</span>
                 <span>
-                  <strong className="uppercase text-[10px] tracking-wider mr-1">Antécédents :</strong>
+                  <strong className="font-semibold mr-1">Antécédents :</strong>
                   {visit.patients.antecedents}
                 </span>
               </div>

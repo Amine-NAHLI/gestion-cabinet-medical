@@ -84,10 +84,10 @@ export default function AddAppointmentModal() {
       <button
         type="button"
         onClick={() => { setIsOpen(true); resetState(); }}
-        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-xs hover:shadow-md hover:shadow-indigo-600/25 cursor-pointer"
+        className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 hover:border-slate-300 px-4 py-2 rounded-lg font-medium text-xs shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition cursor-pointer"
       >
-        <span className="material-symbols-outlined text-base">event</span>
-        Nouveau Rendez-vous
+        <span className="material-symbols-outlined text-[17px] text-slate-500">event</span>
+        Nouveau rendez-vous
       </button>
 
       <AnimatePresence>

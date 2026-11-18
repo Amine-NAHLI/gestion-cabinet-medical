@@ -39,73 +39,64 @@ export default async function QueuePage() {
   const readyList = visitArray.filter(v => v.status === 'ready');
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-600 mb-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Flux en direct
-          </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">File d'attente</h1>
-          <p className="text-slate-500 text-sm mt-1">Gestion des admissions et présences du cabinet pour aujourd'hui.</p>
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Salle d'attente</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Admissions et patients en attente pour aujourd'hui.</p>
         </div>
         {role === 'assistant' && <AddPatientModal />}
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-6">
 
         {/* Section Médecin: Patient Prêt */}
         {role === 'doctor' && readyList.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                Patient Prêt en Consultation
+              <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Patient prêt en consultation
               </h2>
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-3 py-1 rounded-full">
-                À recevoir
-              </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {readyList.map(visit => {
                 const initials = `${visit.patient.firstName[0] || ""}${visit.patient.lastName[0] || ""}`.toUpperCase();
                 return (
-                  <MotionDiv
+                  <div
                     key={visit.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="relative overflow-hidden bg-gradient-to-r from-emerald-50/70 via-white to-white border-2 border-emerald-500/80 p-6 rounded-2xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-5"
+                    className="bg-white border border-emerald-300/90 p-5 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg tracking-wider shadow-sm shadow-emerald-600/30">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center font-semibold text-sm">
                         {initials}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-slate-900 text-xl tracking-tight">
+                          <h3 className="font-semibold text-slate-900 text-base">
                             {visit.patient.lastName} {visit.patient.firstName}
                           </h3>
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-100/70 text-emerald-800 text-[10px] font-bold uppercase tracking-wider">
-                            Salle prête
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-medium">
+                            En salle
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                        <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
                           <span>{visit.patient.age} ans</span>
                           <span>•</span>
-                          <span>Tél: {visit.patient.phone}</span>
+                          <span>Tél. {visit.patient.phone}</span>
                         </p>
                       </div>
                     </div>
                     <Link
                       href={`/dashboard/consultation/${visit.id}`}
-                      className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-7 py-3 rounded-xl font-bold text-sm tracking-wide shadow-sm hover:shadow-md hover:shadow-emerald-600/25 transition-all cursor-pointer"
+                      className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition cursor-pointer"
                     >
-                      <span>Ouvrir la Consultation</span>
+                      <span>Ouvrir la consultation</span>
                       <span className="material-symbols-outlined text-base">arrow_forward</span>
                     </Link>
-                  </MotionDiv>
+                  </div>
                 );
               })}
             </div>

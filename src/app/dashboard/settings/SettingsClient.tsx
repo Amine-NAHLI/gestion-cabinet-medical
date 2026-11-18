@@ -306,19 +306,19 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
         )}
       </AnimatePresence>
 
-      {/* NAVIGATION DES ONGLETS PARAMÈTRES */}
-      <div className="bg-white p-2 rounded-2xl border border-slate-200/90 shadow-xs flex flex-wrap gap-2">
+      {/* NAVIGATION DES ONGLETS PARAMÈTRES (SOBRE À SOULIGNEMENT) */}
+      <div className="border-b border-slate-200/90 flex overflow-x-auto gap-2">
         <button
           type="button"
           onClick={() => setActiveTab("general")}
-          className={`flex-1 min-w-[170px] flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition cursor-pointer ${
+          className={`flex items-center gap-2 pb-3 px-3 text-sm font-medium border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
             activeTab === "general"
-              ? "bg-slate-900 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              ? "border-slate-900 text-slate-900 font-semibold"
+              : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <span className="material-symbols-outlined text-base">business</span>
-          <span>Infos du Cabinet</span>
+          <span className="material-symbols-outlined text-[18px]">business</span>
+          <span>Infos du cabinet</span>
         </button>
 
         {isDoctor && (
@@ -326,19 +326,15 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
             <button
               type="button"
               onClick={() => setActiveTab("fields")}
-              className={`flex-1 min-w-[190px] flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-2 pb-3 px-3 text-sm font-medium border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
                 activeTab === "fields"
-                  ? "bg-sky-600 text-white shadow-xs"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  ? "border-slate-900 text-slate-900 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              <span className="material-symbols-outlined text-base">dynamic_form</span>
-              <span>Cases Fiche Patient</span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                  activeTab === "fields" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
-                }`}
-              >
+              <span className="material-symbols-outlined text-[18px]">dynamic_form</span>
+              <span>Cases fiche patient</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
                 {fields.length}
               </span>
             </button>
@@ -346,21 +342,15 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
             <button
               type="button"
               onClick={() => setActiveTab("template")}
-              className={`flex-1 min-w-[200px] flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-2 pb-3 px-3 text-sm font-medium border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
                 activeTab === "template"
-                  ? "bg-teal-600 text-white shadow-xs"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  ? "border-slate-900 text-slate-900 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              <span className="material-symbols-outlined text-base">description</span>
-              <span>Template Ordonnance</span>
-              {templateUrl && (
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    activeTab === "template" ? "bg-emerald-300" : "bg-emerald-500"
-                  }`}
-                />
-              )}
+              <span className="material-symbols-outlined text-[18px]">description</span>
+              <span>Template d'ordonnance</span>
+              {templateUrl && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
             </button>
           </>
         )}

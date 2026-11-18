@@ -67,15 +67,14 @@ export default function AddPatientModal() {
 
   return (
     <>
-      <motion.button 
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
+      <button
+        type="button"
         onClick={() => { setIsOpen(true); setFeedbackMsg(null); }}
-        className="flex items-center gap-2 bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs tracking-wide uppercase shadow-xs hover:shadow-md hover:shadow-teal-600/20 transition-all cursor-pointer"
+        className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-medium text-xs shadow-[0_1px_2px_rgba(16,24,40,0.08)] transition cursor-pointer"
       >
-        <span className="material-symbols-outlined text-base">person_add</span>
-        Admission Patient
-      </motion.button>
+        <span className="material-symbols-outlined text-[17px]">person_add</span>
+        Nouvelle admission
+      </button>
 
       <AnimatePresence>
         {isOpen && (

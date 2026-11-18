@@ -257,37 +257,26 @@ export default function AdminDashboardClient({
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-slate-900 selection:text-white">
-      {/* 1. TOP EXECUTIVE NAVBAR (BLANC PRO) */}
-      <header className="border-b border-slate-200/80 bg-white/95 backdrop-blur-md sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 text-sky-400 flex items-center justify-center shadow-xs">
-              <span className="material-symbols-outlined text-lg">admin_panel_settings</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base tracking-tight text-slate-900">
-                  Mon<span className="text-sky-600">Cabinet</span>
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-700">
-                  Super Admin
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-500 font-medium">
-                Administration Centrale de la Plateforme
-              </span>
-            </div>
+    <div className="min-h-screen bg-[#F8F9FB] text-slate-900 flex flex-col">
+      {/* TOP HEADER SOBRE */}
+      <header className="border-b border-slate-200/90 bg-white sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="font-semibold text-base tracking-tight text-slate-900">
+              Mon<span className="text-sky-700">Cabinet</span>
+            </span>
+            <span className="text-slate-300">/</span>
+            <span className="text-xs font-medium text-slate-500">Administration</span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => refreshData(false)}
               disabled={actionLoading === "refreshing"}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 transition cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition cursor-pointer"
             >
               <span
-                className={`material-symbols-outlined text-sm text-slate-500 ${
+                className={`material-symbols-outlined text-[15px] text-slate-500 ${
                   actionLoading === "refreshing" ? "animate-spin" : ""
                 }`}
               >
@@ -296,79 +285,66 @@ export default function AdminDashboardClient({
               <span className="hidden sm:inline">Actualiser</span>
             </button>
 
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-700 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{adminEmail}</span>
-            </div>
+            <span className="hidden md:inline-block px-2.5 py-1.5 text-xs text-slate-500">
+              {adminEmail}
+            </span>
 
             <button
               onClick={handleAdminLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 text-xs font-medium transition cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm">logout</span>
+              <span className="material-symbols-outlined text-[16px]">logout</span>
               <span className="hidden sm:inline">Déconnexion</span>
             </button>
           </div>
         </div>
 
-        {/* NAVIGATION DES 3 PAGES ADMIN */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 border-t border-slate-100 bg-slate-50/50">
-          <nav className="flex items-center gap-2 overflow-x-auto py-2.5">
+        {/* NAVIGATION DES 3 PAGES ADMIN (ONGLETS SOBRES À SOULIGNEMENT) */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 border-t border-slate-100">
+          <nav className="flex items-center gap-2 overflow-x-auto">
             <button
               onClick={() => setActivePage("stats")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
                 activePage === "stats"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-white text-slate-600 border border-slate-200/80 hover:border-slate-300 hover:text-slate-900"
+                  ? "border-slate-900 text-slate-900 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              <span className="material-symbols-outlined text-base">bar_chart</span>
-              <span>Statistiques Globales</span>
+              <span className="material-symbols-outlined text-[17px]">bar_chart</span>
+              <span>Statistiques</span>
             </button>
 
             <button
               onClick={() => setActivePage("doctors")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
                 activePage === "doctors"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-white text-slate-600 border border-slate-200/80 hover:border-slate-300 hover:text-slate-900"
+                  ? "border-slate-900 text-slate-900 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              <span className="material-symbols-outlined text-base">medical_services</span>
+              <span className="material-symbols-outlined text-[17px]">medical_services</span>
               <span>Médecins & Assistantes</span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                  activePage === "doctors"
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
+              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
                 {data.doctorsWithAssistants.length}
               </span>
             </button>
 
             <button
               onClick={() => setActivePage("requests")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
                 activePage === "requests"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-white text-slate-600 border border-slate-200/80 hover:border-slate-300 hover:text-slate-900"
+                  ? "border-slate-900 text-slate-900 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              <span className="material-symbols-outlined text-base">inbox</span>
-              <span>Demandes de Création</span>
+              <span className="material-symbols-outlined text-[17px]">inbox</span>
+              <span>Demandes de création</span>
               {data.stats.pendingCount > 0 ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-white animate-pulse">
+                <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[11px] font-semibold tabular-nums">
                   {data.stats.pendingCount} en attente
                 </span>
               ) : (
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                    activePage === "requests"
-                      ? "bg-white/20 text-white"
-                      : "bg-slate-100 text-slate-700"
-                  }`}
-                >
+                <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
                   {data.allRequests.length}
                 </span>
               )}
