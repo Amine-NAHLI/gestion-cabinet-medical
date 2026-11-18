@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { addPatientAndVisit, searchPatients, createVisitForExistingPatient } from "@/actions/patients";
 
 export default function AddPatientModal() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<"search" | "new">("search");
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +42,7 @@ export default function AddPatientModal() {
       setIsOpen(false);
       setSearchQuery("");
       setSearchResults([]);
+      router.refresh();
     } else {
       setFeedbackMsg(res.error || "Erreur");
     }
@@ -56,6 +59,7 @@ export default function AddPatientModal() {
       setIsOpen(false);
       setSearchQuery("");
       setSearchResults([]);
+      router.refresh();
     } else {
       setFeedbackMsg(res.error || "Erreur");
     }

@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/authOptions";
 import { redirect } from "next/navigation";
 import { getClinicSettings } from "@/actions/settings";
 import BottomNav from "@/components/BottomNav";
+import RealtimeSync from "@/components/RealtimeSync";
 
 export default async function DashboardLayout({
   children,
@@ -56,8 +57,9 @@ export default async function DashboardLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 text-slate-500 text-xs font-semibold capitalize">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <RealtimeSync role={role} />
+            <div className="hidden md:flex items-center gap-2 text-slate-500 text-xs font-semibold capitalize">
               <span className="material-symbols-outlined text-base text-slate-400">
                 calendar_today
               </span>

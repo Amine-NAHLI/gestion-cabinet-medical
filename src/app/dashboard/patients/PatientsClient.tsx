@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createVisitForExistingPatient, updatePatient } from "@/actions/patients";
 import AddPatientModal from "@/components/AddPatientModal";
@@ -39,6 +39,15 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
   const [editingPatient, setEditingPatient] = useState<PatientWithHistory | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Synchronisation automatique lorsque de nouveaux patients arrivent en direct
+  useEffect(() => {
+    setPatientsList(initialPatients);
+    setSelectedPatient((prev) => {
+      if (!prev) return null;
+      return initialPatients.find((p) => p.id === prev.id) || prev;
+    });
+  }, [initialPatients]);
 
   function showToast(msg: string) {
     setToast(msg);
