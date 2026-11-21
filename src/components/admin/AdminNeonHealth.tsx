@@ -182,14 +182,16 @@ export default function AdminNeonHealth({
         <div className="bg-white rounded-2xl border border-slate-200/90 p-4.5 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold text-slate-700">Taux Cache Buffer (RAM)</span>
-              <span className="material-symbols-outlined text-lg text-emerald-600">memory</span>
+              <span className="text-xs font-semibold text-slate-700">Efficacité Cache RAM</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Performance Max
+              </span>
             </div>
             <p className="text-2xl font-extrabold text-emerald-700 tabular-nums">
               {performance.cacheHitRatio || "99.9"}%
             </p>
             <p className="text-xs text-slate-500 mt-1">
-              Lectures servies depuis la mémoire vive
+              Lectures servies directement en RAM ultra-rapide (Hit Ratio)
             </p>
           </div>
 
