@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import {
   createCommunityPost,
+  deleteCommunityPost,
   toggleCommunityMembership,
 } from "@/actions/community";
 
@@ -63,8 +64,10 @@ const CATEGORIES = [
 export default function CommunityClient({ initialData }: CommunityClientProps) {
   const [isMember, setIsMember] = useState(initialData.isMember);
   const [posts, setPosts] = useState<Post[]>(initialData.posts || []);
+  const [feedView, setFeedView] = useState<"confreres" | "my_posts">("confreres");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [postSearch, setPostSearch] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // Modal Nouvelle publication
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -113,8 +116,32 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
     });
   };
 
+  // Supprimer ma publication
+  const handleDeletePost = async (postId: number) => {
+    if (!confirm("Voulez-vous vraiment supprimer cette publication ?")) return;
+    setDeletingId(postId);
+    try {
+      const res = await deleteCommunityPost(postId);
+      if (res.success) {
+        setPosts((prev) => prev.filter((p) => p.id !== postId));
+      } else {
+        alert(res.error || "Erreur lors de la suppression");
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Séparation du fil : confrères vs mes publications
+  const myPostsCount = posts.filter((p) => p.isMyPost).length;
+  const confreresPostsCount = posts.filter((p) => !p.isMyPost).length;
+
+  const displayedPool = feedView === "confreres"
+    ? posts.filter((p) => !p.isMyPost)
+    : posts.filter((p) => p.isMyPost);
+
   // Filtre des publications (catégorie + recherche textuelle)
-  const filteredPosts = posts.filter((p) => {
+  const filteredPosts = displayedPool.filter((p) => {
     const matchesCategory = selectedCategory === "all" || p.category === selectedCategory;
     if (!matchesCategory) return false;
     if (!postSearch.trim()) return true;
@@ -131,8 +158,8 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
 
   // Compteur de posts par catégorie
   const getCategoryCount = (catId: string) => {
-    if (catId === "all") return posts.length;
-    return posts.filter((p) => p.category === catId).length;
+    if (catId === "all") return displayedPool.length;
+    return displayedPool.filter((p) => p.category === catId).length;
   };
 
   // ============================================================
@@ -239,6 +266,55 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
 
       {/* FIL CONFRATERNEL (BLOG / FEED MÉDICAL) */}
       <div className="space-y-4">
+          {/* ONGLETS PRINCIPAUX DU RÉSEAU : FIL CONFRATERNEL vs MES PUBLICATIONS */}
+          <div className="flex items-center gap-2 border-b border-slate-200/80 pb-3">
+            <button
+              type="button"
+              onClick={() => {
+                setFeedView("confreres");
+                setSelectedCategory("all");
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                feedView === "confreres"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[17px]">forum</span>
+              <span>Fil Confraternel (Autres Confrères)</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
+                  feedView === "confreres" ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {confreresPostsCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setFeedView("my_posts");
+                setSelectedCategory("all");
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                feedView === "my_posts"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[17px]">person</span>
+              <span>Mes publications</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
+                  feedView === "my_posts" ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {myPostsCount}
+              </span>
+            </button>
+          </div>
+
           {/* BARRE D'ACTION 1 : RECHERCHE RAPIDE + BOUTON NOUVELLE PUBLICATION */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Champ de recherche instantané */}
@@ -325,6 +401,8 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
                   <h3 className="text-sm font-bold text-slate-900">
                     {postSearch
                       ? `Aucune publication correspondant à "${postSearch}"`
+                      : feedView === "my_posts"
+                      ? "Vous n'avez pas encore publié de message"
                       : selectedCategory === "all"
                       ? "Le fil confraternel est calme pour le moment"
                       : "Aucune publication dans cette rubrique"}
@@ -332,6 +410,8 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
                   <p className="text-xs text-slate-500 leading-relaxed">
                     {postSearch
                       ? "Essayez d'autres mots-clés ou réinitialisez la recherche."
+                      : feedView === "my_posts"
+                      ? "Partagez votre premier cas clinique, proposez un remplacement ou publiez une annonce médicale."
                       : "Partagez un cas clinique atypique, proposez un remplacement ou sollicitez un spécialiste certifié."}
                   </p>
                 </div>
@@ -475,9 +555,19 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
                         </span>
                       </span>
 
-                      {!post.isMyPost && (
+                      {post.isMyPost ? (
+                        <button
+                          type="button"
+                          disabled={deletingId === post.id}
+                          onClick={() => handleDeletePost(post.id)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-semibold transition cursor-pointer disabled:opacity-50 self-start sm:self-auto"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">delete</span>
+                          <span>{deletingId === post.id ? "Suppression..." : "Supprimer cette publication"}</span>
+                        </button>
+                      ) : (
                         <Link
-                          href={`/dashboard/chat?doctor=${post.authorDoctorId}`}
+                          href={`/dashboard/chat?doctor=${post.authorDoctorId}&postTitle=${encodeURIComponent(post.title)}`}
                           className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer shadow-2xs self-start sm:self-auto"
                         >
                           <span className="material-symbols-outlined text-[15px]">

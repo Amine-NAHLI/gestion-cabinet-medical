@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { communityPosts, communityMessages, clinics, users } from "@/db/schema";
+import { communityPosts, communityMessages, clinics, users, clinicSettings } from "@/db/schema";
 import { eq, and, or, desc, asc, ne } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
@@ -62,9 +62,11 @@ export async function getCommunityData() {
       bio: users.bio,
       clinicName: clinics.name,
       clinicCity: clinics.city,
+      specialty: clinicSettings.specialty,
     })
     .from(users)
     .innerJoin(clinics, eq(users.clinicId, clinics.id))
+    .leftJoin(clinicSettings, eq(clinics.id, clinicSettings.clinicId))
     .where(
       and(
         eq(users.role, "doctor"),
@@ -93,7 +95,10 @@ export async function getCommunityData() {
       createdAt: p.createdAt.toISOString(),
       isMyPost: p.authorDoctorId === currentDoctorId,
     })),
-    confreres,
+    confreres: confreres.map((c) => ({
+      ...c,
+      specialty: c.specialty || "Médecine Générale",
+    })),
   };
 }
 
@@ -115,6 +120,7 @@ export async function createCommunityPost(data: {
 
   const [clinic] = await db.select().from(clinics).where(eq(clinics.id, clinicId)).limit(1);
   const [doctor] = await db.select().from(users).where(eq(users.id, currentDoctorId)).limit(1);
+  const [settings] = await db.select().from(clinicSettings).where(eq(clinicSettings.clinicId, clinicId)).limit(1);
 
   if (!clinic?.isCommunityMember) {
     return { success: false, error: "Veuillez d'abord rejoindre la communauté." };
@@ -131,7 +137,7 @@ export async function createCommunityPost(data: {
     clinicId,
     authorDoctorId: currentDoctorId,
     authorName: doctor?.name || "Dr. Confrère",
-    authorSpecialty: "Médecin",
+    authorSpecialty: settings?.specialty || "Médecine Générale",
     authorCity: clinic.city || "Maroc",
     authorAvatarUrl: doctor?.avatarUrl || null,
     category: data.category || "general",
@@ -139,6 +145,37 @@ export async function createCommunityPost(data: {
     content: cleanContent,
   });
 
+  revalidatePath("/dashboard/community");
+  return { success: true };
+}
+
+export async function deleteCommunityPost(postId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
+  const userSession = session.user as { id?: string; role?: string };
+  if (userSession.role !== "doctor") {
+    return { success: false, error: "Seuls les médecins peuvent supprimer leurs publications." };
+  }
+
+  const currentDoctorId = parseInt(userSession.id || "0");
+
+  const [post] = await db
+    .select()
+    .from(communityPosts)
+    .where(
+      and(
+        eq(communityPosts.id, postId),
+        eq(communityPosts.authorDoctorId, currentDoctorId)
+      )
+    )
+    .limit(1);
+
+  if (!post) {
+    return { success: false, error: "Publication introuvable ou vous n'en êtes pas l'auteur." };
+  }
+
+  await db.delete(communityPosts).where(eq(communityPosts.id, postId));
   revalidatePath("/dashboard/community");
   return { success: true };
 }
@@ -321,9 +358,11 @@ export async function getChatOverviewData() {
       bio: users.bio,
       clinicName: clinics.name,
       clinicCity: clinics.city,
+      specialty: clinicSettings.specialty,
     })
     .from(users)
     .innerJoin(clinics, eq(users.clinicId, clinics.id))
+    .leftJoin(clinicSettings, eq(clinics.id, clinicSettings.clinicId))
     .where(
       and(
         eq(users.role, "doctor"),
@@ -363,6 +402,7 @@ export async function getChatOverviewData() {
       bio: c.bio,
       clinicName: c.clinicName,
       clinicCity: c.clinicCity,
+      specialty: c.specialty || "Médecine Générale",
       unreadCount,
       lastMessage: lastMsg
         ? {

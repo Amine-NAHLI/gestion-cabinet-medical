@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ChatPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ doctor?: string }>;
+  searchParams?: Promise<{ doctor?: string; postTitle?: string }>;
 }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
@@ -21,9 +21,16 @@ export default async function ChatPage({
 
   const resolvedParams = searchParams ? await searchParams : {};
   const initialDoctorId = resolvedParams.doctor ? parseInt(resolvedParams.doctor) : null;
+  const initialPostTitle = resolvedParams.postTitle ? decodeURIComponent(resolvedParams.postTitle) : null;
 
   const data = await getChatOverviewData();
   if (!data) redirect("/dashboard");
 
-  return <ChatClient initialData={data} initialDoctorId={initialDoctorId} />;
+  return (
+    <ChatClient
+      initialData={data}
+      initialDoctorId={initialDoctorId}
+      initialPostTitle={initialPostTitle}
+    />
+  );
 }

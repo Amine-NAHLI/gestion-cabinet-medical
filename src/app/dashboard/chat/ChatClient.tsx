@@ -15,6 +15,7 @@ interface ConfrereChat {
   bio: string | null;
   clinicName: string;
   clinicCity: string;
+  specialty?: string;
   unreadCount: number;
   lastMessage: {
     content: string;
@@ -42,19 +43,30 @@ interface ChatClientProps {
     currentDoctorId: number;
   };
   initialDoctorId?: number | null;
+  initialPostTitle?: string | null;
 }
 
-export default function ChatClient({ initialData, initialDoctorId }: ChatClientProps) {
+export default function ChatClient({
+  initialData,
+  initialDoctorId,
+  initialPostTitle,
+}: ChatClientProps) {
   const [isMember, setIsMember] = useState(initialData.isMember);
   const [confreres, setConfreres] = useState<ConfrereChat[]>(initialData.confreres || []);
   const [searchQuery, setSearchQuery] = useState("");
+  const [closedConfrereIds, setClosedConfrereIds] = useState<number[]>([]);
 
-  // Trouver le confrère initial s'il est spécifié dans l'URL
+  // Tag / Référence publication lors d'un échange depuis la communauté
+  const [activePostRef, setActivePostRef] = useState<string | null>(initialPostTitle || null);
+
+  // Filtre spécialité et recherche pour l'annuaire des confrères
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string>("all");
+  const [directorySearch, setDirectorySearch] = useState<string>("");
+
+  // Trouver le confrère initial s'il est spécifié dans l'URL ou ayant des messages récents
   const initialSelected = initialDoctorId
     ? initialData.confreres.find((c) => c.id === initialDoctorId) || null
-    : initialData.confreres.length > 0
-    ? initialData.confreres[0]
-    : null;
+    : initialData.confreres.find((c) => c.lastMessage !== null) || null;
 
   const [selectedConfrere, setSelectedConfrere] = useState<ConfrereChat | null>(initialSelected);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -109,6 +121,8 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
 
   // Sélectionner un confrère et marquer ses messages comme lus
   const handleSelectConfrere = async (confrere: ConfrereChat) => {
+    // Si la discussion était fermée, la réouvrir
+    setClosedConfrereIds((prev) => prev.filter((id) => id !== confrere.id));
     setSelectedConfrere({ ...confrere, unreadCount: 0 });
 
     if (confrere.unreadCount > 0) {
@@ -122,17 +136,39 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
     }
   };
 
-  // Envoi d'un message direct
+  // Fermer une conversation pour ne pas la laisser encombrer la barre latérale
+  const handleCloseConversation = (e: React.MouseEvent, confrereId: number) => {
+    e.stopPropagation();
+    setClosedConfrereIds((prev) => (prev.includes(confrereId) ? prev : [...prev, confrereId]));
+    if (selectedConfrere?.id === confrereId) {
+      setSelectedConfrere(null);
+    }
+  };
+
+  // Démarrer une conversation depuis l'annuaire
+  const handleStartConversation = (confrere: ConfrereChat) => {
+    setClosedConfrereIds((prev) => prev.filter((id) => id !== confrere.id));
+    handleSelectConfrere(confrere);
+  };
+
+  // Envoi d'un message direct (avec tag publication éventuel)
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedConfrere || !inputText.trim() || isSending) return;
 
-    const text = inputText.trim();
+    const baseText = inputText.trim();
+    // Si on répond à une publication, ajouter le tag de contexte
+    const textToSend = activePostRef
+      ? `📌 [Réf. Publication : "${activePostRef}"]\n\n${baseText}`
+      : baseText;
+
     setIsSending(true);
     setInputText("");
+    const sentPostRef = activePostRef;
+    setActivePostRef(null); // Consommer le tag après le premier envoi
 
     try {
-      const res = await sendCommunityDirectMessage(selectedConfrere.id, text);
+      const res = await sendCommunityDirectMessage(selectedConfrere.id, textToSend);
       if (res.success && res.message) {
         setMessages((prev) => [...prev, res.message]);
 
@@ -143,7 +179,7 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
               ? {
                   ...c,
                   lastMessage: {
-                    content: text,
+                    content: textToSend,
                     createdAt: new Date().toISOString(),
                     isMe: true,
                   },
@@ -151,17 +187,56 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
               : c
           )
         );
+      } else {
+        // En cas d'échec, restaurer le tag
+        setActivePostRef(sentPostRef);
       }
+    } catch {
+      setActivePostRef(sentPostRef);
     } finally {
       setIsSending(false);
     }
   };
 
-  // Filtre de recherche
-  const filteredConfreres = confreres.filter((c) => {
+  // Liste des conversations actives dans la barre latérale
+  const activeConversations = confreres.filter((c) => {
+    const isCurrentlySelected = selectedConfrere?.id === c.id;
+    const isClosed = closedConfrereIds.includes(c.id);
+    if (isClosed && !isCurrentlySelected) return false;
+
+    // Est active si elle a des messages échangés OU est actuellement sélectionnée
+    const hasHistory = c.lastMessage !== null;
+    return hasHistory || isCurrentlySelected || initialDoctorId === c.id;
+  });
+
+  // Filtrer les conversations actives par la recherche
+  const filteredActiveConversations = activeConversations.filter((c) => {
     const q = searchQuery.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
+      (c.specialty || "").toLowerCase().includes(q) ||
+      c.clinicCity.toLowerCase().includes(q) ||
+      c.clinicName.toLowerCase().includes(q)
+    );
+  });
+
+  // Liste des spécialités disponibles pour le filtre de l'annuaire
+  const allSpecialties = Array.from(
+    new Set(confreres.map((c) => c.specialty || "Médecine Générale"))
+  ).sort();
+
+  // Liste des confrères pour l'annuaire (confrères qui ont activé la messagerie)
+  const directoryDoctors = confreres.filter((c) => {
+    const matchesSpec =
+      selectedSpecialty === "all" ||
+      (c.specialty || "Médecine Générale") === selectedSpecialty;
+    if (!matchesSpec) return false;
+    if (!directorySearch.trim()) return true;
+
+    const q = directorySearch.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      (c.specialty || "").toLowerCase().includes(q) ||
       c.clinicCity.toLowerCase().includes(q) ||
       c.clinicName.toLowerCase().includes(q)
     );
@@ -209,21 +284,35 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
             )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Discussions privées 1-à-1 chiffrées entre médecins certifiés • Style WhatsApp Web
+            Discussions privées chiffrées entre médecins certifiés • Style WhatsApp Web
           </p>
         </div>
+
+        {/* Bouton Annuaire / Nouveau Message */}
+        <button
+          type="button"
+          onClick={() => setSelectedConfrere(null)}
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+            !selectedConfrere
+              ? "bg-slate-900 text-white shadow-xs"
+              : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-2xs"
+          }`}
+        >
+          <span className="material-symbols-outlined text-[17px] text-sky-600">person_add</span>
+          <span>Annuaire des Médecins ({confreres.length})</span>
+        </button>
       </div>
 
-      {/* Interface Principale 2 Colonnes WhatsApp Style */}
+      {/* Interface Principale 2 Colonnes */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-12 h-[calc(100vh-14rem)] min-h-[580px]">
-        {/* COLONNE GAUCHE (CONFRÈRES) : 4/12 sur desktop */}
+        {/* COLONNE GAUCHE (DISCUSSIONS EN COURS) : 4/12 sur desktop */}
         <aside
           className={`md:col-span-4 lg:col-span-4 border-r border-slate-200 flex flex-col bg-slate-50/50 ${
             selectedConfrere ? "hidden md:flex" : "flex"
           }`}
         >
-          {/* Barre de recherche */}
-          <div className="p-3 border-b border-slate-200 bg-white">
+          {/* Barre de recherche + bouton nouveau */}
+          <div className="p-3 border-b border-slate-200 bg-white space-y-2">
             <div className="relative">
               <span className="material-symbols-outlined text-slate-400 text-base absolute left-3 top-1/2 -translate-y-1/2">
                 search
@@ -232,20 +321,47 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher une discussion..."
+                placeholder="Filtrer mes discussions..."
                 className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-slate-900 transition"
               />
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-500 px-1 font-medium">
+              <span>Discussions actives ({filteredActiveConversations.length})</span>
+              <button
+                type="button"
+                onClick={() => setSelectedConfrere(null)}
+                className="text-sky-600 hover:text-sky-800 font-semibold cursor-pointer inline-flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-xs">add</span>
+                <span>Nouveau</span>
+              </button>
             </div>
           </div>
 
           {/* Liste des discussions */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-            {filteredConfreres.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs">
-                Aucun confrère trouvé.
+            {filteredActiveConversations.length === 0 ? (
+              <div className="p-6 text-center space-y-3">
+                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                  <span className="material-symbols-outlined text-lg">chat_bubble_outline</span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-slate-700">Aucune discussion ouverte</p>
+                  <p className="text-[11px] text-slate-400 max-w-[200px] mx-auto">
+                    Sélectionnez un médecin dans l&apos;annuaire à droite pour débuter un échange.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedConfrere(null)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[11px] font-semibold transition cursor-pointer"
+                >
+                  Voir l&apos;annuaire
+                </button>
               </div>
             ) : (
-              filteredConfreres.map((c) => {
+              filteredActiveConversations.map((c) => {
                 const isSelected = selectedConfrere?.id === c.id;
                 const initials = c.name
                   .split(" ")
@@ -262,11 +378,10 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                   : "";
 
                 return (
-                  <button
+                  <div
                     key={c.id}
-                    type="button"
                     onClick={() => handleSelectConfrere(c)}
-                    className={`w-full p-3.5 text-left transition flex items-start gap-3 cursor-pointer ${
+                    className={`group relative w-full p-3.5 text-left transition flex items-start gap-3 cursor-pointer ${
                       isSelected
                         ? "bg-white shadow-2xs border-l-4 border-l-slate-900"
                         : "hover:bg-slate-100/70"
@@ -293,7 +408,7 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                     </div>
 
                     {/* Infos Confrère & Aperçu Dernier Message */}
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 pr-5">
                       <div className="flex items-center justify-between gap-1">
                         <p
                           className={`text-xs truncate flex items-center gap-1 ${
@@ -316,6 +431,10 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                         )}
                       </div>
 
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {c.specialty || "Médecine Générale"} • {c.clinicCity}
+                      </p>
+
                       <div className="flex items-center justify-between gap-2 mt-1">
                         <p
                           className={`text-[11px] truncate leading-tight ${
@@ -330,7 +449,7 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                               {c.lastMessage.content}
                             </>
                           ) : (
-                            <span className="italic text-slate-400">Aucun message</span>
+                            <span className="italic text-slate-400">Discussion ouverte</span>
                           )}
                         </p>
 
@@ -342,20 +461,33 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                         )}
                       </div>
                     </div>
-                  </button>
+
+                    {/* Bouton discret pour FERMER la conversation */}
+                    <button
+                      type="button"
+                      title="Fermer cette discussion"
+                      onClick={(e) => handleCloseConversation(e, c.id)}
+                      className="absolute right-2 top-3 w-5 h-5 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  </div>
                 );
               })
             )}
           </div>
         </aside>
 
-        {/* COLONNE DROITE (CONVERSATION ACTIVE) : 8/12 sur desktop */}
+        {/* COLONNE DROITE : CONVERSATION ACTIVE OU ANNUAIRE DES CONFRÈRES */}
         <main
           className={`md:col-span-8 lg:col-span-8 flex flex-col bg-white ${
-            !selectedConfrere ? "hidden md:flex" : "flex"
+            !selectedConfrere ? "flex" : "flex"
           }`}
         >
           {selectedConfrere ? (
+            /* ============================================================
+               VUE 1 : CONVERSATION EN COURS AVEC LE MÉDECIN SÉLECTIONNÉ
+               ============================================================ */
             <>
               {/* En-tête de la conversation */}
               <header className="px-4 py-3 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between shrink-0">
@@ -394,7 +526,7 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                       </span>
                     </p>
                     <p className="text-[11px] text-slate-500 truncate">
-                      {selectedConfrere.clinicCity} • {selectedConfrere.clinicName}
+                      {selectedConfrere.specialty || "Médecine Générale"} • {selectedConfrere.clinicCity} • {selectedConfrere.clinicName}
                     </p>
                   </div>
                 </div>
@@ -404,6 +536,15 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     En direct
                   </span>
+                  <button
+                    type="button"
+                    onClick={(e) => handleCloseConversation(e, selectedConfrere.id)}
+                    title="Fermer cette discussion"
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-600 hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition"
+                  >
+                    <span className="material-symbols-outlined text-xs">close</span>
+                    <span>Fermer</span>
+                  </button>
                 </div>
               </header>
 
@@ -416,7 +557,7 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                     </span>
                     <p className="text-xs font-bold text-slate-700">Début de la discussion</p>
                     <p className="text-[11px] text-slate-400 max-w-xs mt-0.5">
-                      Les messages échangés avec le Dr. {selectedConfrere.name} sont strictement confidentiels et réservés aux praticiens.
+                      Les messages échangés avec le Dr. {selectedConfrere.name} sont strictement confidentiels et chiffrés.
                     </p>
                   </div>
                 ) : (
@@ -425,6 +566,19 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                       hour: "2-digit",
                       minute: "2-digit",
                     });
+
+                    // Détection du tag de publication
+                    const isTagged = msg.content.startsWith("📌 [Réf. Publication :");
+                    let quoteHeader = "";
+                    let cleanBody = msg.content;
+
+                    if (isTagged) {
+                      const splitIndex = msg.content.indexOf("\n\n");
+                      if (splitIndex !== -1) {
+                        quoteHeader = msg.content.substring(0, splitIndex);
+                        cleanBody = msg.content.substring(splitIndex + 2);
+                      }
+                    }
 
                     return (
                       <div
@@ -438,7 +592,25 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
                               : "bg-white text-slate-900 border border-slate-200/80 rounded-bl-xs"
                           }`}
                         >
-                          <p>{msg.content}</p>
+                          {/* En-tête de référence publication si présent */}
+                          {quoteHeader && (
+                            <div
+                              className={`mb-2 p-2 rounded-xl text-[11px] font-medium border ${
+                                msg.isMe
+                                  ? "bg-slate-800/80 border-slate-700 text-sky-200"
+                                  : "bg-sky-50 border-sky-100 text-sky-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1 font-bold">
+                                <span className="material-symbols-outlined text-xs">forum</span>
+                                <span>Réponse à une publication</span>
+                              </div>
+                              <p className="mt-0.5 italic">{quoteHeader.replace("📌 [Réf. Publication :", "").replace(/\]$/, "").trim()}</p>
+                            </div>
+                          )}
+
+                          <p className="whitespace-pre-line">{cleanBody}</p>
+
                           <div
                             className={`flex items-center justify-end gap-1 text-[10px] mt-1 ${
                               msg.isMe ? "text-slate-400" : "text-slate-400"
@@ -465,7 +637,27 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
               </div>
 
               {/* Barre de saisie message */}
-              <footer className="p-3 border-t border-slate-200 bg-white shrink-0">
+              <footer className="p-3 border-t border-slate-200 bg-white shrink-0 space-y-2">
+                {/* Badge visuel si une référence de publication est active */}
+                {activePostRef && (
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 shadow-2xs animate-in fade-in">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="material-symbols-outlined text-base text-sky-600">reply</span>
+                      <span className="truncate">
+                        En réponse à la publication : <strong>&quot;{activePostRef}&quot;</strong>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActivePostRef(null)}
+                      className="text-sky-500 hover:text-sky-800 cursor-pointer p-0.5"
+                      title="Retirer la référence"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                )}
+
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                   <input
                     type="text"
@@ -485,12 +677,145 @@ export default function ChatClient({ initialData, initialDoctorId }: ChatClientP
               </footer>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
-              <span className="material-symbols-outlined text-5xl mb-2 text-slate-300">chat</span>
-              <p className="text-sm font-bold text-slate-800">Sélectionnez une discussion</p>
-              <p className="text-xs text-slate-400 max-w-sm mt-1">
-                Choisissez un médecin dans la liste de gauche pour échanger en direct ou demander un avis.
-              </p>
+            /* ============================================================
+               VUE 2 : ANNUAIRE DES MÉDECINS CERTIFIÉS (QUAND TOUT EST FERMÉ OU MODE EXPLORATION)
+               ============================================================ */
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FAFAFC]">
+              {/* En-tête Annuaire */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sky-600 text-2xl">contacts</span>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    Annuaire des Médecins du Réseau
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Tous ces praticiens ont activé la messagerie confraternelle. Choisissez un confrère pour démarrer un échange privé.
+                </p>
+              </div>
+
+              {/* Barre de recherche dans l'annuaire */}
+              <div className="relative max-w-md">
+                <span className="material-symbols-outlined text-slate-400 text-base absolute left-3 top-1/2 -translate-y-1/2">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={directorySearch}
+                  onChange={(e) => setDirectorySearch(e.target.value)}
+                  placeholder="Rechercher par nom, spécialité, ville ou cabinet..."
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs transition"
+                />
+              </div>
+
+              {/* Filtres par spécialité */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSpecialty("all")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                    selectedSpecialty === "all"
+                      ? "bg-slate-900 text-white shadow-2xs"
+                      : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                  }`}
+                >
+                  Toutes les spécialités ({confreres.length})
+                </button>
+                {allSpecialties.map((spec) => {
+                  const count = confreres.filter(
+                    (c) => (c.specialty || "Médecine Générale") === spec
+                  ).length;
+                  return (
+                    <button
+                      key={spec}
+                      type="button"
+                      onClick={() => setSelectedSpecialty(spec)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                        selectedSpecialty === spec
+                          ? "bg-slate-900 text-white shadow-2xs"
+                          : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                      }`}
+                    >
+                      <span>{spec}</span>
+                      <span className="text-[10px] opacity-75 font-normal">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Grille des cartes médecins */}
+              {directoryDoctors.length === 0 ? (
+                <div className="p-10 text-center rounded-2xl bg-white border border-slate-200 space-y-2">
+                  <span className="material-symbols-outlined text-3xl text-slate-300">
+                    person_search
+                  </span>
+                  <p className="text-xs font-semibold text-slate-700">Aucun médecin trouvé</p>
+                  <p className="text-[11px] text-slate-400">
+                    Modifiez vos critères de recherche ou réinitialisez le filtre de spécialité.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  {directoryDoctors.map((doc) => {
+                    const initials = doc.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2);
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-xs transition space-y-3 flex flex-col justify-between"
+                      >
+                        <div className="flex items-start gap-3">
+                          {doc.avatarUrl ? (
+                            <div className="w-11 h-11 rounded-full bg-slate-200 border border-slate-200 overflow-hidden shrink-0 shadow-2xs">
+                              <img src={doc.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="w-11 h-11 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                              {initials}
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
+                              <span>{doc.name}</span>
+                              <span className="material-symbols-outlined text-[14px] text-sky-600">
+                                verified
+                              </span>
+                            </p>
+                            <p className="text-[11px] font-semibold text-sky-700 truncate">
+                              {doc.specialty || "Médecine Générale"}
+                            </p>
+                            <p className="text-[11px] text-slate-400 truncate">
+                              {doc.clinicCity} • {doc.clinicName}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Messagerie active
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleStartConversation(doc)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold transition cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-xs">chat</span>
+                            <span>Contacter</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </main>
