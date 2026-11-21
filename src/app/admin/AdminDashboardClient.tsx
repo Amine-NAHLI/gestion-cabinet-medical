@@ -38,6 +38,7 @@ export default function AdminDashboardClient({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
 
   // Modale édition cabinet
   const [editingClinic, setEditingClinic] = useState<any | null>(null);
@@ -62,17 +63,18 @@ export default function AdminDashboardClient({
     visitsCount: number;
   } | null>(null);
 
-  // Polling automatique toutes les 5 secondes (demandes OTP + stats en direct)
+  // Polling automatique en temps réel toutes les 3.5 secondes (demandes OTP, télémétrie Neon et statistiques)
   useEffect(() => {
     const interval = setInterval(async () => {
       if (document.hidden) return;
       try {
         const fresh = await getAdminDashboardData();
         setData(fresh);
+        setLastSyncTime(new Date());
       } catch {
         // Ignorer les erreurs réseau ponctuelles
       }
-    }, 5000);
+    }, 3500);
 
     return () => clearInterval(interval);
   }, []);
@@ -94,6 +96,7 @@ export default function AdminDashboardClient({
     try {
       const fresh = await getAdminDashboardData();
       setData(fresh);
+      setLastSyncTime(new Date());
       if (!silent) showFeedback("success", "Données actualisées en direct.");
     } catch {
       if (!silent) showFeedback("error", "Erreur lors de l'actualisation.");
@@ -295,6 +298,15 @@ export default function AdminDashboardClient({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Indicateur Temps Réel Actif */}
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span>En direct (3s)</span>
+            </div>
+
             <button
               onClick={() => refreshData(false)}
               disabled={actionLoading === "refreshing"}

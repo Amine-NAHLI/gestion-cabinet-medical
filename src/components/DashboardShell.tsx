@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -8,8 +8,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import RealtimeSync from "@/components/RealtimeSync";
 import InternalChatDrawer from "@/components/InternalChatDrawer";
 import AssistantOnboardingModal from "@/components/AssistantOnboardingModal";
-import NotificationBell from "@/components/NotificationBell";
+import DashboardTour from "@/components/DashboardTour";
 import { getUnreadChatCount } from "@/actions/community";
+import { getActiveNotifications, markNotificationsAsRead } from "@/actions/notifications";
 
 interface DashboardShellProps {
   role: string;
@@ -51,6 +52,49 @@ export default function DashboardShell({
 
   const isDoctor = role === "doctor";
 
+  // Notifications en direct par catégorie (Communauté, Messagerie, Interphone, Salle d'attente)
+  const [notifCounts, setNotifCounts] = useState({
+    community: 0,
+    chat: unreadChatCount || 0,
+    interphone: 0,
+    queue: 0,
+  });
+
+  const fetchAllNotifications = useCallback(async () => {
+    try {
+      const data = await getActiveNotifications();
+      const unread = data.notifications.filter((n) => !n.isRead);
+      setNotifCounts({
+        community: unread.filter((n) => n.type === "community_post").length,
+        chat: unread.filter((n) => n.type === "community_message").length,
+        interphone: unread.filter((n) => n.type === "clinic_message").length,
+        queue: unread.filter((n) => n.type === "queue_arrival").length,
+      });
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllNotifications();
+    const interval = setInterval(fetchAllNotifications, 5000);
+    return () => clearInterval(interval);
+  }, [fetchAllNotifications]);
+
+  // Réinitialiser les compteurs et marquer comme lues à la visite de la section
+  useEffect(() => {
+    if (pathname.startsWith("/dashboard/community") && notifCounts.community > 0) {
+      markNotificationsAsRead("community_post");
+      setNotifCounts((prev) => ({ ...prev, community: 0 }));
+    } else if (pathname.startsWith("/dashboard/chat") && notifCounts.chat > 0) {
+      markNotificationsAsRead("community_message");
+      setNotifCounts((prev) => ({ ...prev, chat: 0 }));
+    } else if (pathname.startsWith("/dashboard/queue") && notifCounts.queue > 0) {
+      markNotificationsAsRead("queue_arrival");
+      setNotifCounts((prev) => ({ ...prev, queue: 0 }));
+    }
+  }, [pathname, notifCounts.community, notifCounts.chat, notifCounts.queue]);
+
   // Rafraîchir périodiquement et sur événement le compteur de messages non lus du médecin
   useEffect(() => {
     if (!isDoctor) return;
@@ -68,6 +112,7 @@ export default function DashboardShell({
 
     const handleChatRead = () => {
       fetchUnread();
+      fetchAllNotifications();
     };
     window.addEventListener("chat_read", handleChatRead);
 
@@ -75,7 +120,7 @@ export default function DashboardShell({
       clearInterval(interval);
       window.removeEventListener("chat_read", handleChatRead);
     };
-  }, [isDoctor]);
+  }, [isDoctor, fetchAllNotifications]);
 
   useEffect(() => {
     try {
@@ -113,31 +158,46 @@ export default function DashboardShell({
   };
 
   const primaryItems = [
-    { href: "/dashboard", label: "Tableau de bord", icon: "grid_view", exact: true },
-    { href: "/dashboard/queue", label: "Salle d'attente", icon: "groups", exact: false },
-    { href: "/dashboard/patients", label: "Patients", icon: "folder_shared", exact: false },
+    { href: "/dashboard", label: "Tableau de bord", icon: "grid_view", exact: true, tourId: "dashboard" },
+    {
+      href: "/dashboard/queue",
+      label: "Salle d'attente",
+      icon: "groups",
+      exact: false,
+      tourId: "queue",
+      badgeCount: notifCounts.queue,
+    },
+    { href: "/dashboard/patients", label: "Patients", icon: "folder_shared", exact: false, tourId: "patients" },
     ...(role === "assistant"
-      ? [{ href: "/dashboard/payments", label: "Encaissements", icon: "payments", exact: false }]
+      ? [{ href: "/dashboard/payments", label: "Encaissements", icon: "payments", exact: false, tourId: "payments" }]
       : []),
-    { href: "/dashboard/appointments", label: "Rendez-vous", icon: "calendar_month", exact: false },
+    { href: "/dashboard/appointments", label: "Rendez-vous", icon: "calendar_month", exact: false, tourId: "appointments" },
     ...(isDoctor
       ? [
-          { href: "/dashboard/community", label: "Communauté", icon: "hub", exact: false },
+          {
+            href: "/dashboard/community",
+            label: "Communauté",
+            icon: "hub",
+            exact: false,
+            tourId: "community",
+            badgeCount: notifCounts.community,
+          },
           {
             href: "/dashboard/chat",
             label: "Messagerie",
             icon: "chat",
             exact: false,
-            badgeCount: chatBadgeCount,
+            tourId: "chat",
+            badgeCount: Math.max(chatBadgeCount, notifCounts.chat),
           },
         ]
       : []),
   ];
 
   const secondaryItems = [
-    { href: "/dashboard/history", label: "Historique", icon: "history", exact: false },
-    { href: "/dashboard/stats", label: "Statistiques", icon: "bar_chart", exact: false },
-    { href: "/dashboard/settings", label: "Paramètres", icon: "tune", exact: false },
+    { href: "/dashboard/history", label: "Historique", icon: "history", exact: false, tourId: "history" },
+    { href: "/dashboard/stats", label: "Statistiques", icon: "bar_chart", exact: false, tourId: "stats" },
+    { href: "/dashboard/settings", label: "Paramètres", icon: "tune", exact: false, tourId: "settings" },
   ];
 
   const userInitials = user?.name
@@ -157,6 +217,7 @@ export default function DashboardShell({
       label: string;
       icon: string;
       exact: boolean;
+      tourId?: string;
       badgeCount?: number;
     }[],
     expanded: boolean,
@@ -177,6 +238,7 @@ export default function DashboardShell({
           <Link
             key={item.href}
             href={item.href}
+            data-tour={item.tourId}
             title={!expanded ? item.label : undefined}
             className={`group relative flex items-center gap-2.5 rounded-lg transition-colors text-[13px] ${
               expanded ? "px-2.5 py-2" : "py-2 justify-center"
@@ -199,7 +261,7 @@ export default function DashboardShell({
             </span>
             {expanded && <span className="truncate flex-1">{item.label}</span>}
             {item.badgeCount && item.badgeCount > 0 ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white shadow-2xs shrink-0 animate-pulse">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white shadow-2xs shrink-0 animate-pulse tabular-nums">
                 {item.badgeCount}
               </span>
             ) : null}
@@ -263,6 +325,18 @@ export default function DashboardShell({
           )}
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event("moncabinet_start_tour"))}
+        title={!expanded ? "Visite guidée" : undefined}
+        className={`w-full flex items-center gap-2.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50/70 transition-colors font-medium text-[13px] cursor-pointer ${
+          expanded ? "px-2.5 py-2 justify-start" : "py-2 justify-center"
+        }`}
+      >
+        <span className="material-symbols-outlined text-[18px] shrink-0 text-emerald-600">help_outline</span>
+        {expanded && <span>Visite guidée</span>}
+      </button>
 
       <button
         type="button"
@@ -402,21 +476,26 @@ export default function DashboardShell({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Cloche de notifications & alertes */}
-            <NotificationBell role={role} onOpenInterphone={() => setChatOpen(true)} />
-
-            {/* Bouton Interphone Cabinet */}
+            {/* Bouton Interphone Cabinet avec Badge de notification directe */}
             <button
+              id="tour-interphone"
+              data-tour="interphone"
               type="button"
-              onClick={() => setChatOpen(true)}
+              onClick={() => {
+                setChatOpen(true);
+                if (notifCounts.interphone > 0) {
+                  markNotificationsAsRead("clinic_message");
+                  setNotifCounts((prev) => ({ ...prev, interphone: 0 }));
+                }
+              }}
               className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs active:bg-slate-100"
               title="Ouvrir l'interphone interne du cabinet"
             >
               <span className="material-symbols-outlined text-[17px] text-slate-600">forum</span>
               <span className="hidden sm:inline">Interphone</span>
-              {chatUnread > 0 && (
-                <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-red-600 text-white animate-pulse">
-                  {chatUnread}
+              {(notifCounts.interphone > 0 || chatUnread > 0) && (
+                <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
+                  {Math.max(notifCounts.interphone, chatUnread)}
                 </span>
               )}
             </button>
@@ -444,6 +523,14 @@ export default function DashboardShell({
         clinicName={clinicName}
         isOpen={assistantModalOpen}
         onClose={() => setAssistantModalOpen(false)}
+      />
+
+      {/* Visite guidée / Product Tour interactif premier passage */}
+      <DashboardTour
+        role={role}
+        userEmail={user?.email}
+        sidebarOpen={sidebarOpen}
+        onEnsureSidebarOpen={() => setSidebarOpen(true)}
       />
     </div>
   );
