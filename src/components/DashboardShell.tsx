@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import RealtimeSync from "@/components/RealtimeSync";
 import InternalChatDrawer from "@/components/InternalChatDrawer";
 import AssistantOnboardingModal from "@/components/AssistantOnboardingModal";
+import NotificationBell from "@/components/NotificationBell";
 
 interface DashboardShellProps {
   role: string;
@@ -348,6 +349,9 @@ export default function DashboardShell({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Cloche de notifications & alertes */}
+            <NotificationBell role={role} onOpenInterphone={() => setChatOpen(true)} />
+
             {/* Bouton Interphone Cabinet */}
             <button
               type="button"

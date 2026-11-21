@@ -67,6 +67,7 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
   const [posts, setPosts] = useState<Post[]>(initialData.posts || []);
   const [confreres, setConfreres] = useState<Confrere[]>(initialData.confreres || []);
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [postSearch, setPostSearch] = useState("");
 
   // Modal Nouvelle publication
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -186,10 +187,20 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
     }
   };
 
-  // Filtre des publications
+  // Filtre des publications (catégorie + recherche textuelle)
   const filteredPosts = posts.filter((p) => {
-    if (selectedCategory === "all") return true;
-    return p.category === selectedCategory;
+    const matchesCategory = selectedCategory === "all" || p.category === selectedCategory;
+    if (!matchesCategory) return false;
+    if (!postSearch.trim()) return true;
+
+    const q = postSearch.toLowerCase();
+    return (
+      p.title.toLowerCase().includes(q) ||
+      p.content.toLowerCase().includes(q) ||
+      p.authorName.toLowerCase().includes(q) ||
+      p.authorCity.toLowerCase().includes(q) ||
+      p.authorSpecialty.toLowerCase().includes(q)
+    );
   });
 
   // Filtre des confrères
@@ -202,7 +213,7 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
     );
   });
 
-  // Helper compteur de posts par catégorie
+  // Compteur de posts par catégorie
   const getCategoryCount = (catId: string) => {
     if (catId === "all") return posts.length;
     return posts.filter((p) => p.category === catId).length;
@@ -273,29 +284,29 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
   // ============================================================
   return (
     <div className="space-y-6">
-      {/* En-tête principal & Sélecteur Onglet */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/70">
+      {/* 1. EN-TÊTE PRINCIPAL : TITRE & ONGLET PRINCIPAL */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
               Réseau Confraternel
             </h1>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 inline-flex items-center gap-1">
+            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 inline-flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Espace Médecins
+              Espace Médecins Certifié
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Échangez entre confrères praticiens : cas cliniques, gardes, orientations et messagerie directe.
+            Échangez entre confrères praticiens : cas cliniques, remplacements, orientations et messagerie privée.
           </p>
         </div>
 
         {/* Sélecteur Onglet Moderne */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 shrink-0 self-start sm:self-auto">
+        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 shrink-0 self-start md:self-auto">
           <button
             type="button"
             onClick={() => setActiveTab("feed")}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
               activeTab === "feed"
                 ? "bg-white text-slate-900 shadow-2xs font-bold"
                 : "text-slate-500 hover:text-slate-900"
@@ -304,7 +315,7 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
             <span className="material-symbols-outlined text-[17px]">forum</span>
             <span>Fil & Publications</span>
             {posts.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-medium">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold">
                 {posts.length}
               </span>
             )}
@@ -313,7 +324,7 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
           <button
             type="button"
             onClick={() => setActiveTab("chat")}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition cursor-pointer ${
               activeTab === "chat"
                 ? "bg-white text-slate-900 shadow-2xs font-bold"
                 : "text-slate-500 hover:text-slate-900"
@@ -322,7 +333,7 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
             <span className="material-symbols-outlined text-[17px]">chat</span>
             <span>Messagerie Directe</span>
             {confreres.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-sky-50 text-sky-700 font-medium border border-sky-100">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-sky-50 text-sky-700 font-bold border border-sky-100">
                 {confreres.length}
               </span>
             )}
@@ -334,60 +345,83 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
           ONGLET 1 : FIL CONFRATERNEL (BLOG / FEED MÉDICAL)
          ============================================================ */}
       {activeTab === "feed" && (
-        <div className="space-y-5">
-          {/* Barre d'action avec filtres responsive et bouton d'action principal */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            {/* Scroll horizontal fluide des catégories */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
-              {CATEGORIES.map((cat) => {
-                const isActive = selectedCategory === cat.id;
-                const count = getCategoryCount(cat.id);
-
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-2 shrink-0 ${
-                      isActive
-                        ? "bg-slate-900 text-white shadow-xs font-semibold"
-                        : "bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-200/90 shadow-2xs"
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[17px] leading-none">
-                      {cat.icon}
-                    </span>
-                    <span>{cat.label}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
-                        isActive
-                          ? "bg-slate-800 text-slate-300"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+        <div className="space-y-4">
+          {/* BARRE D'ACTION 1 : RECHERCHE RAPIDE + BOUTON NOUVELLE PUBLICATION */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Champ de recherche instantané */}
+            <div className="relative flex-1 max-w-md">
+              <span className="material-symbols-outlined text-slate-400 text-lg absolute left-3 top-1/2 -translate-y-1/2">
+                search
+              </span>
+              <input
+                type="text"
+                value={postSearch}
+                onChange={(e) => setPostSearch(e.target.value)}
+                placeholder="Rechercher par titre, confrère, ville, symptôme..."
+                className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 bg-white shadow-2xs focus:outline-none focus:border-slate-900 transition"
+              />
+              {postSearch && (
+                <button
+                  type="button"
+                  onClick={() => setPostSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              )}
             </div>
 
-            {/* Bouton Nouvelle Publication */}
+            {/* Bouton Nouvelle Publication bien en vue */}
             <button
               type="button"
               onClick={() => handleOpenCreateWithCategory(selectedCategory)}
-              className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shadow-xs flex items-center justify-center gap-2 cursor-pointer shrink-0 self-start lg:self-auto"
+              className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shadow-xs flex items-center justify-center gap-2 cursor-pointer shrink-0 self-start sm:self-auto"
             >
               <span className="material-symbols-outlined text-[18px]">edit_note</span>
-              <span>Nouvelle publication</span>
+              <span>+ Nouvelle publication</span>
             </button>
+          </div>
+
+          {/* BARRE D'ACTION 2 : CATÉGORIES 100% VISIBLES (FLEX-WRAP, AUCUN SCROLL CACHÉ) */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
+            {CATEGORIES.map((cat) => {
+              const isActive = selectedCategory === cat.id;
+              const count = getCategoryCount(cat.id);
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-medium transition cursor-pointer flex items-center gap-2 ${
+                    isActive
+                      ? "bg-slate-900 text-white shadow-xs font-semibold ring-2 ring-slate-900/10"
+                      : "bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 border border-slate-200/90 shadow-2xs"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[17px] leading-none">
+                    {cat.icon}
+                  </span>
+                  <span>{cat.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums ${
+                      isActive
+                        ? "bg-slate-800 text-slate-200"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* ============================================================
               ÉTAT VIDE AMÉLIORÉ : AVEC CTA ET SUGGESTIONS CLINIQUES
              ============================================================ */}
           {filteredPosts.length === 0 ? (
-            <div className="space-y-5">
+            <div className="space-y-4 pt-2">
               {/* Carte centrale vide */}
               <div className="p-8 sm:p-12 text-center rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-4">
                 <div className="w-14 h-14 rounded-2xl bg-sky-50 text-sky-700 border border-sky-100 flex items-center justify-center mx-auto shadow-2xs">
@@ -396,16 +430,29 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
 
                 <div className="space-y-1.5 max-w-md mx-auto">
                   <h3 className="text-sm font-bold text-slate-900">
-                    {selectedCategory === "all"
-                      ? "Le fil confraternel est calme"
+                    {postSearch
+                      ? `Aucune publication correspondant à "${postSearch}"`
+                      : selectedCategory === "all"
+                      ? "Le fil confraternel est calme pour le moment"
                       : "Aucune publication dans cette rubrique"}
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Initiez les échanges ! Partagez un cas clinique atypique, proposez un remplacement ou sollicitez un spécialiste certifié.
+                    {postSearch
+                      ? "Essayez d'autres mots-clés ou réinitialisez la recherche."
+                      : "Partagez un cas clinique atypique, proposez un remplacement ou sollicitez un spécialiste certifié."}
                   </p>
                 </div>
 
-                <div>
+                <div className="flex items-center justify-center gap-2">
+                  {postSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setPostSearch("")}
+                      className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      Effacer la recherche
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleOpenCreateWithCategory(selectedCategory)}
@@ -484,9 +531,9 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
             </div>
           ) : (
             /* ============================================================
-               LISTE DES PUBLICATIONS
+               LISTE DES PUBLICATIONS : CARTES MÉDICALES PROPRES
                ============================================================ */
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-4 pt-1">
               {filteredPosts.map((post) => {
                 const dateStr = new Date(post.createdAt).toLocaleDateString("fr-FR", {
                   day: "numeric",
@@ -520,30 +567,41 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
                         cls: "bg-slate-100 text-slate-700 border-slate-200",
                       };
 
+                const authorInitials = post.authorName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2);
+
                 return (
                   <article
                     key={post.id}
-                    className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3.5 hover:border-slate-300 transition"
+                    className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-4 hover:border-slate-300 hover:shadow-xs transition"
                   >
+                    {/* Ligne 1 : Médecin + Catégorie */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                          {post.authorAvatarUrl ? (
+                        {post.authorAvatarUrl ? (
+                          <div className="w-10 h-10 rounded-full border border-slate-200 overflow-hidden shrink-0 shadow-2xs">
                             <img
                               src={post.authorAvatarUrl}
                               alt="Avatar"
                               className="w-full h-full object-cover"
                             />
-                          ) : (
-                            <span className="material-symbols-outlined text-lg text-slate-400">
-                              person
-                            </span>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                            {authorInitials || "DR"}
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5">
                             <span>{post.authorName}</span>
-                            <span className="material-symbols-outlined text-[14px] text-sky-600" title="Médecin certifié">
+                            <span
+                              className="material-symbols-outlined text-[15px] text-sky-600"
+                              title="Médecin certifié par l'Ordre"
+                            >
                               verified
                             </span>
                           </p>
@@ -553,46 +611,52 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 shrink-0 text-right sm:text-left">
                         <span
-                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${catBadge.cls}`}
+                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border inline-flex items-center gap-1 self-end sm:self-auto ${catBadge.cls}`}
                         >
                           <span className="material-symbols-outlined text-[13px] leading-none">
                             {catBadge.icon}
                           </span>
                           <span>{catBadge.label}</span>
                         </span>
-                        <span className="text-[11px] text-slate-400">{dateStr}</span>
+                        <span className="text-[11px] text-slate-400 font-medium">{dateStr}</span>
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <h2 className="text-sm font-bold text-slate-900 leading-snug">
+                    {/* Ligne 2 : Titre & Contenu */}
+                    <div className="space-y-2">
+                      <h2 className="text-base font-bold text-slate-900 leading-snug">
                         {post.title}
                       </h2>
-                      <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">
+                      <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50/50 p-3 rounded-xl border border-slate-100">
                         {post.content}
                       </p>
                     </div>
 
-                    <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[11px] text-slate-400 font-medium inline-flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px] text-slate-400">
-                          lock
+                    {/* Ligne 3 : Pied de carte & Action de contact */}
+                    <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <span className="text-[11px] text-slate-400 font-medium inline-flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px] text-emerald-600">
+                          shield_person
                         </span>
-                        {post.isMyPost ? "Votre publication" : "Cas anonymisé • Médecin certifié"}
+                        <span>
+                          {post.isMyPost
+                            ? "Votre publication active sur le réseau"
+                            : "Secret médical préservé • Médecin certifié"}
+                        </span>
                       </span>
 
                       {!post.isMyPost && (
                         <button
                           type="button"
                           onClick={() => handleStartChatWithAuthor(post)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold transition cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer shadow-2xs self-start sm:self-auto"
                         >
-                          <span className="material-symbols-outlined text-[15px] text-sky-700">
+                          <span className="material-symbols-outlined text-[15px]">
                             chat
                           </span>
-                          <span>Échanger en privé</span>
+                          <span>Échanger en privé avec ce confrère</span>
                         </button>
                       )}
                     </div>
@@ -609,9 +673,19 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
          ============================================================ */}
       {activeTab === "chat" && (
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden grid grid-cols-1 md:grid-cols-3 min-h-[580px]">
-          {/* Colonne de gauche : Liste des confrères */}
-          <aside className="border-r border-slate-200/90 flex flex-col bg-slate-50/50">
-            <div className="p-3.5 border-b border-slate-200 bg-white">
+          {/* Colonne de gauche : Liste des confrères (masquée sur mobile si conversation ouverte) */}
+          <aside
+            className={`border-r border-slate-200/90 flex flex-col bg-slate-50/50 ${
+              selectedConfrere ? "hidden md:flex" : "flex"
+            }`}
+          >
+            <div className="p-3.5 border-b border-slate-200 bg-white space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-900">Confrères du Réseau</p>
+                <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {confreres.length} médecins
+                </span>
+              </div>
               <div className="relative">
                 <span className="material-symbols-outlined text-base text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">
                   search
@@ -620,7 +694,7 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
                   type="text"
                   value={confrereSearch}
                   onChange={(e) => setConfrereSearch(e.target.value)}
-                  placeholder="Rechercher un confrère..."
+                  placeholder="Rechercher par nom, ville, cabinet..."
                   className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-slate-50/60 focus:outline-none focus:border-slate-900"
                 />
               </div>
@@ -634,6 +708,13 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
               ) : (
                 filteredConfreres.map((c) => {
                   const isSelected = selectedConfrere?.id === c.id;
+                  const initials = c.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2);
+
                   return (
                     <button
                       key={c.id}
@@ -641,21 +722,26 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
                       onClick={() => setSelectedConfrere(c)}
                       className={`w-full p-3.5 text-left transition flex items-center gap-3 cursor-pointer ${
                         isSelected
-                          ? "bg-white shadow-2xs border-l-3 border-l-slate-900"
+                          ? "bg-white shadow-2xs border-l-4 border-l-slate-900"
                           : "hover:bg-slate-100/60"
                       }`}
                     >
-                      <div className="w-9 h-9 rounded-full bg-slate-200 border border-white overflow-hidden flex items-center justify-center shrink-0">
-                        {c.avatarUrl ? (
+                      {c.avatarUrl ? (
+                        <div className="w-9 h-9 rounded-full bg-slate-200 border border-white overflow-hidden shrink-0">
                           <img src={c.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="material-symbols-outlined text-base text-slate-400">
-                            person
-                          </span>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-slate-900 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
+                          {initials}
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-slate-900 truncate">{c.name}</p>
+                        <p className="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
+                          <span>{c.name}</span>
+                          <span className="material-symbols-outlined text-[13px] text-sky-600">
+                            verified
+                          </span>
+                        </p>
                         <p className="text-[11px] text-slate-500 truncate">
                           {c.clinicCity} • {c.clinicName}
                         </p>
@@ -668,13 +754,26 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
           </aside>
 
           {/* Colonne de droite : Conversation privée active */}
-          <main className="md:col-span-2 flex flex-col bg-white">
+          <main
+            className={`md:col-span-2 flex flex-col bg-white ${
+              !selectedConfrere ? "hidden md:flex" : "flex"
+            }`}
+          >
             {selectedConfrere ? (
               <>
-                {/* En-tête conversation */}
+                {/* En-tête conversation avec bouton retour sur mobile */}
                 <header className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/70 shrink-0">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedConfrere(null)}
+                      className="md:hidden w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 cursor-pointer"
+                      title="Retour à la liste"
+                    >
+                      <span className="material-symbols-outlined text-base">arrow_back</span>
+                    </button>
+
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
                       {selectedConfrere.avatarUrl ? (
                         <img
                           src={selectedConfrere.avatarUrl}
@@ -682,9 +781,12 @@ export default function CommunityClient({ initialData }: CommunityClientProps) {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <span className="material-symbols-outlined text-sm text-slate-400">
-                          person
-                        </span>
+                        selectedConfrere.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)
                       )}
                     </div>
                     <div className="min-w-0">

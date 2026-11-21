@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   updateClinicSettings,
   updateConsultationFields,
   updatePrescriptionTemplate,
 } from "@/actions/settings";
+import {
+  updateNotificationPreferences,
+  NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from "@/actions/notifications";
 import {
   ConsultationFieldConfig,
   ConsultationFieldType,
@@ -37,6 +43,7 @@ interface SettingsClientProps {
     prescriptionTemplateName: string | null;
     prescriptionTemplateLayout: PrescriptionTemplateLayout;
   };
+  initialNotificationPreferences?: NotificationPreferences;
 }
 
 const FIELD_TYPE_LABELS: Record<ConsultationFieldType, string> = {
@@ -48,11 +55,25 @@ const FIELD_TYPE_LABELS: Record<ConsultationFieldType, string> = {
   date: "Date",
 };
 
-export default function SettingsClient({ role, initialSettings }: SettingsClientProps) {
+export default function SettingsClient({
+  role,
+  initialSettings,
+  initialNotificationPreferences,
+}: SettingsClientProps) {
   const isDoctor = role === "doctor";
-  const [activeTab, setActiveTab] = useState<"general" | "fields" | "template">("general");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"general" | "fields" | "template" | "notifications">(
+    tabParam === "notifications" ? "notifications" : "general"
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
+  // Préférences de notifications (par défaut toutes activées)
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(
+    initialNotificationPreferences || DEFAULT_NOTIFICATION_PREFERENCES
+  );
+  const [isSavingNotifs, setIsSavingNotifs] = useState(false);
 
   const [fields, setFields] = useState<ConsultationFieldConfig[]>(
     initialSettings.consultationFields?.length > 0
@@ -107,6 +128,23 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
     } else {
       showToast(res.error || "Erreur lors de la sauvegarde.", "error");
     }
+  }
+
+  async function handleSaveNotifications(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSavingNotifs(true);
+    const res = await updateNotificationPreferences(notifPrefs);
+    setIsSavingNotifs(false);
+    if (res.success) {
+      showToast("Préférences de notifications enregistrées avec succès");
+    } else {
+      showToast(res.error || "Erreur lors de la sauvegarde.", "error");
+    }
+  }
+
+  function handleResetDefaultNotifications() {
+    setNotifPrefs(DEFAULT_NOTIFICATION_PREFERENCES);
+    showToast("Toutes les alertes sont réactivées par défaut");
   }
 
   function handleAddField(e: React.FormEvent) {
@@ -299,7 +337,7 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
       </AnimatePresence>
 
       {/* Onglets sobres à soulignement */}
-      <div className="border-b border-slate-200/90 flex overflow-x-auto gap-1">
+      <div className="border-b border-slate-200/90 flex flex-wrap items-center gap-1">
         <button
           type="button"
           onClick={() => setActiveTab("general")}
@@ -346,6 +384,19 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
             </button>
           </>
         )}
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("notifications")}
+          className={`flex items-center gap-2 pb-3 px-3 text-xs sm:text-[13px] border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+            activeTab === "notifications"
+              ? "border-slate-900 text-slate-900 font-semibold"
+              : "border-transparent text-slate-500 font-medium hover:text-slate-800"
+          }`}
+        >
+          <span className="material-symbols-outlined text-[17px]">notifications_active</span>
+          <span>Notifications & Alertes</span>
+        </button>
       </div>
 
       {/* ============================================================
@@ -1167,6 +1218,230 @@ export default function SettingsClient({ role, initialSettings }: SettingsClient
             )}
           </div>
         </div>
+      )}
+
+      {/* ============================================================
+          ONGLET 4 : NOTIFICATIONS & ALERTES EN DIRECT
+         ============================================================ */}
+      {activeTab === "notifications" && (
+        <form
+          onSubmit={handleSaveNotifications}
+          className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] divide-y divide-slate-200/80"
+        >
+          {/* En-tête de section */}
+          <div className="p-5 sm:p-6 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-slate-700 text-lg">
+                    notifications_active
+                  </span>
+                  <span>Gestion des Notifications & Alertes</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Choisissez les canaux et événements pour lesquels vous souhaitez être averti en direct.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetDefaultNotifications}
+                className="text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                <span>Tout réactiver par défaut</span>
+              </button>
+            </div>
+
+            {/* Note par défaut */}
+            <div className="p-3.5 rounded-xl bg-sky-50/70 border border-sky-200/80 text-sky-900 text-xs flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-sky-600 text-base shrink-0 mt-0.5">
+                info
+              </span>
+              <p className="leading-relaxed">
+                <strong>Réactivité garantie :</strong> Par défaut, toutes les notifications sont activées pour vous tenir informé des arrivées de patients, des urgences de l&apos;accueil et des échanges confraternels.
+              </p>
+            </div>
+          </div>
+
+          {/* Section 1 : Réseau Confraternel (Médecins uniquement) */}
+          {isDoctor && (
+            <div className="p-5 sm:p-6 space-y-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider text-slate-500">
+                  Réseau Médical Confraternel
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Notifications liées au fil de publications et au chat privé entre confrères certifiés.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {/* Switch Publications communauté */}
+                <label className="flex items-start justify-between gap-4 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition cursor-pointer">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 flex items-center justify-center shrink-0 border border-rose-100">
+                      <span className="material-symbols-outlined text-base">stethoscope</span>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">
+                        Publications Confraternelles & Cas Cliniques
+                      </p>
+                      <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                        Alerte dès qu&apos;un confrère publie un nouveau cas clinique, une demande d&apos;orientation ou une annonce de garde.
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={notifPrefs.communityPosts}
+                    onChange={(e) =>
+                      setNotifPrefs((prev) => ({ ...prev, communityPosts: e.target.checked }))
+                    }
+                    className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 mt-1 cursor-pointer"
+                  />
+                </label>
+
+                {/* Switch Messagerie directe */}
+                <label className="flex items-start justify-between gap-4 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition cursor-pointer">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center shrink-0 border border-sky-100">
+                      <span className="material-symbols-outlined text-base">chat</span>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">
+                        Messagerie Directe Confraternelle (Chat 1-à-1)
+                      </p>
+                      <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                        Notifications instantanées lors de la réception d&apos;un message privé d&apos;un confrère médecin.
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={notifPrefs.communityMessages}
+                    onChange={(e) =>
+                      setNotifPrefs((prev) => ({ ...prev, communityMessages: e.target.checked }))
+                    }
+                    className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 mt-1 cursor-pointer"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Section 2 : Cabinet & Pratique Interne */}
+          <div className="p-5 sm:p-6 space-y-4">
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider text-slate-500">
+                Cabinet & Coordination Interne
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Alertes pour la fluidité des consultations et le travail en équipe.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {/* Switch Interphone Cabinet */}
+              <label className="flex items-start justify-between gap-4 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition cursor-pointer">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
+                    <span className="material-symbols-outlined text-base">forum</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">
+                      Interphone Cabinet (Médecin ⟷ Assistante)
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                      Messages prioritaires, appels d&apos;urgence et consignes rapides échangés entre le bureau et l&apos;accueil.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notifPrefs.clinicMessages}
+                  onChange={(e) =>
+                    setNotifPrefs((prev) => ({ ...prev, clinicMessages: e.target.checked }))
+                  }
+                  className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 mt-1 cursor-pointer"
+                />
+              </label>
+
+              {/* Switch Salle d'attente */}
+              <label className="flex items-start justify-between gap-4 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition cursor-pointer">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-100">
+                    <span className="material-symbols-outlined text-base">groups</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">
+                      Salle d&apos;Attente (Arrivée d&apos;un patient)
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                      Notification dès qu&apos;un patient est accueilli et enregistré en salle d&apos;attente par le secrétariat.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notifPrefs.queueArrivals}
+                  onChange={(e) =>
+                    setNotifPrefs((prev) => ({ ...prev, queueArrivals: e.target.checked }))
+                  }
+                  className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 mt-1 cursor-pointer"
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Section 3 : Alertes Sonores */}
+          <div className="p-5 sm:p-6 space-y-4">
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider text-slate-500">
+                Signaux Audio
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Retour audio lors de la réception d&apos;une alerte.
+              </p>
+            </div>
+
+            <label className="flex items-start justify-between gap-4 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50/50 transition cursor-pointer">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-100">
+                  <span className="material-symbols-outlined text-base">volume_up</span>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900">
+                    Signal Sonore Discret (Bip audio)
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                    Émet un son doux et professionnel pour vous signaler l&apos;arrivée d&apos;un message urgent ou d&apos;une notification sans déranger la consultation.
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={notifPrefs.soundEnabled}
+                onChange={(e) =>
+                  setNotifPrefs((prev) => ({ ...prev, soundEnabled: e.target.checked }))
+                }
+                className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 mt-1 cursor-pointer"
+              />
+            </label>
+          </div>
+
+          {/* Barre d'action enregistrement */}
+          <div className="p-5 sm:p-6 bg-slate-50/50 flex items-center justify-end gap-3">
+            <button
+              type="submit"
+              disabled={isSavingNotifs}
+              className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50 shadow-xs flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-base">save</span>
+              <span>{isSavingNotifs ? "Enregistrement..." : "Enregistrer les préférences"}</span>
+            </button>
+          </div>
+        </form>
       )}
     </div>
   );
