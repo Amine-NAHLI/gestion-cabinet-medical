@@ -1,7 +1,6 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { getClinicSettings } from "@/actions/settings";
-import { getNotificationPreferences } from "@/actions/notifications";
 import SettingsClient from "./SettingsClient";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +9,6 @@ export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   const role = (session?.user as { role?: string } | undefined)?.role || "assistant";
   const settings = await getClinicSettings();
-  const notifPreferences = await getNotificationPreferences();
 
   return (
     <div className="space-y-6">
@@ -45,7 +43,6 @@ export default async function SettingsPage() {
           prescriptionTemplateName: settings.prescriptionTemplateName,
           prescriptionTemplateLayout: settings.prescriptionTemplateLayout,
         }}
-        initialNotificationPreferences={notifPreferences}
       />
     </div>
   );
