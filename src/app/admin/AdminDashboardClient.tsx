@@ -122,12 +122,16 @@ export default function AdminDashboardClient({
     }
   };
 
-  // Déconnexion sécurisée sur le domaine actuel
+  // Déconnexion sécurisée sur le domaine principal
   const handleAdminLogout = async () => {
     try {
       await signOut({ redirect: false });
     } finally {
-      window.location.href = "/admin";
+      if (typeof window !== "undefined" && window.location.hostname.endsWith("toncabinet.me")) {
+        window.location.href = "https://toncabinet.me/admin";
+      } else {
+        window.location.href = "/admin";
+      }
     }
   };
 

@@ -23,7 +23,11 @@ export default function BottomNav({ role = "assistant", user }: BottomNavProps) 
     try {
       await signOut({ redirect: false });
     } finally {
-      window.location.href = "/login";
+      if (typeof window !== "undefined" && window.location.hostname.endsWith("toncabinet.me")) {
+        window.location.href = "https://toncabinet.me/login";
+      } else {
+        window.location.href = "/login";
+      }
     }
   };
 
