@@ -37,7 +37,16 @@ export default function LoginForm() {
         if (session?.user?.role === "superadmin") {
           window.location.href = "/admin";
         } else {
-          window.location.href = "/dashboard";
+          const slug = (session?.user as any)?.clinicSlug;
+          const isProduction =
+            typeof window !== "undefined" && window.location.hostname.endsWith("toncabinet.me");
+
+          // Redirection dynamique vers le sous-domaine dédié du cabinet (médecin et assistante)
+          if (slug && isProduction) {
+            window.location.href = `https://${slug}.toncabinet.me/dashboard`;
+          } else {
+            window.location.href = "/dashboard";
+          }
         }
       }
     } catch {

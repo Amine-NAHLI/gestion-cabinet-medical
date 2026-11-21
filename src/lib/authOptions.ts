@@ -1,7 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, clinics } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
@@ -25,12 +25,24 @@ export const authOptions: NextAuthOptions = {
         const passwordsMatch = await bcrypt.compare(credentials.password, user.password);
 
         if (passwordsMatch) {
+          // Récupérer le slug du cabinet pour le sous-domaine dynamique
+          let clinicSlug: string | null = null;
+          if (user.clinicId) {
+            const clinicArray = await db
+              .select({ slug: clinics.slug })
+              .from(clinics)
+              .where(eq(clinics.id, user.clinicId))
+              .limit(1);
+            clinicSlug = clinicArray[0]?.slug || null;
+          }
+
           return {
             id: user.id.toString(),
             email: user.email,
             name: user.name,
             role: user.role,
             clinicId: user.clinicId,
+            clinicSlug,
           };
         }
 
@@ -44,6 +56,7 @@ export const authOptions: NextAuthOptions = {
         token.id = (user as any).id;
         token.role = (user as any).role;
         token.clinicId = (user as any).clinicId;
+        token.clinicSlug = (user as any).clinicSlug;
       }
       return token;
     },
@@ -52,35 +65,46 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
         session.user.clinicId = token.clinicId as number | null;
+        session.user.clinicSlug = token.clinicSlug as string | null;
       }
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // Déterminer l'URL canonique de production
-      let host = baseUrl;
-      if (process.env.VERCEL_URL) {
-        host = `https://${process.env.VERCEL_URL}`;
-      } else if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
-        host = process.env.NEXTAUTH_URL;
-      }
-
-      // Si URL relative, concaténer avec le domaine actuel
-      if (url.startsWith("/")) {
-        return `${host}${url}`;
-      }
-
-      // Si même origine ou domaine vercel
       try {
         const parsed = new URL(url);
-        if (parsed.origin === host || parsed.hostname.includes("vercel.app")) {
+        // Autoriser la navigation cross-subdomain sur .toncabinet.me
+        if (parsed.hostname.endsWith("toncabinet.me") || parsed.hostname.includes("vercel.app")) {
           return url;
         }
       } catch {
-        return host;
+        // url relative
       }
 
-      return host;
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`;
+      }
+
+      return baseUrl;
     }
+  },
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        // Permet de partager la session entre toncabinet.me et *.toncabinet.me
+        domain:
+          process.env.NODE_ENV === "production" && !process.env.VERCEL_URL?.includes("localhost")
+            ? ".toncabinet.me"
+            : undefined,
+      },
+    },
   },
   pages: {
     signIn: '/login',
