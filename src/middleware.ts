@@ -7,6 +7,17 @@ export default withAuth(
     const host = req.headers.get("host") || "";
     const pathname = req.nextUrl.pathname;
 
+    // Ne JAMAIS intercepter les fichiers statiques, polices, sons, images ou requêtes API
+    if (
+      pathname.startsWith("/_next") ||
+      pathname.startsWith("/fonts") ||
+      pathname.startsWith("/sounds") ||
+      pathname.startsWith("/api") ||
+      pathname.includes(".")
+    ) {
+      return NextResponse.next();
+    }
+
     // Détecter si la requête est sur le domaine toncabinet.me
     if (host.endsWith("toncabinet.me")) {
       const subdomain = host.replace(".toncabinet.me", "").replace(/^www\./, "");
@@ -37,9 +48,6 @@ export default withAuth(
           if (subdomain !== clinicSlug) {
             return NextResponse.redirect(new URL(`https://${clinicSlug}.toncabinet.me${pathname}`));
           }
-        } else {
-          // Tout autre chemin sur un sous-domaine (ex: anciennes pages ou requêtes perdues) -> retour login racine
-          return NextResponse.redirect(new URL("https://toncabinet.me/login"));
         }
       }
 
@@ -76,9 +84,9 @@ export default withAuth(
   }
 );
 
-// Matcher global interceptant toutes les routes applicatives
+// Matcher global excluant tous les fichiers statiques, polices et images
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/auth|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|fonts|sounds|api/auth|.*\\.(?:woff|woff2|ttf|eot|svg|png|jpg|jpeg|gif|webp|ico|mp3|wav)$).*)",
   ],
 };
