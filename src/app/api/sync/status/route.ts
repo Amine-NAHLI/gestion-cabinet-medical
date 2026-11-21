@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
-import { visits, patients, appointments, users } from "@/db/schema";
+import { visits, patients, appointments, users, clinicMessages } from "@/db/schema";
 import { eq, and, sql, asc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function GET() {
     todayStart.setHours(0, 0, 0, 0);
 
     // Requêtes légères en parallèle, strictement isolées par cabinet
-    const [todayVisits, clinicAppointments, patientsStats] = await Promise.all([
+    const [todayVisits, clinicAppointments, patientsStats, messagesStats] = await Promise.all([
       db
         .select({
           id: visits.id,
@@ -68,6 +68,14 @@ export async function GET() {
         })
         .from(patients)
         .where(eq(patients.clinicId, numericClinicId)),
+
+      db
+        .select({
+          total: sql<number>`count(*)::int`,
+          maxId: sql<number>`coalesce(max(${clinicMessages.id}), 0)::int`,
+        })
+        .from(clinicMessages)
+        .where(eq(clinicMessages.clinicId, numericClinicId)),
     ]);
 
     const waitingVisits = todayVisits.filter((v) => v.status === "waiting");
@@ -97,8 +105,9 @@ export async function GET() {
       .join("|");
     const patientsCount = patientsStats[0]?.total ?? 0;
     const maxPatientId = patientsStats[0]?.maxId ?? 0;
+    const maxMessageId = messagesStats[0]?.maxId ?? 0;
 
-    const signature = `v[${visitsSig}]_a[${apptSig}]_p[${patientsCount}:${maxPatientId}]`;
+    const signature = `v[${visitsSig}]_a[${apptSig}]_p[${patientsCount}:${maxPatientId}]_m[${maxMessageId}]`;
 
     return NextResponse.json(
       {

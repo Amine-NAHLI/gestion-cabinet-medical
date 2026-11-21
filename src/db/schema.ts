@@ -4,9 +4,15 @@ import { pgTable, text, serial, timestamp, integer, json, boolean, decimal } fro
 export const clinics = pgTable("clinics", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  slug: text("slug").unique(), // Identifiant sous-domaine unique (ex: 'dr-amine', 'amine')
   city: text("city").notNull(),
   address: text("address"),
   phone: text("phone"),
+  logoUrl: text("logo_url"), // Logo personnalisé du cabinet (Data URL ou lien)
+  primaryColor: text("primary_color").default("#0f172a"), // Couleur d'accentuation du cabinet
+  isCommunityMember: boolean("is_community_member").default(false).notNull(), // Accord réseau médical
+  quickMessagesDoctor: json("quick_messages_doctor"), // Raccourcis personnalisés médecin (ex: ['Faites entrer le patient'])
+  quickMessagesAssistant: json("quick_messages_assistant"), // Raccourcis personnalisés assistante
   status: text("status").notNull().default("active"), // 'active', 'suspended'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -20,6 +26,9 @@ export const users = pgTable("users", {
   role: text("role").notNull(), // 'superadmin' | 'doctor' | 'assistant'
   name: text("name").notNull(),
   phone: text("phone"),
+  avatarUrl: text("avatar_url"), // Photo de profil praticien ou assistante
+  bio: text("bio"), // Courte présentation confraternelle
+  isOnboarded: boolean("is_onboarded").default(false).notNull(), // A complété le parcours d'accueil
   status: text("status").notNull().default("active"), // 'active', 'suspended'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -148,5 +157,43 @@ export const customMedications = pgTable("custom_medications", {
   dosage: text("dosage"),
   form: text("form"),
   defaultInstructions: text("default_instructions"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Clinic Messages table (Live interphone chat between Doctor & Assistant in the same clinic)
+export const clinicMessages = pgTable("clinic_messages", {
+  id: serial("id").primaryKey(),
+  clinicId: integer("clinic_id").references(() => clinics.id, { onDelete: "cascade" }).notNull(),
+  senderId: integer("sender_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  senderName: text("sender_name").notNull(),
+  senderRole: text("sender_role").notNull(), // 'doctor' | 'assistant'
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Community Posts table (Feed / Blog / Clinical cases & peer requests strictly for doctors)
+export const communityPosts = pgTable("community_posts", {
+  id: serial("id").primaryKey(),
+  clinicId: integer("clinic_id").references(() => clinics.id, { onDelete: "cascade" }).notNull(),
+  authorDoctorId: integer("author_doctor_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  authorName: text("author_name").notNull(),
+  authorSpecialty: text("author_specialty").notNull(),
+  authorCity: text("author_city").notNull(),
+  authorAvatarUrl: text("author_avatar_url"),
+  category: text("category").notNull().default("general"), // 'general', 'cas_clinique', 'remplacement', 'orientation', 'materiel'
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  likesCount: integer("likes_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Community Messages table (Private 1-on-1 WhatsApp-style chat between doctors in the network)
+export const communityMessages = pgTable("community_messages", {
+  id: serial("id").primaryKey(),
+  senderDoctorId: integer("sender_doctor_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  receiverDoctorId: integer("receiver_doctor_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

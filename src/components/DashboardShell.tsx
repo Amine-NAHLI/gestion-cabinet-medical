@@ -6,14 +6,21 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
 import RealtimeSync from "@/components/RealtimeSync";
+import InternalChatDrawer from "@/components/InternalChatDrawer";
+import AssistantOnboardingModal from "@/components/AssistantOnboardingModal";
 
 interface DashboardShellProps {
   role: string;
   clinicName: string;
+  clinicLogoUrl?: string | null;
+  primaryColor?: string;
+  isCommunityMember?: boolean;
   todayStr: string;
   user?: {
     name?: string | null;
     email?: string | null;
+    avatarUrl?: string | null;
+    isOnboarded?: boolean;
   };
   children: React.ReactNode;
 }
@@ -21,6 +28,9 @@ interface DashboardShellProps {
 export default function DashboardShell({
   role,
   clinicName,
+  clinicLogoUrl,
+  primaryColor = "#0f172a",
+  isCommunityMember,
   todayStr,
   user,
   children,
@@ -28,6 +38,11 @@ export default function DashboardShell({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
+  const [assistantModalOpen, setAssistantModalOpen] = useState(
+    role === "assistant" && user?.isOnboarded === false
+  );
 
   useEffect(() => {
     try {
@@ -74,6 +89,9 @@ export default function DashboardShell({
       ? [{ href: "/dashboard/payments", label: "Encaissements", icon: "payments", exact: false }]
       : []),
     { href: "/dashboard/appointments", label: "Rendez-vous", icon: "calendar_month", exact: false },
+    ...(isDoctor
+      ? [{ href: "/dashboard/community", label: "Communauté", icon: "hub", exact: false }]
+      : []),
   ];
 
   const secondaryItems = [
@@ -118,7 +136,7 @@ export default function DashboardShell({
               expanded ? "px-2.5 py-2" : "py-2 justify-center"
             } ${
               isActive
-                ? "bg-slate-100 text-slate-900 font-semibold"
+                ? "bg-slate-100 text-slate-900 font-semibold shadow-2xs"
                 : "text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
@@ -153,9 +171,18 @@ export default function DashboardShell({
     <div className="p-2.5 border-t border-slate-200/80 space-y-1">
       {expanded ? (
         <div className="flex items-center gap-2.5 px-2 py-1.5">
-          <div className="w-7 h-7 rounded-md bg-slate-900 text-white flex items-center justify-center text-[11px] font-semibold shrink-0">
-            {userInitials}
-          </div>
+          {user?.avatarUrl ? (
+            <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200 shrink-0 shadow-2xs">
+              <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div
+              style={{ backgroundColor: primaryColor }}
+              className="w-7 h-7 rounded-md text-white flex items-center justify-center text-[11px] font-semibold shrink-0 shadow-2xs"
+            >
+              {userInitials}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-slate-900 truncate leading-tight">
               {user?.name || (isDoctor ? "Médecin" : "Assistante")}
@@ -168,9 +195,18 @@ export default function DashboardShell({
       ) : (
         <div
           title={user?.name || (isDoctor ? "Médecin" : "Assistante")}
-          className="w-8 h-8 mx-auto rounded-md bg-slate-900 text-white flex items-center justify-center text-[11px] font-semibold"
+          className="w-8 h-8 mx-auto rounded-md overflow-hidden flex items-center justify-center shadow-2xs"
         >
-          {userInitials}
+          {user?.avatarUrl ? (
+            <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+          ) : (
+            <div
+              style={{ backgroundColor: primaryColor }}
+              className="w-full h-full text-white flex items-center justify-center text-[11px] font-semibold"
+            >
+              {userInitials}
+            </div>
+          )}
         </div>
       )}
 
@@ -189,7 +225,10 @@ export default function DashboardShell({
   );
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] flex relative">
+    <div
+      style={{ "--clinic-primary": primaryColor } as React.CSSProperties}
+      className="min-h-screen bg-[#F8F9FB] flex relative"
+    >
       {/* SIDEBAR DESKTOP */}
       <aside
         className={`hidden lg:flex flex-col bg-white border-r border-slate-200/90 sticky top-0 h-screen shrink-0 transition-[width] duration-200 ease-out z-30 ${
@@ -202,13 +241,20 @@ export default function DashboardShell({
           }`}
         >
           {sidebarOpen && (
-            <div className="min-w-0 pr-2">
-              <p className="font-semibold text-slate-900 text-sm tracking-tight truncate">
-                {clinicName}
-              </p>
-              <p className="text-[11px] text-slate-500 truncate">
-                MonCabinet • {isDoctor ? "Praticien" : "Accueil"}
-              </p>
+            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+              {clinicLogoUrl && (
+                <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                  <img src={clinicLogoUrl} alt="Logo" className="w-full h-full object-contain p-0.5" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-900 text-sm tracking-tight truncate">
+                  {clinicName}
+                </p>
+                <p className="text-[11px] text-slate-500 truncate">
+                  MonCabinet • {isDoctor ? "Praticien" : "Accueil"}
+                </p>
+              </div>
             </div>
           )}
 
@@ -247,13 +293,20 @@ export default function DashboardShell({
               className="relative z-10 w-60 max-w-[80vw] bg-white h-full flex flex-col shadow-xl border-r border-slate-200"
             >
               <div className="h-14 px-3.5 border-b border-slate-200/80 flex items-center justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-900 text-sm truncate">
-                    {clinicName}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {isDoctor ? "Espace Praticien" : "Espace Accueil"}
-                  </p>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {clinicLogoUrl && (
+                    <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                      <img src={clinicLogoUrl} alt="Logo" className="w-full h-full object-contain p-0.5" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 text-sm truncate">
+                      {clinicName}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {isDoctor ? "Espace Praticien" : "Espace Accueil"}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -295,6 +348,22 @@ export default function DashboardShell({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Bouton Interphone Cabinet */}
+            <button
+              type="button"
+              onClick={() => setChatOpen(true)}
+              className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs active:bg-slate-100"
+              title="Ouvrir l'interphone interne du cabinet"
+            >
+              <span className="material-symbols-outlined text-[17px] text-slate-600">forum</span>
+              <span className="hidden sm:inline">Interphone</span>
+              {chatUnread > 0 && (
+                <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-red-600 text-white animate-pulse">
+                  {chatUnread}
+                </span>
+              )}
+            </button>
+
             <RealtimeSync role={role} />
           </div>
         </header>
@@ -303,6 +372,22 @@ export default function DashboardShell({
           {children}
         </main>
       </div>
+
+      {/* Tiroir Interphone Cabinet Médecin ⟷ Assistante */}
+      <InternalChatDrawer
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        primaryColor={primaryColor}
+        onUnreadChange={setChatUnread}
+      />
+
+      {/* Modal d'accueil première connexion assistante */}
+      <AssistantOnboardingModal
+        assistantName={user?.name || "Assistante"}
+        clinicName={clinicName}
+        isOpen={assistantModalOpen}
+        onClose={() => setAssistantModalOpen(false)}
+      />
     </div>
   );
 }

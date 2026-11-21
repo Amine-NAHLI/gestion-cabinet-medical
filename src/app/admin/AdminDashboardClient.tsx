@@ -7,17 +7,22 @@ import {
   adminDeleteRequest,
   adminUpdateUserPassword,
   adminDeleteClinic,
+  adminRunVacuum,
   getAdminDashboardData,
 } from "@/actions/admin";
 import { signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
+import AdminNeonHealth from "@/components/admin/AdminNeonHealth";
+import AdminUsersManagement from "@/components/admin/AdminUsersManagement";
+import AdminDatabaseExplorer from "@/components/admin/AdminDatabaseExplorer";
+import AdminClinicEditModal from "@/components/admin/AdminClinicEditModal";
 
 interface AdminDashboardClientProps {
   initialData: Awaited<ReturnType<typeof getAdminDashboardData>>;
   adminEmail: string;
 }
 
-type AdminPage = "stats" | "doctors" | "requests";
+type AdminPage = "stats" | "neon" | "doctors" | "users" | "database" | "requests";
 
 export default function AdminDashboardClient({
   initialData,
@@ -33,6 +38,9 @@ export default function AdminDashboardClient({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+
+  // Modale édition cabinet
+  const [editingClinic, setEditingClinic] = useState<any | null>(null);
 
   // Modale modification de mot de passe
   const [passwordModalUser, setPasswordModalUser] = useState<{
@@ -91,6 +99,23 @@ export default function AdminDashboardClient({
       if (!silent) showFeedback("error", "Erreur lors de l'actualisation.");
     } finally {
       if (!silent) setActionLoading(null);
+    }
+  };
+
+  const handleRunVacuum = async () => {
+    setActionLoading("vacuum");
+    try {
+      const res = await adminRunVacuum();
+      if (res?.error) {
+        showFeedback("error", res.error);
+      } else {
+        showFeedback("success", res.message || "Base de données optimisée avec succès.");
+        await refreshData(true);
+      }
+    } catch {
+      showFeedback("error", "Erreur lors de l'optimisation.");
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -299,9 +324,9 @@ export default function AdminDashboardClient({
           </div>
         </div>
 
-        {/* NAVIGATION DES 3 PAGES ADMIN (ONGLETS SOBRES À SOULIGNEMENT) */}
+        {/* NAVIGATION DES 6 PAGES ADMIN (ONGLETS SOBRES À SOULIGNEMENT) */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 border-t border-slate-100">
-          <nav className="flex items-center gap-2 overflow-x-auto">
+          <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
             <button
               onClick={() => setActivePage("stats")}
               className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
@@ -311,7 +336,22 @@ export default function AdminDashboardClient({
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">bar_chart</span>
-              <span>Statistiques</span>
+              <span>Vue d'ensemble</span>
+            </button>
+
+            <button
+              onClick={() => setActivePage("neon")}
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+                activePage === "neon"
+                  ? "border-sky-600 text-sky-800 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[17px] text-sky-600">database</span>
+              <span>Santé Neon & Calcul</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[11px] font-semibold tabular-nums border border-sky-100">
+                1 Go • 100 CU-h
+              </span>
             </button>
 
             <button
@@ -323,10 +363,37 @@ export default function AdminDashboardClient({
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">medical_services</span>
-              <span>Médecins & Assistantes</span>
+              <span>Cabinets Médicaux</span>
               <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
                 {data.doctorsWithAssistants.length}
               </span>
+            </button>
+
+            <button
+              onClick={() => setActivePage("users")}
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+                activePage === "users"
+                  ? "border-slate-900 text-slate-900 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[17px]">group</span>
+              <span>Toutes les Personnes</span>
+              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
+                {data.allUsers?.length || data.stats.totalUsers}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActivePage("database")}
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+                activePage === "database"
+                  ? "border-slate-900 text-slate-900 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[17px]">table_rows</span>
+              <span>Explorateur Tables</span>
             </button>
 
             <button
@@ -338,10 +405,10 @@ export default function AdminDashboardClient({
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">inbox</span>
-              <span>Demandes de création</span>
+              <span>Demandes OTP</span>
               {data.stats.pendingCount > 0 ? (
                 <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[11px] font-semibold tabular-nums">
-                  {data.stats.pendingCount} en attente
+                  {data.stats.pendingCount}
                 </span>
               ) : (
                 <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
@@ -689,6 +756,17 @@ export default function AdminDashboardClient({
         )}
 
         {/* ============================================================
+            PAGE 1.5 : SANTÉ & PERFORMANCES DE LA BASE DE DONNÉES NEON
+           ============================================================ */}
+        {activePage === "neon" && (
+          <AdminNeonHealth
+            stats={data.stats}
+            onRunVacuum={handleRunVacuum}
+            actionLoading={actionLoading}
+          />
+        )}
+
+        {/* ============================================================
             PAGE 2 : MÉDECINS & LEURS ASSISTANTES (+ SUPPRESSION)
            ============================================================ */}
         {activePage === "doctors" && (
@@ -758,22 +836,45 @@ export default function AdminDashboardClient({
                         </p>
                       </div>
 
-                      <button
-                        onClick={() =>
-                          setDeleteTarget({
-                            clinicId: item.clinic.id,
-                            clinicName: item.clinic.name,
-                            doctorName: item.doctor?.name || "Médecin",
-                            assistantsCount: item.assistants.length,
-                            patientsCount: item.metrics.patientsCount,
-                            visitsCount: item.metrics.visitsCount,
-                          })
-                        }
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 text-xs font-medium transition cursor-pointer self-start sm:self-center shrink-0"
-                      >
-                        <span className="material-symbols-outlined text-[15px]">delete</span>
-                        <span>Supprimer</span>
-                      </button>
+                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                        <button
+                          onClick={() => {
+                            const fullClinic = data.allClinics?.find((c) => c.id === item.clinic.id);
+                            setEditingClinic({
+                              id: item.clinic.id,
+                              name: item.clinic.name,
+                              slug: fullClinic?.slug || "",
+                              city: item.clinic.city,
+                              address: item.clinic.address,
+                              phone: item.clinic.phone,
+                              primaryColor: fullClinic?.primaryColor || "#0f172a",
+                              isCommunityMember: fullClinic?.isCommunityMember ?? true,
+                              status: (fullClinic?.status as any) || "active",
+                            });
+                          }}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-medium transition cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[15px] text-slate-500">edit</span>
+                          <span>Modifier</span>
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            setDeleteTarget({
+                              clinicId: item.clinic.id,
+                              clinicName: item.clinic.name,
+                              doctorName: item.doctor?.name || "Médecin",
+                              assistantsCount: item.assistants.length,
+                              patientsCount: item.metrics.patientsCount,
+                              visitsCount: item.metrics.visitsCount,
+                            })
+                          }
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 text-xs font-medium transition cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">delete</span>
+                          <span>Supprimer</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Corps : Médecin | Assistante(s) séparés par une fine bordure */}
@@ -862,6 +963,33 @@ export default function AdminDashboardClient({
               </div>
             )}
           </div>
+        )}
+
+        {/* ============================================================
+            PAGE 2.5 : GESTION GLOBALE DES PERSONNES (UTILISATEURS)
+           ============================================================ */}
+        {activePage === "users" && (
+          <AdminUsersManagement
+            users={(data.allUsers || []) as any}
+            clinics={(data.allClinics || []) as any}
+            doctorsWithAssistants={data.doctorsWithAssistants}
+            onRefresh={() => refreshData(true)}
+            onPasswordModal={(user) => {
+              setPasswordModalUser(user);
+              setNewPassword("");
+            }}
+            showFeedback={showFeedback}
+          />
+        )}
+
+        {/* ============================================================
+            PAGE 2.6 : EXPLORATEUR DIRECT BASE DE DONNÉES
+           ============================================================ */}
+        {activePage === "database" && (
+          <AdminDatabaseExplorer
+            onRefresh={() => refreshData(true)}
+            showFeedback={showFeedback}
+          />
         )}
 
         {/* ============================================================
@@ -1284,6 +1412,15 @@ export default function AdminDashboardClient({
           </div>
         )}
       </AnimatePresence>
+      {/* MODALE ÉDITION DU CABINET */}
+      {editingClinic && (
+        <AdminClinicEditModal
+          clinic={editingClinic}
+          onClose={() => setEditingClinic(null)}
+          onSaved={() => refreshData(true)}
+          showFeedback={showFeedback}
+        />
+      )}
     </div>
   );
 }
