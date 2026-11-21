@@ -4,6 +4,7 @@ export interface NotificationPreferences {
   clinicMessages: boolean;
   queueArrivals: boolean;
   soundEnabled: boolean;
+  readNotificationIds?: string[];
 }
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
@@ -12,6 +13,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   clinicMessages: true,
   queueArrivals: true,
   soundEnabled: true,
+  readNotificationIds: [],
 };
 
 export interface AppNotification {

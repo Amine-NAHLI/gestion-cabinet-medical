@@ -119,7 +119,7 @@ export default function NotificationBell({ role, onOpenInterphone }: Notificatio
         prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
       );
       setUnreadCount((c) => Math.max(0, c - 1));
-      await markNotificationsAsRead(notif.type);
+      await markNotificationsAsRead(notif.id);
     }
 
     if (notif.action === "open_interphone") {

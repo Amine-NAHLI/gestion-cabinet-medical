@@ -9,6 +9,7 @@ import RealtimeSync from "@/components/RealtimeSync";
 import InternalChatDrawer from "@/components/InternalChatDrawer";
 import AssistantOnboardingModal from "@/components/AssistantOnboardingModal";
 import NotificationBell from "@/components/NotificationBell";
+import { getUnreadChatCount } from "@/actions/community";
 
 interface DashboardShellProps {
   role: string;
@@ -16,6 +17,7 @@ interface DashboardShellProps {
   clinicLogoUrl?: string | null;
   primaryColor?: string;
   isCommunityMember?: boolean;
+  unreadChatCount?: number;
   todayStr: string;
   user?: {
     name?: string | null;
@@ -32,6 +34,7 @@ export default function DashboardShell({
   clinicLogoUrl,
   primaryColor = "#0f172a",
   isCommunityMember,
+  unreadChatCount = 0,
   todayStr,
   user,
   children,
@@ -41,9 +44,38 @@ export default function DashboardShell({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatUnread, setChatUnread] = useState(0);
+  const [chatBadgeCount, setChatBadgeCount] = useState(unreadChatCount);
   const [assistantModalOpen, setAssistantModalOpen] = useState(
     role === "assistant" && user?.isOnboarded === false
   );
+
+  const isDoctor = role === "doctor";
+
+  // Rafraîchir périodiquement et sur événement le compteur de messages non lus du médecin
+  useEffect(() => {
+    if (!isDoctor) return;
+    const fetchUnread = async () => {
+      try {
+        const count = await getUnreadChatCount();
+        setChatBadgeCount(count);
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 6000);
+
+    const handleChatRead = () => {
+      fetchUnread();
+    };
+    window.addEventListener("chat_read", handleChatRead);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("chat_read", handleChatRead);
+    };
+  }, [isDoctor]);
 
   useEffect(() => {
     try {
@@ -80,8 +112,6 @@ export default function DashboardShell({
     }
   };
 
-  const isDoctor = role === "doctor";
-
   const primaryItems = [
     { href: "/dashboard", label: "Tableau de bord", icon: "grid_view", exact: true },
     { href: "/dashboard/queue", label: "Salle d'attente", icon: "groups", exact: false },
@@ -91,7 +121,16 @@ export default function DashboardShell({
       : []),
     { href: "/dashboard/appointments", label: "Rendez-vous", icon: "calendar_month", exact: false },
     ...(isDoctor
-      ? [{ href: "/dashboard/community", label: "Communauté", icon: "hub", exact: false }]
+      ? [
+          { href: "/dashboard/community", label: "Communauté", icon: "hub", exact: false },
+          {
+            href: "/dashboard/chat",
+            label: "Messagerie",
+            icon: "chat",
+            exact: false,
+            badgeCount: chatBadgeCount,
+          },
+        ]
       : []),
   ];
 
@@ -113,7 +152,13 @@ export default function DashboardShell({
     : "AS";
 
   const renderGroup = (
-    items: { href: string; label: string; icon: string; exact: boolean }[],
+    items: {
+      href: string;
+      label: string;
+      icon: string;
+      exact: boolean;
+      badgeCount?: number;
+    }[],
     expanded: boolean,
     sectionTitle?: string
   ) => (
@@ -133,7 +178,7 @@ export default function DashboardShell({
             key={item.href}
             href={item.href}
             title={!expanded ? item.label : undefined}
-            className={`group flex items-center gap-2.5 rounded-lg transition-colors text-[13px] ${
+            className={`group relative flex items-center gap-2.5 rounded-lg transition-colors text-[13px] ${
               expanded ? "px-2.5 py-2" : "py-2 justify-center"
             } ${
               isActive
@@ -152,7 +197,15 @@ export default function DashboardShell({
             >
               {item.icon}
             </span>
-            {expanded && <span className="truncate">{item.label}</span>}
+            {expanded && <span className="truncate flex-1">{item.label}</span>}
+            {item.badgeCount && item.badgeCount > 0 ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white shadow-2xs shrink-0 animate-pulse">
+                {item.badgeCount}
+              </span>
+            ) : null}
+            {!expanded && item.badgeCount && item.badgeCount > 0 ? (
+              <span className="absolute top-1.5 right-2 w-2.5 h-2.5 rounded-full bg-rose-600 ring-2 ring-white animate-pulse" />
+            ) : null}
           </Link>
         );
       })}
@@ -233,7 +286,7 @@ export default function DashboardShell({
       {/* SIDEBAR DESKTOP */}
       <aside
         className={`hidden lg:flex flex-col bg-white border-r border-slate-200/90 sticky top-0 h-screen shrink-0 transition-[width] duration-200 ease-out z-30 ${
-          sidebarOpen ? "w-60" : "w-16"
+          sidebarOpen ? "w-[240px] min-w-[240px]" : "w-[68px] min-w-[68px]"
         }`}
       >
         <div

@@ -348,7 +348,7 @@ export default function AdminDashboardClient({
               }`}
             >
               <span className="material-symbols-outlined text-[17px] text-sky-600">database</span>
-              <span>Santé Neon & Calcul</span>
+              <span>Infrastructure Neon</span>
               <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[11px] font-semibold tabular-nums border border-sky-100">
                 1 Go • 100 CU-h
               </span>
@@ -378,7 +378,7 @@ export default function AdminDashboardClient({
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">group</span>
-              <span>Toutes les Personnes</span>
+              <span>Gestion des Personnes</span>
               <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
                 {data.allUsers?.length || data.stats.totalUsers}
               </span>
@@ -393,7 +393,7 @@ export default function AdminDashboardClient({
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">table_rows</span>
-              <span>Explorateur Tables</span>
+              <span>Explorateur BDD</span>
             </button>
 
             <button
@@ -405,7 +405,7 @@ export default function AdminDashboardClient({
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">inbox</span>
-              <span>Demandes OTP</span>
+              <span>Demandes d&apos;inscription</span>
               {data.stats.pendingCount > 0 ? (
                 <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[11px] font-semibold tabular-nums">
                   {data.stats.pendingCount}

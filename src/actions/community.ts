@@ -250,3 +250,177 @@ export async function toggleCommunityMembership(enable: boolean) {
   revalidatePath("/dashboard/community");
   return { success: true, isCommunityMember: enable };
 }
+
+// 5. Compter tous les messages non lus pour le médecin connecté
+export async function getUnreadChatCount(): Promise<number> {
+  const session = await getServerSession(authOptions);
+  if (!session) return 0;
+  const userSession = session.user as { id?: string; role?: string };
+  if (userSession.role !== "doctor") return 0;
+  const myId = parseInt(userSession.id || "0");
+  if (!myId) return 0;
+
+  try {
+    const unreadMsgs = await db
+      .select({ id: communityMessages.id })
+      .from(communityMessages)
+      .where(
+        and(
+          eq(communityMessages.receiverDoctorId, myId),
+          eq(communityMessages.isRead, false)
+        )
+      );
+    return unreadMsgs.length;
+  } catch {
+    return 0;
+  }
+}
+
+// 6. Données complètes pour la messagerie WhatsApp-style
+export async function getChatOverviewData() {
+  const session = await getServerSession(authOptions);
+  if (!session) return null;
+
+  const userSession = session.user as { id?: string; role?: string };
+  if (userSession.role !== "doctor") {
+    return {
+      isDoctor: false,
+      isMember: false,
+      confreres: [],
+      totalUnreadCount: 0,
+      currentDoctorId: 0,
+    };
+  }
+
+  const currentDoctorId = parseInt(userSession.id || "0");
+  const clinicId = await getTenantClinicId();
+
+  const [clinic] = await db
+    .select({ isCommunityMember: clinics.isCommunityMember })
+    .from(clinics)
+    .where(eq(clinics.id, clinicId))
+    .limit(1);
+
+  const isMember = clinic?.isCommunityMember ?? false;
+  if (!isMember) {
+    return {
+      isDoctor: true,
+      isMember: false,
+      confreres: [],
+      totalUnreadCount: 0,
+      currentDoctorId,
+    };
+  }
+
+  // Tous les confrères médecins membres
+  const rawConfreres = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      bio: users.bio,
+      clinicName: clinics.name,
+      clinicCity: clinics.city,
+    })
+    .from(users)
+    .innerJoin(clinics, eq(users.clinicId, clinics.id))
+    .where(
+      and(
+        eq(users.role, "doctor"),
+        eq(clinics.isCommunityMember, true),
+        ne(users.id, currentDoctorId)
+      )
+    );
+
+  // Tous les messages où je suis impliqué (expéditeur ou destinataire)
+  const myMessages = await db
+    .select()
+    .from(communityMessages)
+    .where(
+      or(
+        eq(communityMessages.senderDoctorId, currentDoctorId),
+        eq(communityMessages.receiverDoctorId, currentDoctorId)
+      )
+    )
+    .orderBy(desc(communityMessages.createdAt));
+
+  // Agréger unreadCount et lastMessage par confrère
+  const enrichedConfreres = rawConfreres.map((c) => {
+    const unreadCount = myMessages.filter(
+      (m) => m.senderDoctorId === c.id && m.receiverDoctorId === currentDoctorId && !m.isRead
+    ).length;
+
+    const lastMsg = myMessages.find(
+      (m) =>
+        (m.senderDoctorId === c.id && m.receiverDoctorId === currentDoctorId) ||
+        (m.senderDoctorId === currentDoctorId && m.receiverDoctorId === c.id)
+    );
+
+    return {
+      id: c.id,
+      name: c.name,
+      avatarUrl: c.avatarUrl,
+      bio: c.bio,
+      clinicName: c.clinicName,
+      clinicCity: c.clinicCity,
+      unreadCount,
+      lastMessage: lastMsg
+        ? {
+            content: lastMsg.content,
+            createdAt: lastMsg.createdAt.toISOString(),
+            isMe: lastMsg.senderDoctorId === currentDoctorId,
+          }
+        : null,
+    };
+  });
+
+  // Tri WhatsApp :
+  // 1. Les conversations avec messages non lus en premier (badge)
+  // 2. Par date du dernier message (les plus récents en haut)
+  // 3. Par ordre alphabétique
+  enrichedConfreres.sort((a, b) => {
+    if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+    if (b.unreadCount > 0 && a.unreadCount === 0) return 1;
+    if (a.unreadCount > 0 && b.unreadCount > 0) return b.unreadCount - a.unreadCount;
+
+    const timeA = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
+    const timeB = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
+    if (timeA !== timeB) return timeB - timeA;
+
+    return a.name.localeCompare(b.name);
+  });
+
+  const totalUnreadCount = enrichedConfreres.reduce((acc, c) => acc + c.unreadCount, 0);
+
+  return {
+    isDoctor: true,
+    isMember: true,
+    currentDoctorId,
+    confreres: enrichedConfreres,
+    totalUnreadCount,
+  };
+}
+
+// 7. Marquer tous les messages d'un confrère comme lus à l'ouverture de sa conversation
+export async function markDoctorChatAsRead(doctorSenderId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false };
+  const userSession = session.user as { id?: string };
+  const myId = parseInt(userSession.id || "0");
+  if (!myId) return { success: false };
+
+  await db
+    .update(communityMessages)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(communityMessages.senderDoctorId, doctorSenderId),
+        eq(communityMessages.receiverDoctorId, myId),
+        eq(communityMessages.isRead, false)
+      )
+    );
+
+  revalidatePath("/dashboard/chat");
+  revalidatePath("/dashboard", "layout");
+  return { success: true };
+}
