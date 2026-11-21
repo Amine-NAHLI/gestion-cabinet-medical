@@ -35,6 +35,8 @@ interface SettingsClientProps {
     email: string;
     address: string;
     city: string;
+    avatarUrl?: string | null;
+    bio?: string | null;
     orderNumber: string | null;
     taxId: string | null;
     defaultFee: string | null;
@@ -111,6 +113,54 @@ export default function SettingsClient({
   );
   const [isConvertingFile, setIsConvertingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Profil praticien (Avatar & Bio)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialSettings.avatarUrl || null);
+  const [bio, setBio] = useState<string>(initialSettings.bio || "");
+  const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Veuillez sélectionner un fichier image (PNG, JPG, WEBP).", "error");
+      return;
+    }
+    setIsProcessingAvatar(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 320;
+          const minDim = Math.min(img.width, img.height);
+          const sx = (img.width - minDim) / 2;
+          const sy = (img.height - minDim) / 2;
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.min(minDim, maxDim);
+          canvas.height = Math.min(minDim, maxDim);
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/webp", 0.88);
+            setAvatarUrl(dataUrl);
+            showToast("Photo sélectionnée (cliquez sur Enregistrer pour valider)");
+          }
+          setIsProcessingAvatar(false);
+        };
+        img.onerror = () => {
+          setIsProcessingAvatar(false);
+          showToast("Erreur lors du traitement de l'image.", "error");
+        };
+        img.src = String(reader.result);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setIsProcessingAvatar(false);
+      showToast("Impossible de lire l'image.", "error");
+    }
+  }
 
   function showToast(msg: string, type: "success" | "error" = "success") {
     setToast({ msg, type });
@@ -400,13 +450,104 @@ export default function SettingsClient({
       </div>
 
       {/* ============================================================
-          ONGLET 1 : COORDONNÉES DU CABINET
+          ONGLET 1 : COORDONNÉES DU CABINET & PROFIL
          ============================================================ */}
       {activeTab === "general" && (
         <form
           onSubmit={handleSaveGeneral}
           className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] divide-y divide-slate-200/80"
         >
+          {/* Section Profil Praticien (Avatar & Bio) */}
+          <div className="p-5 sm:p-6 space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Photo de profil & Présentation</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Visible par vos confrères sur la communauté médicale et la messagerie privée.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 pt-1">
+              <div className="relative group shrink-0">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-slate-200 bg-slate-100 flex items-center justify-center shadow-xs">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt="Photo du médecin"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-slate-400 text-3xl font-bold uppercase">
+                      {initialSettings.doctorName?.replace(/^Dr\.?\s*/i, "")?.[0] || "M"}
+                    </span>
+                  )}
+                </div>
+                {isProcessingAvatar && (
+                  <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white animate-spin text-xl">
+                      progress_activity
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 flex-1 text-center sm:text-left">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+                <input type="hidden" name="avatarUrl" value={avatarUrl || ""} />
+
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={isProcessingAvatar}
+                    className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-slate-500">
+                      photo_camera
+                    </span>
+                    <span>{avatarUrl ? "Changer la photo" : "Ajouter une photo"}</span>
+                  </button>
+
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setAvatarUrl("")}
+                      className="px-3 py-1.5 rounded-lg border border-red-200 bg-red-50/50 hover:bg-red-50 text-xs font-semibold text-red-600 inline-flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      <span>Supprimer</span>
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Formats acceptés : JPG, PNG, WEBP. Recadré automatiquement au format carré.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Présentation / Biographie confraternelle
+              </label>
+              <textarea
+                name="bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                rows={3}
+                placeholder="Ex : Médecin spécialiste, disponible pour avis confraternels et prises en charge coordonnées..."
+                className={`${inputCls} resize-none`}
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Présentez succinctement vos diplômes, expertises ou sur-spécialités à vos confrères.
+              </p>
+            </div>
+          </div>
+
           <div className="p-5 sm:p-6 space-y-4">
             <div>
               <h2 className="text-sm font-semibold text-slate-900">Identité du praticien</h2>

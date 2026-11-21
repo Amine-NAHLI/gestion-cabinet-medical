@@ -24,54 +24,23 @@ interface InitialData {
   };
 }
 
-const PRESET_THEMES = [
-  {
-    id: "default",
-    name: "Ardoise Minimaliste",
-    subtitle: "Style Doctolib élégant et neutre",
-    color: "#0f172a",
-    badge: "Par défaut",
-  },
-  {
-    id: "ocean",
-    name: "Bleu Océan",
-    subtitle: "Rigueur, clarté et confiance",
-    color: "#0284c7",
-    badge: "Recommandé",
-  },
-  {
-    id: "emerald",
-    name: "Vert Émeraude",
-    subtitle: "Santé, sérénité et soin",
-    color: "#059669",
-    badge: "Clinique",
-  },
-  {
-    id: "amethyst",
-    name: "Améthyste Moderne",
-    subtitle: "Pratique moderne et esthétique",
-    color: "#7c3aed",
-    badge: "Spécialités",
-  },
-];
-
 export default function DoctorOnboardingClient({ initialData }: { initialData: InitialData }) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [isSaving, startSaving] = useTransition();
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
-  // Étape 1 : Logo & Sous-domaine
-  const [logoUrl, setLogoUrl] = useState<string | null>(initialData.clinic.logoUrl);
+  // Étape 1 : Identifiant web et Logo du Cabinet
   const [slug, setSlug] = useState<string>(() => {
     if (initialData.clinic.slug) return initialData.clinic.slug;
-    // Préremplissage intelligent depuis le nom du médecin ou de la clinique
-    const base = (initialData.doctor.name || initialData.clinic.name || "cabinet")
+    const cleanDoc = initialData.doctor.name
       .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/^dr\.\s*|^dr\s*/, "")
       .replace(/[^a-z0-9]/g, "-")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
-    return base || "cabinet";
+    return cleanDoc ? `dr-${cleanDoc}` : "mon-cabinet";
   });
+
   const [slugStatus, setSlugStatus] = useState<{
     loading: boolean;
     available?: boolean;
@@ -80,53 +49,57 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
     suggestions?: string[];
   }>({ loading: false });
 
-  // Étape 2 : Profil Médecin
+  const [logoUrl, setLogoUrl] = useState<string | null>(initialData.clinic.logoUrl);
+
+  // Étape 2 : Profil Médecin & Présentation
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialData.doctor.avatarUrl);
   const [bio, setBio] = useState<string>(initialData.doctor.bio || "");
 
-  // Étape 3 : Thème de couleur
-  const [selectedColor, setSelectedColor] = useState<string>(initialData.clinic.primaryColor || "#0f172a");
-  const [isCustomColor, setIsCustomColor] = useState<boolean>(false);
-
-  // Étape 4 : Accord Communauté
-  const [isCommunityMember, setIsCommunityMember] = useState<boolean>(initialData.clinic.isCommunityMember ?? true);
-
-  const [isSaving, startSaving] = useTransition();
-  const [generalError, setGeneralError] = useState<string | null>(null);
+  // Étape 3 : Réseau Médical Confraternel
+  const [isCommunityMember, setIsCommunityMember] = useState<boolean>(true);
 
   // Vérification de la disponibilité du slug avec debounce
   useEffect(() => {
     if (!slug || slug.trim().length < 3) {
-      setSlugStatus({ loading: false, available: false, error: "Au moins 3 caractères requis." });
+      setSlugStatus({
+        loading: false,
+        available: false,
+        error: "L'identifiant doit contenir au moins 3 caractères",
+      });
       return;
     }
 
-    setSlugStatus({ loading: true });
+    setSlugStatus((prev) => ({ ...prev, loading: true }));
     const timer = setTimeout(async () => {
       try {
         const res = await checkSlugAvailability(slug);
-        if (res.available) {
+        if (res.available && res.slug) {
           setSlugStatus({ loading: false, available: true, cleanSlug: res.slug });
         } else {
           setSlugStatus({
             loading: false,
             available: false,
+            cleanSlug: res.slug,
             error: res.error,
             suggestions: res.suggestions,
           });
         }
       } catch {
-        setSlugStatus({ loading: false, available: true });
+        setSlugStatus({
+          loading: false,
+          available: false,
+          error: "Impossible de vérifier la disponibilité",
+        });
       }
     }, 400);
 
     return () => clearTimeout(timer);
   }, [slug]);
 
-  // Fonction pour compresser les images côté client (logo & avatar) via Canvas
+  // Upload d'image compressée (WebP)
   const handleImageUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
-    callback: (dataUrl: string) => void,
+    callback: (url: string) => void,
     maxDim = 400
   ) => {
     const file = e.target.files?.[0];
@@ -174,7 +147,7 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
         slug: slugStatus.cleanSlug || slug,
         logoUrl,
         avatarUrl,
-        primaryColor: selectedColor,
+        primaryColor: "#0f172a",
         isCommunityMember,
         bio,
       });
@@ -200,11 +173,11 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
           </h1>
         </div>
         <div className="text-right">
-          <span className="text-xs font-medium text-slate-400">Étape {step} sur 4</span>
+          <span className="text-xs font-medium text-slate-400">Étape {step} sur 3</span>
           <div className="w-28 h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
             <div
               className="h-full bg-slate-900 transition-all duration-300"
-              style={{ width: `${(step / 4) * 100}%` }}
+              style={{ width: `${(step / 3) * 100}%` }}
             />
           </div>
         </div>
@@ -226,10 +199,10 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                1. Logo & Identifiant de votre Cabinet
+                1. Logo & Adresse Web de votre Cabinet
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Choisissez l&apos;adresse de votre cabinet et téléversez votre logo officiel.
+                Définissez l&apos;adresse de connexion de votre cabinet et téléversez votre logo officiel.
               </p>
             </div>
 
@@ -271,60 +244,63 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
               </div>
             </div>
 
-            {/* Choix du Sous-domaine */}
+            {/* Sous-domaine personnalisé */}
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-slate-700">
-                Sous-domaine / Adresse personnalisée
+                Adresse Web personnalisée du cabinet <span className="text-red-500">*</span>
               </label>
-              <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:ring-2 focus-within:ring-slate-900/10 focus-within:border-slate-900 transition overflow-hidden">
-                <span className="pl-3.5 text-xs text-slate-400 font-medium select-none">https://</span>
+              <div className="flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-2xs focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/10 transition">
+                <span className="text-xs font-medium text-slate-400 select-none">https://</span>
                 <input
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                  placeholder="ex: amine"
-                  className="flex-1 px-1.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none"
+                  placeholder="nom-cabinet"
+                  className="flex-1 px-1 text-xs font-semibold text-slate-900 focus:outline-none bg-transparent"
                 />
-                <span className="pr-3.5 text-xs font-semibold text-slate-500 select-none bg-slate-50 border-l border-slate-200 py-2.5 pl-2.5">
-                  .toncabinet.ma
+                <span className="text-xs font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100 select-none">
+                  .toncabinet.me
                 </span>
               </div>
 
-              {/* Indicateur de disponibilité */}
-              <div className="min-h-[22px] flex items-center justify-between text-xs px-1">
+              {/* Statut disponibilité du slug */}
+              <div className="text-[11px] pt-1">
                 {slugStatus.loading ? (
                   <span className="text-slate-400 flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="w-2.5 h-2.5 rounded-full border border-slate-400 border-t-transparent animate-spin" />
                     Vérification de la disponibilité...
                   </span>
                 ) : slugStatus.available ? (
-                  <span className="text-emerald-600 font-medium flex items-center gap-1">
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
                     <span className="material-symbols-outlined text-sm">check_circle</span>
-                    Adresse disponible : <strong>{slugStatus.cleanSlug}.toncabinet.ma</strong>
+                    Adresse disponible : <strong>{slugStatus.cleanSlug}.toncabinet.me</strong>
                   </span>
                 ) : (
-                  <span className="text-red-600 font-medium flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">cancel</span>
-                    {slugStatus.error || "Adresse non disponible"}
-                  </span>
+                  slugStatus.error && (
+                    <span className="text-red-600 font-medium flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">cancel</span>
+                      {slugStatus.error || "Adresse non disponible"}
+                    </span>
+                  )
+                )}
+
+                {/* Suggestions si non dispo */}
+                {slugStatus.suggestions && slugStatus.suggestions.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span className="text-slate-400 text-[11px]">Suggestions :</span>
+                    {slugStatus.suggestions.map((sug) => (
+                      <button
+                        key={sug}
+                        type="button"
+                        onClick={() => setSlug(sug)}
+                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition cursor-pointer"
+                      >
+                        {sug}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-
-              {slugStatus.suggestions && slugStatus.suggestions.length > 0 && (
-                <div className="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                  <span>Suggestions :</span>
-                  {slugStatus.suggestions.map((sug) => (
-                    <button
-                      key={sug}
-                      type="button"
-                      onClick={() => setSlug(sug)}
-                      className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-medium text-slate-700 cursor-pointer"
-                    >
-                      {sug}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -336,28 +312,26 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                2. Profil du Médecin
+                2. Profil du Médecin Praticien
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Votre photo et votre courte biographie pour humaniser vos échanges et vos ordonnances.
+                Ces informations apparaîtront dans votre espace et sur l&apos;annuaire médical confraternel.
               </p>
             </div>
 
-            {/* Photo de profil */}
-            <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-              <div className="w-20 h-20 rounded-full border-2 border-white shadow-sm bg-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+            {/* Photo de profil Praticien */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center gap-4">
+              <div className="w-20 h-20 rounded-full border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="material-symbols-outlined text-3xl text-slate-400">person</span>
+                  <span className="material-symbols-outlined text-3xl text-slate-300">account_circle</span>
                 )}
               </div>
               <div className="flex-1 text-center sm:text-left">
-                <p className="text-xs font-semibold text-slate-800">
-                  Photo de profil du praticien
-                </p>
+                <p className="text-xs font-semibold text-slate-800">Photo de profil praticien</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Visible par votre assistante, sur vos ordonnances et auprès des confrères de la communauté.
+                  Une photo professionnelle pour rassurer vos confrères et patients.
                 </p>
                 <div className="mt-2.5 flex items-center justify-center sm:justify-start gap-2">
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-xs font-medium text-slate-700 cursor-pointer transition">
@@ -392,184 +366,94 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
                 rows={3}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Ex: Spécialiste en cardiologie, ancien chef de clinique. Consultation sur rendez-vous..."
+                placeholder="Ex: Spécialiste en cardiologie, ancien interne des hôpitaux. Consultation sur rendez-vous..."
                 className="w-full px-3.5 py-2.5 text-xs text-slate-900 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 placeholder:text-slate-400"
               />
               <p className="text-[11px] text-slate-400">
-                Apparaîtra sur votre fiche de confrère dans l&apos;annuaire médical.
+                Apparaîtra sur votre fiche de confrère dans l&apos;annuaire médical sécurisé.
               </p>
             </div>
           </div>
         )}
 
         {/* ============================================================
-            ÉTAPE 3 : PERSONNALISATION DES COULEURS
+            ÉTAPE 3 : RÉSEAU & COMMUNAUTÉ MÉDICALE CONFRATERNELLE
            ============================================================ */}
         {step === 3 && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                3. Thème & Couleurs du Cabinet
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Choisissez l&apos;ambiance visuelle qui sera appliquée à votre espace cabinet.
-              </p>
-            </div>
-
-            {/* Palettes Prédéfinies */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {PRESET_THEMES.map((theme) => {
-                const isSelected = !isCustomColor && selectedColor === theme.color;
-                return (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedColor(theme.color);
-                      setIsCustomColor(false);
-                    }}
-                    className={`p-4 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
-                      isSelected
-                        ? "border-slate-900 bg-slate-50/80 shadow-2xs ring-1 ring-slate-900"
-                        : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
-                  >
-                    <span
-                      className="w-8 h-8 rounded-lg shrink-0 shadow-2xs border border-black/10 mt-0.5"
-                      style={{ backgroundColor: theme.color }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <p className="text-xs font-bold text-slate-900 truncate">{theme.name}</p>
-                        <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                          {theme.badge}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                        {theme.subtitle}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Sélecteur libre */}
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold text-slate-800">Couleur personnalisée (Code HEX)</p>
-                <p className="text-[11px] text-slate-500">
-                  Si vous avez déjà votre propre charte graphique ou couleur de logo.
-                </p>
-              </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={selectedColor}
-                  onChange={(e) => {
-                    setSelectedColor(e.target.value);
-                    setIsCustomColor(true);
-                  }}
-                  className="w-9 h-9 rounded-lg border border-slate-200 cursor-pointer p-0.5 bg-white"
-                />
-                <input
-                  type="text"
-                  value={selectedColor}
-                  onChange={(e) => {
-                    setSelectedColor(e.target.value);
-                    setIsCustomColor(true);
-                  }}
-                  className="w-24 px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-mono uppercase font-semibold text-slate-800 bg-white text-center"
-                />
+                <span className="material-symbols-outlined text-sky-600 text-2xl">verified_user</span>
+                <h2 className="text-lg font-bold text-slate-900">
+                  3. Réseau Médical Confraternel Sécurisé
+                </h2>
               </div>
-            </div>
-
-            {/* Prévisualisation dynamique live */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Aperçu en direct
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  style={{ backgroundColor: selectedColor }}
-                  className="px-4 py-2 rounded-lg text-white text-xs font-semibold shadow-xs"
-                >
-                  Bouton d&apos;action
-                </button>
-                <span
-                  style={{ borderColor: selectedColor, color: selectedColor }}
-                  className="px-3 py-1.5 rounded-lg border text-xs font-semibold bg-white"
-                >
-                  Badge du cabinet
-                </span>
-                <span className="text-xs text-slate-600 font-medium">
-                  Les menus, titres et accents de votre cabinet s&apos;accorderont automatiquement.
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================
-            ÉTAPE 4 : ACCORD COMMUNAUTÉ MÉDICALE
-           ============================================================ */}
-        {step === 4 && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                4. Réseau & Communauté Médicale
-              </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Connectez-vous à la communauté fermée et sécurisée des médecins utilisateurs de la plateforme.
+                Espace professionnel inter-praticiens strictement fermé et réservé aux médecins certifiés.
               </p>
             </div>
 
             <div className="space-y-3">
-              {/* Option 1 : Oui */}
+              {/* Option 1 : Oui (Recommandé) */}
               <button
                 type="button"
                 onClick={() => setIsCommunityMember(true)}
-                className={`w-full p-4 rounded-xl border text-left transition flex items-start gap-3.5 cursor-pointer ${
+                className={`w-full p-5 rounded-2xl border text-left transition flex items-start gap-4 cursor-pointer ${
                   isCommunityMember
-                    ? "border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-600"
+                    ? "border-emerald-600 bg-emerald-50/40 ring-2 ring-emerald-600/20 shadow-sm"
                     : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
               >
                 <div
-                  className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                  className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
                     isCommunityMember
-                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      ? "border-emerald-600 bg-emerald-600 text-white shadow-2xs"
                       : "border-slate-300 bg-white"
                   }`}
                 >
                   {isCommunityMember && (
-                    <span className="material-symbols-outlined text-sm">check</span>
+                    <span className="material-symbols-outlined text-base">check</span>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-slate-900">
-                      Oui, je rejoins la communauté confraternelle
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                      <span>Oui, je rejoins le réseau confraternel certifié</span>
                     </p>
-                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                       Recommandé
                     </span>
                   </div>
-                  <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                    <li className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm text-emerald-600">forum</span>
-                      <span>Fil confraternel : partagez des cas cliniques et demandes d&apos;avis.</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm text-emerald-600">chat</span>
-                      <span>Chat privé style WhatsApp direct entre médecins membres.</span>
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm text-emerald-600">lock</span>
-                      <span>100 % réservé aux médecins certifiés, secret médical préservé.</span>
-                    </li>
-                  </ul>
+
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Accédez aux outils d&apos;entraide médicale et collaborez directement avec vos confrères praticiens :
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-2 pt-1">
+                    <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white border border-emerald-100/80">
+                      <span className="material-symbols-outlined text-emerald-600 text-base shrink-0 mt-0.5">stethoscope</span>
+                      <div className="text-[11px] leading-snug">
+                        <strong className="text-slate-900 block font-semibold">Cas Cliniques & Deuxième Avis</strong>
+                        <span className="text-slate-500">Partagez des cas complexes et sollicitez des confrères spécialistes en toute confidentialité.</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white border border-emerald-100/80">
+                      <span className="material-symbols-outlined text-sky-600 text-base shrink-0 mt-0.5">chat</span>
+                      <div className="text-[11px] leading-snug">
+                        <strong className="text-slate-900 block font-semibold">Messagerie Directe 1-à-1 Chiffrée</strong>
+                        <span className="text-slate-500">Discutez en direct de praticien à praticien grâce à l&apos;annuaire des médecins par spécialité.</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white border border-emerald-100/80">
+                      <span className="material-symbols-outlined text-purple-600 text-base shrink-0 mt-0.5">shield</span>
+                      <div className="text-[11px] leading-snug">
+                        <strong className="text-slate-900 block font-semibold">Secret Médical Préservé</strong>
+                        <span className="text-slate-500">Réseau 100% clos et étanche, isolé de la patientèle et des dossiers non anonymisés.</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </button>
 
@@ -595,11 +479,11 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-slate-900">
-                    Non, je préfère garder mon cabinet privé pour l&apos;instant
+                  <p className="text-xs font-bold text-slate-900">
+                    Garder mon cabinet en mode privé pour l&apos;instant
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Votre profil n&apos;apparaîtra pas dans l&apos;annuaire et vous n&apos;aurez pas accès au fil confraternel. Vous pourrez modifier ce choix à tout moment dans vos Paramètres.
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Votre profil n&apos;apparaîtra pas dans l&apos;annuaire médical et vous n&apos;aurez pas accès à la messagerie confraternelle. Vous pourrez activer cette option à tout moment dans vos Paramètres.
                   </p>
                 </div>
               </button>
@@ -621,7 +505,7 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
             <div />
           )}
 
-          {step < 4 ? (
+          {step < 3 ? (
             <button
               type="button"
               disabled={step === 1 && !slugStatus.available}

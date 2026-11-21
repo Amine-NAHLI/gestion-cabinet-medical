@@ -116,7 +116,7 @@ export default function ChatClient({
   }, [selectedConfrere, fetchMessages]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages]);
 
   // Sélectionner un confrère et marquer ses messages comme lus
@@ -157,7 +157,6 @@ export default function ChatClient({
     if (!selectedConfrere || !inputText.trim() || isSending) return;
 
     const baseText = inputText.trim();
-    // Si on répond à une publication, ajouter le tag de contexte
     const textToSend = activePostRef
       ? `📌 [Réf. Publication : "${activePostRef}"]\n\n${baseText}`
       : baseText;
@@ -165,14 +164,13 @@ export default function ChatClient({
     setIsSending(true);
     setInputText("");
     const sentPostRef = activePostRef;
-    setActivePostRef(null); // Consommer le tag après le premier envoi
+    setActivePostRef(null);
 
     try {
       const res = await sendCommunityDirectMessage(selectedConfrere.id, textToSend);
       if (res.success && res.message) {
         setMessages((prev) => [...prev, res.message]);
 
-        // Mettre à jour le dernier message dans la liste de gauche
         setConfreres((prev) =>
           prev.map((c) =>
             c.id === selectedConfrere.id
@@ -188,7 +186,6 @@ export default function ChatClient({
           )
         );
       } else {
-        // En cas d'échec, restaurer le tag
         setActivePostRef(sentPostRef);
       }
     } catch {
@@ -204,7 +201,6 @@ export default function ChatClient({
     const isClosed = closedConfrereIds.includes(c.id);
     if (isClosed && !isCurrentlySelected) return false;
 
-    // Est active si elle a des messages échangés OU est actuellement sélectionnée
     const hasHistory = c.lastMessage !== null;
     return hasHistory || isCurrentlySelected || initialDoctorId === c.id;
   });
@@ -225,7 +221,7 @@ export default function ChatClient({
     new Set(confreres.map((c) => c.specialty || "Médecine Générale"))
   ).sort();
 
-  // Liste des confrères pour l'annuaire (confrères qui ont activé la messagerie)
+  // Liste des confrères pour l'annuaire
   const directoryDoctors = confreres.filter((c) => {
     const matchesSpec =
       selectedSpecialty === "all" ||
@@ -267,10 +263,10 @@ export default function ChatClient({
   return (
     <div className="space-y-4">
       {/* En-tête de la page */}
-      <div className="flex items-center justify-between pb-1 border-b border-slate-200/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200/80">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Messagerie Confraternelle
             </h1>
             {totalUnread > 0 ? (
@@ -284,7 +280,7 @@ export default function ChatClient({
             )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Discussions privées chiffrées entre médecins certifiés • Style WhatsApp Web
+            Discussions privées 1-à-1 chiffrées entre médecins certifiés • Style WhatsApp Web
           </p>
         </div>
 
@@ -292,7 +288,7 @@ export default function ChatClient({
         <button
           type="button"
           onClick={() => setSelectedConfrere(null)}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 shrink-0 self-start sm:self-auto ${
             !selectedConfrere
               ? "bg-slate-900 text-white shadow-xs"
               : "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-2xs"
@@ -303,16 +299,16 @@ export default function ChatClient({
         </button>
       </div>
 
-      {/* Interface Principale 2 Colonnes */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-12 h-[calc(100vh-14rem)] min-h-[580px]">
-        {/* COLONNE GAUCHE (DISCUSSIONS EN COURS) : 4/12 sur desktop */}
+      {/* Interface Principale 2 Colonnes (Flexbox robuste, 100% responsive WhatsApp Style) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row h-[calc(100vh-14rem)] min-h-[580px]">
+        {/* COLONNE GAUCHE (DISCUSSIONS EN COURS) : 320px sur desktop, cachée sur mobile si chat ouvert */}
         <aside
-          className={`md:col-span-4 lg:col-span-4 border-r border-slate-200 flex flex-col bg-slate-50/50 ${
+          className={`w-full md:w-[320px] lg:w-[360px] md:shrink-0 border-r border-slate-200 flex flex-col bg-slate-50/60 ${
             selectedConfrere ? "hidden md:flex" : "flex"
           }`}
         >
           {/* Barre de recherche + bouton nouveau */}
-          <div className="p-3 border-b border-slate-200 bg-white space-y-2">
+          <div className="p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
             <div className="relative">
               <span className="material-symbols-outlined text-slate-400 text-base absolute left-3 top-1/2 -translate-y-1/2">
                 search
@@ -328,19 +324,11 @@ export default function ChatClient({
 
             <div className="flex items-center justify-between text-[11px] text-slate-500 px-1 font-medium">
               <span>Discussions actives ({filteredActiveConversations.length})</span>
-              <button
-                type="button"
-                onClick={() => setSelectedConfrere(null)}
-                className="text-sky-600 hover:text-sky-800 font-semibold cursor-pointer inline-flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-xs">add</span>
-                <span>Nouveau</span>
-              </button>
             </div>
           </div>
 
           {/* Liste des discussions */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-0">
             {filteredActiveConversations.length === 0 ? (
               <div className="p-6 text-center space-y-3">
                 <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
@@ -349,7 +337,7 @@ export default function ChatClient({
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-slate-700">Aucune discussion ouverte</p>
                   <p className="text-[11px] text-slate-400 max-w-[200px] mx-auto">
-                    Sélectionnez un médecin dans l&apos;annuaire à droite pour débuter un échange.
+                    Sélectionnez un confrère dans l&apos;annuaire pour débuter un échange.
                   </p>
                 </div>
                 <button
@@ -364,11 +352,13 @@ export default function ChatClient({
               filteredActiveConversations.map((c) => {
                 const isSelected = selectedConfrere?.id === c.id;
                 const initials = c.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2);
+                  ? c.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)
+                  : "DR";
 
                 const lastTime = c.lastMessage
                   ? new Date(c.lastMessage.createdAt).toLocaleTimeString("fr-FR", {
@@ -408,7 +398,7 @@ export default function ChatClient({
                     </div>
 
                     {/* Infos Confrère & Aperçu Dernier Message */}
-                    <div className="min-w-0 flex-1 pr-5">
+                    <div className="min-w-0 flex-1 pr-6">
                       <div className="flex items-center justify-between gap-1">
                         <p
                           className={`text-xs truncate flex items-center gap-1 ${
@@ -446,14 +436,16 @@ export default function ChatClient({
                           {c.lastMessage ? (
                             <>
                               {c.lastMessage.isMe && <span className="text-slate-400">Vous : </span>}
-                              {c.lastMessage.content}
+                              {c.lastMessage.content.startsWith("📌 [Réf. Publication :")
+                                ? c.lastMessage.content.replace(/^📌 \[Réf\. Publication : "[^"]*"\]\n\n/, "💬 ")
+                                : c.lastMessage.content}
                             </>
                           ) : (
                             <span className="italic text-slate-400">Discussion ouverte</span>
                           )}
                         </p>
 
-                        {/* Badge rouge WhatsApp sur la ligne */}
+                        {/* Badge rouge sur la ligne */}
                         {c.unreadCount > 0 && (
                           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white shrink-0">
                             {c.unreadCount}
@@ -467,7 +459,7 @@ export default function ChatClient({
                       type="button"
                       title="Fermer cette discussion"
                       onClick={(e) => handleCloseConversation(e, c.id)}
-                      className="absolute right-2 top-3 w-5 h-5 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                      className="absolute right-2 top-3 w-6 h-6 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[14px]">close</span>
                     </button>
@@ -480,8 +472,8 @@ export default function ChatClient({
 
         {/* COLONNE DROITE : CONVERSATION ACTIVE OU ANNUAIRE DES CONFRÈRES */}
         <main
-          className={`md:col-span-8 lg:col-span-8 flex flex-col bg-white ${
-            !selectedConfrere ? "flex" : "flex"
+          className={`flex-1 min-w-0 flex flex-col bg-white ${
+            !selectedConfrere ? "hidden md:flex" : "flex"
           }`}
         >
           {selectedConfrere ? (
@@ -489,19 +481,20 @@ export default function ChatClient({
                VUE 1 : CONVERSATION EN COURS AVEC LE MÉDECIN SÉLECTIONNÉ
                ============================================================ */
             <>
-              {/* En-tête de la conversation */}
-              <header className="px-4 py-3 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between shrink-0">
+              {/* En-tête de la conversation (Toujours fixé en haut) */}
+              <header className="h-16 px-4 py-3 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  {/* Bouton retour sur mobile */}
+                  {/* Bouton retour sur mobile pour revenir à la liste */}
                   <button
                     type="button"
                     onClick={() => setSelectedConfrere(null)}
-                    className="md:hidden w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 cursor-pointer"
+                    className="md:hidden w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 cursor-pointer shrink-0"
+                    title="Retour aux discussions"
                   >
                     <span className="material-symbols-outlined text-base">arrow_back</span>
                   </button>
 
-                  <div className="w-9 h-9 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                     {selectedConfrere.avatarUrl ? (
                       <img
                         src={selectedConfrere.avatarUrl}
@@ -509,7 +502,7 @@ export default function ChatClient({
                         className="w-full h-full object-cover rounded-full"
                       />
                     ) : (
-                      selectedConfrere.name
+                      (selectedConfrere.name || "DR")
                         .split(" ")
                         .map((n) => n[0])
                         .join("")
@@ -531,25 +524,25 @@ export default function ChatClient({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     En direct
                   </span>
                   <button
                     type="button"
                     onClick={(e) => handleCloseConversation(e, selectedConfrere.id)}
                     title="Fermer cette discussion"
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-600 hover:bg-slate-100 flex items-center gap-1 cursor-pointer transition"
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-600 hover:text-rose-600 hover:bg-rose-50 flex items-center gap-1 cursor-pointer transition"
                   >
                     <span className="material-symbols-outlined text-xs">close</span>
-                    <span>Fermer</span>
+                    <span className="hidden sm:inline">Fermer</span>
                   </button>
                 </div>
               </header>
 
               {/* Fil des messages WhatsApp Style */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F8F9FB]">
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F8F9FB] min-h-0">
                 {messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
                     <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">
@@ -586,7 +579,7 @@ export default function ChatClient({
                         className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}
                       >
                         <div
-                          className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs break-words ${
+                          className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs break-words ${
                             msg.isMe
                               ? "bg-slate-900 text-white rounded-br-xs"
                               : "bg-white text-slate-900 border border-slate-200/80 rounded-bl-xs"
@@ -595,24 +588,26 @@ export default function ChatClient({
                           {/* En-tête de référence publication si présent */}
                           {quoteHeader && (
                             <div
-                              className={`mb-2 p-2 rounded-xl text-[11px] font-medium border ${
+                              className={`mb-2 p-2.5 rounded-xl text-[11px] font-medium border ${
                                 msg.isMe
-                                  ? "bg-slate-800/80 border-slate-700 text-sky-200"
+                                  ? "bg-slate-800/90 border-slate-700 text-sky-200"
                                   : "bg-sky-50 border-sky-100 text-sky-900"
                               }`}
                             >
-                              <div className="flex items-center gap-1 font-bold">
-                                <span className="material-symbols-outlined text-xs">forum</span>
-                                <span>Réponse à une publication</span>
+                              <div className="flex items-center gap-1.5 font-bold">
+                                <span className="material-symbols-outlined text-xs text-sky-400">forum</span>
+                                <span>En réponse à une publication</span>
                               </div>
-                              <p className="mt-0.5 italic">{quoteHeader.replace("📌 [Réf. Publication :", "").replace(/\]$/, "").trim()}</p>
+                              <p className="mt-1 italic font-semibold">
+                                {quoteHeader.replace("📌 [Réf. Publication :", "").replace(/\]$/, "").trim()}
+                              </p>
                             </div>
                           )}
 
                           <p className="whitespace-pre-line">{cleanBody}</p>
 
                           <div
-                            className={`flex items-center justify-end gap-1 text-[10px] mt-1 ${
+                            className={`flex items-center justify-end gap-1 text-[10px] mt-1.5 ${
                               msg.isMe ? "text-slate-400" : "text-slate-400"
                             }`}
                           >
@@ -680,12 +675,12 @@ export default function ChatClient({
             /* ============================================================
                VUE 2 : ANNUAIRE DES MÉDECINS CERTIFIÉS (QUAND TOUT EST FERMÉ OU MODE EXPLORATION)
                ============================================================ */
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#FAFAFC]">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 bg-[#FAFAFC] min-h-0">
               {/* En-tête Annuaire */}
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-sky-600 text-2xl">contacts</span>
-                  <h2 className="text-lg font-bold text-slate-900">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
                     Annuaire des Médecins du Réseau
                   </h2>
                 </div>
@@ -758,11 +753,13 @@ export default function ChatClient({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   {directoryDoctors.map((doc) => {
                     const initials = doc.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2);
+                      ? doc.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)
+                      : "DR";
 
                     return (
                       <div

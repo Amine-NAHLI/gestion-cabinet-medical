@@ -36,6 +36,8 @@ async function buildDefaultSettingsForClinic(clinicId: number) {
     email: d?.email || "",
     address: c?.address || "",
     city: c?.city || "",
+    avatarUrl: d?.avatarUrl || null,
+    bio: d?.bio || "",
     orderNumber: "",
     taxId: "",
     defaultFee: "250.00",
@@ -64,10 +66,18 @@ export async function getClinicSettings(targetClinicId?: number) {
       .where(eq(clinicSettings.clinicId, clinicId))
       .limit(1);
 
+    const [doctorUser] = await db
+      .select({ avatarUrl: users.avatarUrl, bio: users.bio })
+      .from(users)
+      .where(and(eq(users.clinicId, clinicId), eq(users.role, "doctor")))
+      .limit(1);
+
     if (list.length > 0) {
       const row = list[0];
       return {
         ...row,
+        avatarUrl: doctorUser?.avatarUrl || null,
+        bio: doctorUser?.bio || "",
         consultationFields: normalizeConsultationFields(row.consultationFields),
         prescriptionTemplateUrl: row.prescriptionTemplateUrl || null,
         prescriptionTemplateName: row.prescriptionTemplateName || null,
@@ -174,6 +184,23 @@ export async function updateClinicSettings(formData: FormData) {
         phone: phone || null,
       })
       .where(eq(clinics.id, clinicId));
+
+    // Mettre à jour le profil praticien dans la table users (nom, téléphone, avatar, bio)
+    const userId = parseInt((session.user as any)?.id || "0");
+    const avatarUrl = formData.get("avatarUrl") as string | null;
+    const bio = formData.get("bio") as string | null;
+
+    if (userId) {
+      await db
+        .update(users)
+        .set({
+          name: doctorName || undefined,
+          phone: phone || undefined,
+          avatarUrl: avatarUrl !== null ? (avatarUrl.trim() || null) : undefined,
+          bio: bio !== null ? (bio.trim() || null) : undefined,
+        })
+        .where(eq(users.id, userId));
+    }
 
     revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/settings");

@@ -35,6 +35,8 @@ export default async function SettingsPage() {
           email: settings.email,
           address: settings.address,
           city: settings.city,
+          avatarUrl: (settings as any).avatarUrl || null,
+          bio: (settings as any).bio || "",
           orderNumber: settings.orderNumber,
           taxId: settings.taxId,
           defaultFee: settings.defaultFee as string | null,
