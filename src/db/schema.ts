@@ -29,6 +29,7 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"), // Photo de profil praticien ou assistante
   bio: text("bio"), // Courte présentation confraternelle
   isOnboarded: boolean("is_onboarded").default(false).notNull(), // A complété le parcours d'accueil
+  notificationPreferences: json("notification_preferences"), // Préférences alertes & notifications
   status: text("status").notNull().default("active"), // 'active', 'suspended'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

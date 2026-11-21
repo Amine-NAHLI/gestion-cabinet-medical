@@ -1,13 +1,12 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
-import { visits, patients } from "@/db/schema";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { visits, patients, prescriptions, appointments } from "@/db/schema";
+import { eq, and, asc, inArray, gte } from "drizzle-orm";
 import { getClinicSettings } from "@/actions/settings";
 import { getTenantClinicId } from "@/lib/tenant";
 import PaymentButton from "@/components/PaymentButton";
 import { redirect } from "next/navigation";
-import { MotionDiv } from "@/components/MotionWrapper";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,7 @@ export default async function PaymentsPage() {
   const user = session?.user as { role?: string } | undefined;
   const role = user?.role;
 
-  if (role !== 'assistant') {
+  if (role !== "assistant") {
     redirect("/dashboard/queue");
   }
 
@@ -24,16 +23,82 @@ export default async function PaymentsPage() {
   const settings = await getClinicSettings();
 
   // Tous les paiements en attente strictement pour ce cabinet
-  const toPayList = await db.select({
+  const toPayList = await db
+    .select({
       id: visits.id,
+      patientId: visits.patientId,
       amountToPay: visits.amountToPay,
       patient: patients,
-      createdAt: visits.createdAt
+      createdAt: visits.createdAt,
     })
     .from(visits)
     .innerJoin(patients, eq(visits.patientId, patients.id))
-    .where(and(eq(visits.clinicId, clinicId), eq(visits.status, 'finished'), eq(visits.paymentStatus, 'pending')))
+    .where(
+      and(
+        eq(visits.clinicId, clinicId),
+        eq(visits.status, "finished"),
+        eq(visits.paymentStatus, "pending")
+      )
+    )
     .orderBy(asc(visits.createdAt));
+
+  // Récupérer en parallèle les ordonnances et les prochains RDV des patients
+  const visitIds = toPayList.map((v) => v.id);
+  const patientIds = toPayList.map((v) => v.patient.id);
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const [prescriptionsRows, upcomingAppointmentsRows] = await Promise.all([
+    visitIds.length > 0
+      ? db
+          .select({
+            visitId: prescriptions.visitId,
+            medicines: prescriptions.medicines,
+          })
+          .from(prescriptions)
+          .where(inArray(prescriptions.visitId, visitIds))
+      : Promise.resolve([]),
+    patientIds.length > 0
+      ? db
+          .select({
+            id: appointments.id,
+            patientId: appointments.patientId,
+            date: appointments.date,
+            time: appointments.time,
+            reason: appointments.reason,
+          })
+          .from(appointments)
+          .where(
+            and(
+              eq(appointments.clinicId, clinicId),
+              inArray(appointments.patientId, patientIds),
+              gte(appointments.date, startOfToday)
+            )
+          )
+          .orderBy(asc(appointments.date))
+      : Promise.resolve([]),
+  ]);
+
+  // Indexation rapide des ordonnances par visite
+  const prescriptionMap = new Map<number, { name: string; instructions: string }[]>();
+  for (const pr of prescriptionsRows) {
+    if (Array.isArray(pr.medicines)) {
+      prescriptionMap.set(pr.visitId, pr.medicines as { name: string; instructions: string }[]);
+    }
+  }
+
+  // Indexation rapide des prochains RDV par patient
+  const upcomingAppointmentMap = new Map<number, { date: string; time: string; reason: string }>();
+  for (const appt of upcomingAppointmentsRows) {
+    if (!upcomingAppointmentMap.has(appt.patientId)) {
+      upcomingAppointmentMap.set(appt.patientId, {
+        date: appt.date.toISOString(),
+        time: appt.time || "10:00",
+        reason: appt.reason || "Consultation de suivi",
+      });
+    }
+  }
 
   // Total à encaisser
   const totalPendingAmount = toPayList.reduce(
@@ -132,9 +197,12 @@ export default async function PaymentsPage() {
                     <div className="flex items-center justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                       <PaymentButton 
                         visitId={visit.id} 
+                        patientId={visit.patient.id}
                         initialAmount={visit.amountToPay as string | null} 
                         patient={visit.patient}
                         settings={settings}
+                        prescriptionMedicines={prescriptionMap.get(visit.id) || []}
+                        upcomingAppointment={upcomingAppointmentMap.get(visit.patient.id) || null}
                       />
                     </div>
                   </div>

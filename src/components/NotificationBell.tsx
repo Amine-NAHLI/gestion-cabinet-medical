@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   getActiveNotifications,
   markNotificationsAsRead,
+} from "@/actions/notifications";
+import {
   AppNotification,
   NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
-} from "@/actions/notifications";
+} from "@/lib/notificationsConfig";
 
 interface NotificationBellProps {
   role: string;

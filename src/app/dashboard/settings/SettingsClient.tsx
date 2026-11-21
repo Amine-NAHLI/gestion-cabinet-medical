@@ -7,11 +7,11 @@ import {
   updateConsultationFields,
   updatePrescriptionTemplate,
 } from "@/actions/settings";
+import { updateNotificationPreferences } from "@/actions/notifications";
 import {
-  updateNotificationPreferences,
   NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
-} from "@/actions/notifications";
+} from "@/lib/notificationsConfig";
 import {
   ConsultationFieldConfig,
   ConsultationFieldType,
