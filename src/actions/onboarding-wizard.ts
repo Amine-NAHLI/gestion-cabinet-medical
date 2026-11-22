@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { getTenantClinicId } from "@/lib/tenant";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 
 const RESERVED_SLUGS = new Set([
   "admin",
@@ -140,6 +141,7 @@ export async function completeDoctorOnboarding(data: {
   primaryColor?: string | null;
   isCommunityMember: boolean;
   bio?: string | null;
+  newPassword?: string | null;
 }) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -186,20 +188,30 @@ export async function completeDoctorOnboarding(data: {
     .where(eq(clinics.id, clinicId));
 
   // 2. Mettre à jour l'utilisateur médecin
+  const userUpdate: any = {
+    avatarUrl: data.avatarUrl || null,
+    bio: data.bio || null,
+    isOnboarded: true,
+  };
+
+  // Si le médecin a choisi de changer son mot de passe initial
+  if (data.newPassword && data.newPassword.trim().length >= 6) {
+    userUpdate.password = await bcrypt.hash(data.newPassword.trim(), 10);
+  }
+
   await db
     .update(users)
-    .set({
-      avatarUrl: data.avatarUrl || null,
-      bio: data.bio || null,
-      isOnboarded: true,
-    })
+    .set(userUpdate)
     .where(eq(users.id, userId));
 
   revalidatePath("/dashboard", "layout");
   return { success: true };
 }
 
-export async function completeAssistantOnboarding(data: { avatarUrl?: string | null }) {
+export async function completeAssistantOnboarding(data: {
+  avatarUrl?: string | null;
+  newPassword?: string | null;
+}) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return { success: false, error: "Non autorisé" };
@@ -208,12 +220,18 @@ export async function completeAssistantOnboarding(data: { avatarUrl?: string | n
   const userSession = session.user as { id?: string };
   const userId = parseInt(userSession.id || "0");
 
+  const assistantUpdate: any = {
+    avatarUrl: data.avatarUrl || null,
+    isOnboarded: true,
+  };
+
+  if (data.newPassword && data.newPassword.trim().length >= 6) {
+    assistantUpdate.password = await bcrypt.hash(data.newPassword.trim(), 10);
+  }
+
   await db
     .update(users)
-    .set({
-      avatarUrl: data.avatarUrl || null,
-      isOnboarded: true,
-    })
+    .set(assistantUpdate)
     .where(eq(users.id, userId));
 
   revalidatePath("/dashboard", "layout");

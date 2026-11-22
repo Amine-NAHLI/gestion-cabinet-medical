@@ -37,7 +37,6 @@ async function runE2ETest() {
   const regResult = await registerClinic({
     doctorName: "Dr. Samir Benjelloun",
     doctorEmail: testDoctorEmail,
-    doctorPassword: "password123",
     doctorPhone: "0661123456",
     specialty: "Cardiologie",
     clinicName: "Clinique Cardio Benjelloun",
@@ -45,7 +44,6 @@ async function runE2ETest() {
     clinicAddress: "45 Avenue Hassan II",
     assistantName: "Khadija Alami",
     assistantEmail: "khadija@benjelloun.ma",
-    assistantPassword: "password123",
   });
 
   if (!regResult.success || !regResult.requestId) {

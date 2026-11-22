@@ -8,12 +8,16 @@ interface MoroccanCitySelectProps {
   value: string;
   onChange: (city: string) => void;
   required?: boolean;
+  className?: string;
+  label?: string;
 }
 
 export default function MoroccanCitySelect({
   value,
   onChange,
   required = true,
+  className,
+  label,
 }: MoroccanCitySelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -43,9 +47,9 @@ export default function MoroccanCitySelect({
   };
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className={`relative ${className || ""}`} ref={containerRef}>
       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-        Ville du Cabinet {required && <span className="text-red-500">*</span>}
+        {label || "Ville du Cabinet"} {required && <span className="text-red-500">*</span>}
       </label>
 
       {/* Bouton de sélection / Champ d'affichage */}

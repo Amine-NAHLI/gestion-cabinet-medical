@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { markTourAsSeen } from "@/actions/onboarding-wizard";
 
@@ -155,15 +154,13 @@ export default function DashboardTour({
   onEnsureSidebarOpen,
 }: DashboardTourProps) {
   const steps = useMemo(() => (role === "doctor" ? DOCTOR_STEPS : ASSISTANT_STEPS), [role]);
-  const searchParams = useSearchParams();
-  const isFirstTime = searchParams?.get("first_time") === "1";
-  const storageKey = `moncabinet_tour_completed_${role}_${userEmail || "user"}_v3`;
+  const storageKey = `moncabinet_tour_completed_${role}_${userEmail || "user"}_v4`;
 
   const [isOpen, setIsOpen] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
-  // Vérifier au montage : S'affiche STRICTEMENT et UNIQUEMENT la première fois après la création de compte
+  // Vérifier au montage : S'affiche STRICTEMENT et UNIQUEMENT la première fois
   useEffect(() => {
     // Si déjà vu en BDD, ne JAMAIS lancer automatiquement
     if (hasSeenTour) return;
@@ -175,31 +172,23 @@ export default function DashboardTour({
       // ignore
     }
 
-    // Se lance UNIQUEMENT si l'utilisateur vient de finaliser la création/onboarding de son compte (?first_time=1)
-    if (isFirstTime) {
-      // Verrouiller immédiatement en localStorage et en BDD pour ne plus JAMAIS se répéter
-      try {
-        localStorage.setItem(storageKey, "true");
-      } catch {
-        // ignore
-      }
-      markTourAsSeen();
-
-      // Nettoyer l'URL de manière transparente sans recharger
-      if (typeof window !== "undefined") {
-        window.history.replaceState({}, "", window.location.pathname);
-      }
-
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-        if (onEnsureSidebarOpen && !sidebarOpen) {
-          onEnsureSidebarOpen();
-        }
-      }, 700);
-
-      return () => clearTimeout(timer);
+    // Première fois de ce compte : verrouiller immédiatement en BDD et en localStorage pour ne plus JAMAIS se répéter
+    try {
+      localStorage.setItem(storageKey, "true");
+    } catch {
+      // ignore
     }
-  }, [hasSeenTour, isFirstTime, storageKey, onEnsureSidebarOpen, sidebarOpen]);
+    markTourAsSeen();
+
+    const timer = setTimeout(() => {
+      setIsOpen(true);
+      if (onEnsureSidebarOpen && !sidebarOpen) {
+        onEnsureSidebarOpen();
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [hasSeenTour, storageKey, onEnsureSidebarOpen, sidebarOpen]);
 
   // Écouter un événement global pour pouvoir relancer le guide à la demande ("Visite guidée")
   useEffect(() => {

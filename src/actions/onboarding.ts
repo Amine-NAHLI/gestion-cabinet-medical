@@ -5,46 +5,56 @@ import { clinics, users, onboardingRequests, clinicSettings } from "@/db/schema"
 import { eq, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { sendAdminOtpNotification } from "@/lib/email";
+import { sendAdminOtpNotification, sendNewRegistrationRequestNotification } from "@/lib/email";
+import { slugifyClinic } from "@/lib/slug";
 
 export async function registerClinic(data: {
   doctorName: string;
   doctorEmail: string;
-  doctorPassword: string;
   doctorPhone: string;
   specialty: string;
   clinicName: string;
   clinicCity: string;
   clinicAddress?: string;
-  assistantName: string;
-  assistantEmail: string;
-  assistantPassword: string;
+  assistantName?: string;
+  assistantEmail?: string;
 }) {
   try {
     const cleanDoctorEmail = data.doctorEmail.trim().toLowerCase();
     const cleanAssistantEmail = data.assistantEmail?.trim().toLowerCase() || "";
     const cleanAssistantName = data.assistantName?.trim() || "";
-    const cleanAssistantPassword = data.assistantPassword?.trim() || "";
 
-    // 0. Validation obligatoire du compte Assistante avec le Médecin
-    if (!cleanAssistantName || !cleanAssistantEmail || !cleanAssistantPassword) {
-      return {
-        error: "La création du compte Assistante (nom, email et mot de passe) est obligatoire avec le compte Médecin.",
-      };
+    if (!data.doctorName.trim() || !cleanDoctorEmail) {
+      return { error: "Veuillez renseigner le nom et l'email du médecin." };
     }
 
-    if (data.doctorPassword.trim().length < 6) {
-      return { error: "Le mot de passe du médecin doit contenir au moins 6 caractères." };
+    if (!data.clinicName.trim() || !data.clinicCity.trim()) {
+      return { error: "Veuillez renseigner le nom du cabinet et sa ville." };
     }
 
-    if (cleanAssistantPassword.length < 6) {
-      return { error: "Le mot de passe de l'assistante doit contenir au moins 6 caractères." };
-    }
+    // Si une assistante est renseignée, vérifier la cohérence
+    if (cleanAssistantEmail || cleanAssistantName) {
+      if (!cleanAssistantName || !cleanAssistantEmail) {
+        return {
+          error: "Si vous ajoutez une assistante, veuillez renseigner son nom et son email.",
+        };
+      }
+      if (cleanAssistantEmail === cleanDoctorEmail) {
+        return {
+          error: "L'adresse email de l'assistante doit être différente de celle du médecin.",
+        };
+      }
 
-    if (cleanAssistantEmail === cleanDoctorEmail) {
-      return {
-        error: "L'adresse email de l'assistante doit être différente de celle du médecin.",
-      };
+      // Vérifier si l'email de l'assistante existe déjà
+      const existingAssistant = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, cleanAssistantEmail))
+        .limit(1);
+
+      if (existingAssistant.length > 0) {
+        return { error: "Cet email d'assistante est déjà attribué à un autre compte." };
+      }
     }
 
     // 1. Vérifier si l'email du médecin existe déjà dans les utilisateurs actifs
@@ -58,25 +68,16 @@ export async function registerClinic(data: {
       return { error: "Un compte praticien existe déjà avec cet email." };
     }
 
-    // Vérifier l'email de l'assistante
-    const existingAssistant = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, cleanAssistantEmail))
-      .limit(1);
-
-    if (existingAssistant.length > 0) {
-      return { error: "Cet email d'assistante est déjà attribué à un autre compte." };
-    }
-
-    // 2. Générer le code OTP sécurisé à 6 chiffres
+    // 2. Code interne & validité 30 jours
     const otpCode = crypto.randomInt(100000, 999999).toString();
-    // Validité : 5 minutes
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    // 3. Hasher les mots de passe
-    const doctorPasswordHash = await bcrypt.hash(data.doctorPassword.trim(), 10);
-    const assistantPasswordHash = await bcrypt.hash(cleanAssistantPassword, 10);
+    // 3. Mot de passe initial temporaire (sera défini ou communiqué par le Super Admin)
+    const tempDocPassword = crypto.randomBytes(8).toString("hex");
+    const doctorPasswordHash = await bcrypt.hash(tempDocPassword, 10);
+    const assistantPasswordHash = cleanAssistantEmail
+      ? await bcrypt.hash(crypto.randomBytes(8).toString("hex"), 10)
+      : null;
 
     // 4. Insérer dans la table des demandes
     const [insertedRequest] = await db
@@ -90,8 +91,8 @@ export async function registerClinic(data: {
         doctorPassword: doctorPasswordHash,
         doctorPhone: data.doctorPhone.trim(),
         specialty: data.specialty.trim(),
-        assistantName: cleanAssistantName,
-        assistantEmail: cleanAssistantEmail,
+        assistantName: cleanAssistantName || null,
+        assistantEmail: cleanAssistantEmail || null,
         assistantPassword: assistantPasswordHash,
         otpCode,
         expiresAt,
@@ -100,31 +101,34 @@ export async function registerClinic(data: {
       })
       .returning({ id: onboardingRequests.id });
 
-    // 5. Envoyer la notification par email au Super Admin (asynchrone sans bloquer)
-    sendAdminOtpNotification({
+    // 5. Envoyer la notification par email au Super Admin avec tous les détails
+    sendNewRegistrationRequestNotification({
       doctorName: data.doctorName.trim(),
       doctorEmail: cleanDoctorEmail,
       doctorPhone: data.doctorPhone.trim(),
       specialty: data.specialty.trim(),
       clinicName: data.clinicName.trim(),
       clinicCity: data.clinicCity.trim(),
-      assistantName: cleanAssistantName,
-      assistantEmail: cleanAssistantEmail,
-      otpCode,
+      clinicAddress: data.clinicAddress?.trim() || null,
+      assistantName: cleanAssistantName || null,
+      assistantEmail: cleanAssistantEmail || null,
       requestId: insertedRequest.id,
     }).catch((err) => {
-      console.error("[ONBOARDING ERROR] Notification email non bloquante :", err);
+      console.error("[ONBOARDING ERROR] Notification email admin non bloquante :", err);
     });
 
-    console.log(`[ONBOARDING] Nouvelle demande créée #${insertedRequest.id} • Dr. ${data.doctorName} • OTP: ${otpCode}`);
+    console.log(`[ONBOARDING] Nouvelle demande d'inscription créée #${insertedRequest.id} • Dr. ${data.doctorName} (${data.clinicName})`);
 
     return {
       success: true,
       requestId: insertedRequest.id,
+      message: "Votre demande d'inscription a été envoyée avec succès.",
     };
   } catch (error: any) {
     console.error("[REGISTER CLINIC ERROR]", error);
-    return { error: error.message || "Une erreur est survenue lors de l'enregistrement." };
+    return {
+      error: error.message || "Une erreur est survenue lors de l'enregistrement de votre demande.",
+    };
   }
 }
 
@@ -267,20 +271,43 @@ export async function getOnboardingRequestStatus(requestId: number) {
 }
 
 // Fonction interne partagée pour activer le cabinet et les utilisateurs
-export async function activateClinicFromRequest(request: typeof onboardingRequests.$inferSelect) {
-  // 1. Créer le cabinet
+export async function activateClinicFromRequest(
+  request: typeof onboardingRequests.$inferSelect,
+  customSlug?: string
+) {
+  // Générer un slug (sous-domaine) unique
+  let baseSlug = customSlug?.trim() ? slugifyClinic(customSlug) : slugifyClinic(request.clinicName);
+  if (!baseSlug || baseSlug.length < 2) {
+    baseSlug = slugifyClinic(request.doctorName) || `cabinet-${request.id}`;
+  }
+  let candidateSlug = baseSlug;
+  let counter = 1;
+  while (true) {
+    const [existing] = await db
+      .select({ id: clinics.id })
+      .from(clinics)
+      .where(eq(clinics.slug, candidateSlug))
+      .limit(1);
+    if (!existing) break;
+    counter++;
+    candidateSlug = `${baseSlug}-${counter}`;
+  }
+
+  // 1. Créer le cabinet avec sous-domaine
   const [newClinic] = await db
     .insert(clinics)
     .values({
       name: request.clinicName,
+      slug: candidateSlug,
       city: request.clinicCity,
       address: request.clinicAddress,
       phone: request.doctorPhone,
       status: "active",
+      isCommunityMember: false,
     })
     .returning({ id: clinics.id });
 
-  // 2. Créer l'utilisateur Médecin
+  // 2. Créer l'utilisateur Médecin (isOnboarded: false pour déclencher sa configuration initiale lors de son premier accès)
   await db.insert(users).values({
     clinicId: newClinic.id,
     name: request.doctorName,
@@ -289,6 +316,7 @@ export async function activateClinicFromRequest(request: typeof onboardingReques
     role: "doctor",
     phone: request.doctorPhone,
     status: "active",
+    isOnboarded: false,
   });
 
   // 3. Créer l'utilisateur Assistante si renseignée
@@ -300,10 +328,11 @@ export async function activateClinicFromRequest(request: typeof onboardingReques
       password: request.assistantPassword,
       role: "assistant",
       status: "active",
+      isOnboarded: false,
     });
   }
 
-  // 4. Paramètres par défaut de la clinique (uniquement les vraies informations saisies)
+  // 4. Paramètres par défaut de la clinique
   await db.insert(clinicSettings).values({
     clinicId: newClinic.id,
     clinicName: request.clinicName,
@@ -321,12 +350,13 @@ export async function activateClinicFromRequest(request: typeof onboardingReques
   // 5. Mettre à jour le statut de la demande
   await db
     .update(onboardingRequests)
-    .set({ status: "verified" })
+    .set({ status: "approved" })
     .where(eq(onboardingRequests.id, request.id));
 
   return {
     success: true,
     clinicId: newClinic.id,
-    message: "Félicitations ! Votre cabinet médical est activé avec succès.",
+    slug: candidateSlug,
+    message: `Félicitations ! Le cabinet médical ${request.clinicName} a été activé avec le sous-domaine https://${candidateSlug}.toncabinet.me`,
   };
 }

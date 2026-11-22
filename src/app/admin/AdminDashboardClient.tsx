@@ -16,6 +16,8 @@ import AdminNeonHealth from "@/components/admin/AdminNeonHealth";
 import AdminUsersManagement from "@/components/admin/AdminUsersManagement";
 import AdminDatabaseExplorer from "@/components/admin/AdminDatabaseExplorer";
 import AdminClinicEditModal from "@/components/admin/AdminClinicEditModal";
+import AdminCreateClinicModal from "@/components/admin/AdminCreateClinicModal";
+import { slugifyClinic } from "@/lib/slug";
 
 interface AdminDashboardClientProps {
   initialData: Awaited<ReturnType<typeof getAdminDashboardData>>;
@@ -42,6 +44,10 @@ export default function AdminDashboardClient({
 
   // Modale édition cabinet
   const [editingClinic, setEditingClinic] = useState<any | null>(null);
+
+  // Modale création d'un nouveau cabinet
+  const [createClinicModalOpen, setCreateClinicModalOpen] = useState(false);
+  const [createClinicPrefill, setCreateClinicPrefill] = useState<any | null>(null);
 
   // Modale modification de mot de passe
   const [passwordModalUser, setPasswordModalUser] = useState<{
@@ -797,17 +803,31 @@ export default function AdminDashboardClient({
                 </p>
               </div>
 
-              <div className="relative w-full sm:w-80">
-                <span className="material-symbols-outlined text-[18px] text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">
-                  search
-                </span>
-                <input
-                  type="text"
-                  value={doctorSearch}
-                  onChange={(e) => setDoctorSearch(e.target.value)}
-                  placeholder="Rechercher médecin, assistante, ville..."
-                  className="w-full pl-9 pr-3.5 py-2 rounded-lg bg-white border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-                />
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateClinicPrefill(null);
+                    setCreateClinicModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition shadow-xs cursor-pointer shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[17px]">add_circle</span>
+                  <span>Nouveau Cabinet</span>
+                </button>
+
+                <div className="relative w-full sm:w-72">
+                  <span className="material-symbols-outlined text-[18px] text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    value={doctorSearch}
+                    onChange={(e) => setDoctorSearch(e.target.value)}
+                    placeholder="Rechercher médecin, assistante..."
+                    className="w-full pl-9 pr-3.5 py-2 rounded-lg bg-white border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1057,11 +1077,16 @@ export default function AdminDashboardClient({
                       >
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium mb-2">
-                              <span className="material-symbols-outlined text-[13px]">schedule</span>
-                              {isExpired ? "Code expiré" : `Expire dans ${remaining}`}
-                            </span>
-                            <h3 className="font-semibold text-slate-900 text-base leading-tight">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Nouvelle inscription • 24h
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                Reçue le {formatDate(req.createdAt)}
+                              </span>
+                            </div>
+                            <h3 className="font-bold text-slate-900 text-base leading-tight">
                               {req.clinicName}
                             </h3>
                             <p className="text-xs text-slate-500 mt-0.5">
@@ -1069,18 +1094,13 @@ export default function AdminDashboardClient({
                             </p>
                           </div>
 
-                          {/* CODE OTP À 6 CHIFFRES */}
-                          <div className="text-center bg-slate-900 text-white px-4 py-2 rounded-lg shrink-0 self-start w-full sm:w-auto">
-                            <p className="text-[10px] uppercase tracking-wider text-slate-300 font-medium">
-                              Code OTP
-                            </p>
-                            <p className="text-xl font-bold tracking-[0.2em] font-mono tabular-nums mt-0.5">
-                              {req.otpCode}
-                            </p>
+                          <div className="px-3 py-1.5 rounded-lg bg-sky-50 border border-sky-100 text-sky-800 text-xs font-semibold flex items-center gap-1.5 self-start">
+                            <span className="material-symbols-outlined text-[16px] text-sky-600">lock_clock</span>
+                            <span>En attente de mot de passe</span>
                           </div>
                         </div>
 
-                        {/* Détails Médecin + Assistante obligatoire */}
+                        {/* Détails Médecin + Assistante */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                           <div className="rounded-lg bg-slate-50/80 border border-slate-200/80 p-3">
                             <p className="text-[11px] font-medium text-sky-700 mb-1">
@@ -1104,27 +1124,38 @@ export default function AdminDashboardClient({
                           </div>
                         </div>
 
-                        {/* Actions Approuver / Rejeter */}
+                        {/* Actions : Créer le compte avec pré-remplissage / Rejeter */}
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
                           <button
-                            onClick={() => handleApprove(req.id)}
-                            disabled={actionLoading === `approve-${req.id}`}
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition cursor-pointer disabled:opacity-60"
+                            type="button"
+                            onClick={() => {
+                              setCreateClinicPrefill({
+                                requestId: req.id,
+                                clinicName: req.clinicName,
+                                slug: slugifyClinic(req.clinicName),
+                                clinicCity: req.clinicCity,
+                                clinicAddress: req.clinicAddress,
+                                doctorName: req.doctorName,
+                                doctorEmail: req.doctorEmail,
+                                doctorPhone: req.doctorPhone,
+                                specialty: req.specialty,
+                                assistantName: req.assistantName,
+                                assistantEmail: req.assistantEmail,
+                              });
+                              setCreateClinicModalOpen(true);
+                            }}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                            <span>
-                              {actionLoading === `approve-${req.id}`
-                                ? "Activation..."
-                                : "Approuver en 1 clic"}
-                            </span>
+                            <span className="material-symbols-outlined text-[16px]">how_to_reg</span>
+                            <span>Créer le compte (Formulaire pré-rempli)</span>
                           </button>
 
                           <button
                             onClick={() => handleReject(req.id)}
                             disabled={actionLoading === `reject-${req.id}`}
-                            className="inline-flex items-center justify-center gap-1.5 py-2 px-4 rounded-lg bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-medium transition cursor-pointer disabled:opacity-60"
+                            className="inline-flex items-center justify-center gap-1 py-2 px-3.5 rounded-lg bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-medium transition cursor-pointer disabled:opacity-60"
                           >
-                            <span className="material-symbols-outlined text-[16px]">close</span>
+                            <span className="material-symbols-outlined text-[15px]">close</span>
                             <span>Rejeter</span>
                           </button>
                         </div>
@@ -1437,6 +1468,18 @@ export default function AdminDashboardClient({
           showFeedback={showFeedback}
         />
       )}
+
+      {/* MODALE CRÉATION D'UN NOUVEAU CABINET */}
+      <AdminCreateClinicModal
+        isOpen={createClinicModalOpen}
+        onClose={() => {
+          setCreateClinicModalOpen(false);
+          setCreateClinicPrefill(null);
+        }}
+        onSuccess={() => refreshData(true)}
+        showFeedback={showFeedback}
+        initialData={createClinicPrefill}
+      />
     </div>
   );
 }

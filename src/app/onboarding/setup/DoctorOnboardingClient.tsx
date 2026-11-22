@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { checkSlugAvailability, completeDoctorOnboarding } from "@/actions/onboarding-wizard";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface InitialData {
   clinic: {
     id: number;
     name: string;
+    slug: string | null;
     city: string;
-    slug: string;
     logoUrl: string | null;
-    primaryColor: string;
+    primaryColor: string | null;
     isCommunityMember: boolean;
   };
   doctor: {
@@ -25,11 +26,17 @@ interface InitialData {
 }
 
 export default function DoctorOnboardingClient({ initialData }: { initialData: InitialData }) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [isSaving, startSaving] = useTransition();
   const [generalError, setGeneralError] = useState<string | null>(null);
 
-  // Étape 1 : Identifiant web et Logo du Cabinet
+  // Étape 1 : Choix Mot de passe
+  const [passwordChoice, setPasswordChoice] = useState<"keep" | "change">("keep");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // Étape 2 : Identifiant web et Logo du Cabinet
   const [slug, setSlug] = useState<string>(() => {
     if (initialData.clinic.slug) return initialData.clinic.slug;
     const cleanDoc = initialData.doctor.name
@@ -51,11 +58,11 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
 
   const [logoUrl, setLogoUrl] = useState<string | null>(initialData.clinic.logoUrl);
 
-  // Étape 2 : Profil Médecin & Présentation
+  // Étape 3 : Profil Médecin & Présentation
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialData.doctor.avatarUrl);
   const [bio, setBio] = useState<string>(initialData.doctor.bio || "");
 
-  // Étape 3 : Réseau Médical Confraternel
+  // Étape 4 : Réseau Médical Confraternel
   const [isCommunityMember, setIsCommunityMember] = useState<boolean>(true);
 
   // Vérification de la disponibilité du slug avec debounce
@@ -134,11 +141,26 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
     reader.readAsDataURL(file);
   };
 
+  const handleNextFromStep1 = () => {
+    setGeneralError(null);
+    if (passwordChoice === "change") {
+      if (!newPassword.trim() || newPassword.trim().length < 6) {
+        setGeneralError("Le mot de passe doit comporter au moins 6 caractères.");
+        return;
+      }
+      if (newPassword.trim() !== confirmPassword.trim()) {
+        setGeneralError("Les deux mots de passe ne correspondent pas.");
+        return;
+      }
+    }
+    setStep(2);
+  };
+
   const handleFinish = () => {
     setGeneralError(null);
     if (!slugStatus.available && slugStatus.error) {
       setGeneralError(slugStatus.error);
-      setStep(1);
+      setStep(2);
       return;
     }
 
@@ -150,6 +172,7 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
         primaryColor: "#0f172a",
         isCommunityMember,
         bio,
+        newPassword: passwordChoice === "change" ? newPassword.trim() : null,
       });
 
       if (res.success) {
@@ -166,18 +189,18 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
       <header className="max-w-3xl w-full mx-auto flex items-center justify-between pb-4 border-b border-slate-200">
         <div>
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Configuration initiale
+            Bienvenue • Configuration initiale
           </span>
           <h1 className="text-xl font-bold text-slate-900">
-            Personnalisation de votre Cabinet
+            Activation de votre Cabinet Médical
           </h1>
         </div>
         <div className="text-right">
-          <span className="text-xs font-medium text-slate-400">Étape {step} sur 3</span>
+          <span className="text-xs font-medium text-slate-400">Étape {step} sur 4</span>
           <div className="w-28 h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
             <div
               className="h-full bg-slate-900 transition-all duration-300"
-              style={{ width: `${(step / 3) * 100}%` }}
+              style={{ width: `${(step / 4) * 100}%` }}
             />
           </div>
         </div>
@@ -193,16 +216,157 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
         )}
 
         {/* ============================================================
-            ÉTAPE 1 : IDENTITÉ & SOUS-DOMAINE DU CABINET
+            ÉTAPE 1 : MOT DE PASSE (CONSERVER OU MODIFIER)
            ============================================================ */}
         {step === 1 && (
           <div className="space-y-6">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center shrink-0 shadow-2xs">
+                <span className="material-symbols-outlined text-2xl">lock</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Sécurité de votre compte praticien
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Bienvenue Dr. <strong>{initialData.doctor.name}</strong> ! Votre compte a été initialisé par l&apos;administrateur.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 text-xs text-slate-700 leading-relaxed">
+              Pour ce premier accès, souhaitez-vous <strong>conserver le mot de passe actuel</strong> communiqué par l&apos;administrateur ou <strong>en choisir un nouveau</strong> ?
+            </div>
+
+            <div className="space-y-3">
+              {/* Option A : Conserver */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPasswordChoice("keep");
+                  setGeneralError(null);
+                }}
+                className={`w-full p-4 rounded-xl border text-left transition flex items-start gap-3.5 cursor-pointer ${
+                  passwordChoice === "keep"
+                    ? "border-sky-600 bg-sky-50/50 ring-1 ring-sky-600 shadow-2xs"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                    passwordChoice === "keep"
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-slate-300 bg-white"
+                  }`}
+                >
+                  {passwordChoice === "keep" && (
+                    <span className="material-symbols-outlined text-xs">check</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900">
+                    Conserver mon mot de passe actuel
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Je continue avec le mot de passe transmis par l&apos;administrateur.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option B : Modifier */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPasswordChoice("change");
+                  setGeneralError(null);
+                }}
+                className={`w-full p-4 rounded-xl border text-left transition flex items-start gap-3.5 cursor-pointer ${
+                  passwordChoice === "change"
+                    ? "border-sky-600 bg-sky-50/50 ring-1 ring-sky-600 shadow-2xs"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                    passwordChoice === "change"
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-slate-300 bg-white"
+                  }`}
+                >
+                  {passwordChoice === "change" && (
+                    <span className="material-symbols-outlined text-xs">check</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900">
+                    Modifier mon mot de passe
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Définir dès maintenant mon mot de passe personnel sécurisé.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Champs si modification choisie */}
+            {passwordChoice === "change" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3"
+              >
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Nouveau mot de passe personnel *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Minimum 6 caractères"
+                      className="w-full text-xs px-3 py-2 pr-9 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-base">
+                        {showNewPassword ? "visibility_off" : "visibility"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Confirmer le nouveau mot de passe *
+                  </label>
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Retapez votre mot de passe"
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white font-mono"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
+
+        {/* ============================================================
+            ÉTAPE 2 : IDENTITÉ & SOUS-DOMAINE DU CABINET
+           ============================================================ */}
+        {step === 2 && (
+          <div className="space-y-6">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                1. Logo & Adresse Web de votre Cabinet
+                2. Logo & Adresse Web de votre Cabinet
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Définissez l&apos;adresse de connexion de votre cabinet et téléversez votre logo officiel.
+                Vérifiez votre adresse web et téléversez le logo de votre cabinet.
               </p>
             </div>
 
@@ -218,7 +382,7 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
               <div className="flex-1 text-center sm:text-left">
                 <p className="text-xs font-semibold text-slate-800">Logo du cabinet</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Apparaîtra sur votre tableau de bord, ordonnances et quittances (PNG, WEBP ou JPG).
+                  Apparaîtra sur votre tableau de bord, ordonnances et quittances.
                 </p>
                 <div className="mt-2.5 flex items-center justify-center sm:justify-start gap-2">
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-xs font-medium text-slate-700 cursor-pointer transition">
@@ -244,99 +408,79 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
               </div>
             </div>
 
-            {/* Sous-domaine personnalisé */}
+            {/* Sous-domaine */}
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-700">
-                Adresse Web personnalisée du cabinet <span className="text-red-500">*</span>
+              <label className="block text-xs font-semibold text-slate-800">
+                Sous-domaine personnalisé de votre Cabinet
               </label>
-              <div className="flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-2xs focus-within:border-slate-900 focus-within:ring-2 focus-within:ring-slate-900/10 transition">
-                <span className="text-xs font-medium text-slate-400 select-none">https://</span>
+              <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 focus-within:ring-2 focus-within:ring-slate-900/10 focus-within:border-slate-900">
+                <span className="text-xs font-mono text-slate-400 select-none">https://</span>
                 <input
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                  placeholder="nom-cabinet"
-                  className="flex-1 px-1 text-xs font-semibold text-slate-900 focus:outline-none bg-transparent"
+                  placeholder="dr-nom"
+                  className="bg-transparent border-0 text-xs font-mono font-semibold text-slate-900 focus:outline-none flex-1 px-1"
                 />
-                <span className="text-xs font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100 select-none">
+                <span className="text-xs font-mono text-slate-500 font-medium select-none">
                   .toncabinet.me
                 </span>
               </div>
 
-              {/* Statut disponibilité du slug */}
-              <div className="text-[11px] pt-1">
-                {slugStatus.loading ? (
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full border border-slate-400 border-t-transparent animate-spin" />
-                    Vérification de la disponibilité...
-                  </span>
-                ) : slugStatus.available ? (
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">check_circle</span>
-                    Adresse disponible : <strong>{slugStatus.cleanSlug}.toncabinet.me</strong>
-                  </span>
-                ) : (
-                  slugStatus.error && (
-                    <span className="text-red-600 font-medium flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">cancel</span>
-                      {slugStatus.error || "Adresse non disponible"}
-                    </span>
-                  )
-                )}
-
-                {/* Suggestions si non dispo */}
-                {slugStatus.suggestions && slugStatus.suggestions.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="text-slate-400 text-[11px]">Suggestions :</span>
-                    {slugStatus.suggestions.map((sug) => (
-                      <button
-                        key={sug}
-                        type="button"
-                        onClick={() => setSlug(sug)}
-                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition cursor-pointer"
-                      >
-                        {sug}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {slugStatus.loading && (
+                <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                  <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  Vérification de la disponibilité...
+                </p>
+              )}
+              {!slugStatus.loading && slugStatus.available && (
+                <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">check_circle</span>
+                  Adresse disponible et réservée pour votre cabinet !
+                </p>
+              )}
+              {!slugStatus.loading && slugStatus.error && (
+                <p className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">cancel</span>
+                  {slugStatus.error}
+                </p>
+              )}
             </div>
           </div>
         )}
 
         {/* ============================================================
-            ÉTAPE 2 : PROFIL DU MÉDECIN
+            ÉTAPE 3 : PROFIL PRATICIEN
            ============================================================ */}
-        {step === 2 && (
+        {step === 3 && (
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                2. Profil du Médecin Praticien
+                3. Profil & Photo du Médecin
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Ces informations apparaîtront dans votre espace et sur l&apos;annuaire médical confraternel.
+                Cette photo apparaîtra sur vos échanges avec l&apos;assistante et sur le réseau médical.
               </p>
             </div>
 
-            {/* Photo de profil Praticien */}
+            {/* Avatar Praticien */}
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center gap-4">
-              <div className="w-20 h-20 rounded-full border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+              <div className="w-20 h-20 rounded-full border-2 border-white shadow-md bg-slate-200 flex items-center justify-center overflow-hidden shrink-0">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="material-symbols-outlined text-3xl text-slate-300">account_circle</span>
+                  <span className="material-symbols-outlined text-3xl text-slate-400">person</span>
                 )}
               </div>
               <div className="flex-1 text-center sm:text-left">
                 <p className="text-xs font-semibold text-slate-800">Photo de profil praticien</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Une photo professionnelle pour rassurer vos confrères et patients.
+                  Une photo professionnelle inspire confiance à votre patientèle et vos confrères.
                 </p>
                 <div className="mt-2.5 flex items-center justify-center sm:justify-start gap-2">
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-xs font-medium text-slate-700 cursor-pointer transition">
                     <span className="material-symbols-outlined text-sm">photo_camera</span>
-                    <span>{avatarUrl ? "Changer la photo" : "Ajouter une photo"}</span>
+                    <span>{avatarUrl ? "Changer la photo" : "Ajouter ma photo"}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -357,101 +501,79 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
               </div>
             </div>
 
-            {/* Bio confraternelle */}
+            {/* Bio / Présentation */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700">
-                Présentation / Titre confraternel <span className="text-slate-400 font-normal">(optionnel)</span>
+              <label className="block text-xs font-semibold text-slate-800">
+                Courte présentation / Bio professionnelle (optionnel)
               </label>
               <textarea
                 rows={3}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Ex: Spécialiste en cardiologie, ancien interne des hôpitaux. Consultation sur rendez-vous..."
-                className="w-full px-3.5 py-2.5 text-xs text-slate-900 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 placeholder:text-slate-400"
+                placeholder="Ex: Ancien interne des hôpitaux, spécialisé en cardiologie interventionnelle..."
+                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 leading-relaxed"
               />
-              <p className="text-[11px] text-slate-400">
-                Apparaîtra sur votre fiche de confrère dans l&apos;annuaire médical sécurisé.
-              </p>
             </div>
           </div>
         )}
 
         {/* ============================================================
-            ÉTAPE 3 : RÉSEAU & COMMUNAUTÉ MÉDICALE CONFRATERNELLE
+            ÉTAPE 4 : RÉSEAU MÉDICAL CONFRATERNEL
            ============================================================ */}
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-6">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-sky-600 text-2xl">verified_user</span>
-                <h2 className="text-lg font-bold text-slate-900">
-                  3. Réseau Médical Confraternel Sécurisé
-                </h2>
-              </div>
+              <h2 className="text-lg font-bold text-slate-900">
+                4. Réseau Médical Confraternel
+              </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Espace professionnel inter-praticiens strictement fermé et réservé aux médecins certifiés.
+                Rejoignez gratuitement la communauté fermée de médecins certifiés.
               </p>
             </div>
 
             <div className="space-y-3">
-              {/* Option 1 : Oui (Recommandé) */}
+              {/* Option 1 : Oui */}
               <button
                 type="button"
                 onClick={() => setIsCommunityMember(true)}
-                className={`w-full p-5 rounded-2xl border text-left transition flex items-start gap-4 cursor-pointer ${
+                className={`w-full p-4 rounded-xl border text-left transition flex items-start gap-3.5 cursor-pointer ${
                   isCommunityMember
-                    ? "border-emerald-600 bg-emerald-50/40 ring-2 ring-emerald-600/20 shadow-sm"
+                    ? "border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-600 shadow-2xs"
                     : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
               >
                 <div
-                  className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                  className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
                     isCommunityMember
-                      ? "border-emerald-600 bg-emerald-600 text-white shadow-2xs"
+                      ? "border-emerald-600 bg-emerald-600 text-white"
                       : "border-slate-300 bg-white"
                   }`}
                 >
                   {isCommunityMember && (
-                    <span className="material-symbols-outlined text-base">check</span>
+                    <span className="material-symbols-outlined text-sm">check</span>
                   )}
                 </div>
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                      <span>Oui, je rejoins le réseau confraternel certifié</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-slate-900">
+                      Oui, je rejoins la communauté confraternelle
                     </p>
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
                       Recommandé
                     </span>
                   </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Accédez aux outils d&apos;entraide médicale et collaborez directement avec vos confrères praticiens :
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-2 pt-1">
-                    <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white border border-emerald-100/80">
-                      <span className="material-symbols-outlined text-emerald-600 text-base shrink-0 mt-0.5">stethoscope</span>
-                      <div className="text-[11px] leading-snug">
-                        <strong className="text-slate-900 block font-semibold">Cas Cliniques & Deuxième Avis</strong>
-                        <span className="text-slate-500">Partagez des cas complexes et sollicitez des confrères spécialistes en toute confidentialité.</span>
-                      </div>
+                  <div className="mt-2.5 space-y-1.5 text-slate-600">
+                    <div className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-emerald-600 text-base shrink-0 mt-0.5">forum</span>
+                      <span className="text-[11px] leading-snug">Partagez des cas cliniques et demandez des avis confraternels en toute sécurité.</span>
                     </div>
-
-                    <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white border border-emerald-100/80">
-                      <span className="material-symbols-outlined text-sky-600 text-base shrink-0 mt-0.5">chat</span>
-                      <div className="text-[11px] leading-snug">
-                        <strong className="text-slate-900 block font-semibold">Messagerie Directe 1-à-1 Chiffrée</strong>
-                        <span className="text-slate-500">Discutez en direct de praticien à praticien grâce à l&apos;annuaire des médecins par spécialité.</span>
-                      </div>
+                    <div className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-emerald-600 text-base shrink-0 mt-0.5">chat</span>
+                      <span className="text-[11px] leading-snug">Messagerie directe privée entre médecins membres.</span>
                     </div>
-
-                    <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white border border-emerald-100/80">
-                      <span className="material-symbols-outlined text-purple-600 text-base shrink-0 mt-0.5">shield</span>
-                      <div className="text-[11px] leading-snug">
-                        <strong className="text-slate-900 block font-semibold">Secret Médical Préservé</strong>
-                        <span className="text-slate-500">Réseau 100% clos et étanche, isolé de la patientèle et des dossiers non anonymisés.</span>
-                      </div>
+                    <div className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-emerald-600 text-base shrink-0 mt-0.5">lock</span>
+                      <span className="text-[11px] leading-snug">100% réservé aux médecins certifiés, secret médical préservé.</span>
                     </div>
                   </div>
                 </div>
@@ -463,7 +585,7 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
                 onClick={() => setIsCommunityMember(false)}
                 className={`w-full p-4 rounded-xl border text-left transition flex items-start gap-3.5 cursor-pointer ${
                   !isCommunityMember
-                    ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
+                    ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900 shadow-2xs"
                     : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
               >
@@ -483,7 +605,7 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
                     Garder mon cabinet en mode privé pour l&apos;instant
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Votre profil n&apos;apparaîtra pas dans l&apos;annuaire médical et vous n&apos;aurez pas accès à la messagerie confraternelle. Vous pourrez activer cette option à tout moment dans vos Paramètres.
+                    Votre profil n&apos;apparaîtra pas dans l&apos;annuaire médical et vous pourrez activer cette option à tout moment dans vos Paramètres.
                   </p>
                 </div>
               </button>
@@ -496,7 +618,10 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
           {step > 1 ? (
             <button
               type="button"
-              onClick={() => setStep((s) => (s - 1) as any)}
+              onClick={() => {
+                setGeneralError(null);
+                setStep((s) => (s - 1) as any);
+              }}
               className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
               Retour
@@ -505,11 +630,23 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
             <div />
           )}
 
-          {step < 3 ? (
+          {step === 1 ? (
             <button
               type="button"
-              disabled={step === 1 && !slugStatus.available}
-              onClick={() => setStep((s) => (s + 1) as any)}
+              onClick={handleNextFromStep1}
+              className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Continuer</span>
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+          ) : step < 4 ? (
+            <button
+              type="button"
+              disabled={step === 2 && !slugStatus.available}
+              onClick={() => {
+                setGeneralError(null);
+                setStep((s) => (s + 1) as any);
+              }}
               className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
               <span>Continuer</span>

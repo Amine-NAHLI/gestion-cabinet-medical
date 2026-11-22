@@ -20,6 +20,7 @@ import {
 import { eq, desc, and, ne, or, inArray, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { activateClinicFromRequest } from "./onboarding";
+import { slugifyClinic } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
 
 async function verifySuperAdmin() {
@@ -493,8 +494,8 @@ export async function getAdminDashboardData() {
   };
 }
 
-// 1-Click Approval direct par le Super Admin
-export async function adminApproveRequest(requestId: number) {
+// 1-Click Approval direct par le Super Admin (avec option sous-domaine personnalisé)
+export async function adminApproveRequest(requestId: number, customSlug?: string) {
   await verifySuperAdmin();
 
   const [request] = await db
@@ -511,15 +512,183 @@ export async function adminApproveRequest(requestId: number) {
     return { error: "Cette demande est déjà validée." };
   }
 
-  const result = await activateClinicFromRequest(request);
-
-  await db
-    .update(onboardingRequests)
-    .set({ status: "approved" })
-    .where(eq(onboardingRequests.id, requestId));
+  const result = await activateClinicFromRequest(request, customSlug);
 
   revalidatePath("/admin");
   return result;
+}
+
+export interface AdminCreateClinicInput {
+  requestId?: number;
+  clinicName: string;
+  slug?: string;
+  clinicCity: string;
+  clinicAddress?: string | null;
+  doctorName: string;
+  doctorEmail: string;
+  doctorPassword: string;
+  doctorPhone?: string | null;
+  specialty: string;
+  assistantName?: string | null;
+  assistantEmail?: string | null;
+  assistantPassword?: string | null;
+}
+
+// Créer un cabinet médical complet directement depuis le Super Admin
+export async function adminCreateClinicAndUsers(input: AdminCreateClinicInput) {
+  await verifySuperAdmin();
+
+  const cleanClinicName = input.clinicName?.trim();
+  const cleanCity = input.clinicCity?.trim();
+  const cleanDoctorName = input.doctorName?.trim();
+  const cleanDoctorEmail = input.doctorEmail?.trim().toLowerCase();
+  const cleanDoctorPassword = input.doctorPassword?.trim();
+  const cleanSpecialty = input.specialty?.trim() || "Médecine Générale";
+  const cleanDoctorPhone = input.doctorPhone?.trim() || null;
+  const cleanAddress = input.clinicAddress?.trim() || null;
+
+  if (!cleanClinicName || !cleanCity) {
+    return { error: "Le nom du cabinet et la ville sont obligatoires." };
+  }
+
+  if (!cleanDoctorName || !cleanDoctorEmail || !cleanDoctorPassword) {
+    return { error: "Le nom, l'email et le mot de passe du médecin sont obligatoires." };
+  }
+
+  if (cleanDoctorPassword.length < 6) {
+    return { error: "Le mot de passe du médecin doit contenir au moins 6 caractères." };
+  }
+
+  // Vérifier si l'email du médecin existe déjà
+  const [existingDoctor] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, cleanDoctorEmail))
+    .limit(1);
+
+  if (existingDoctor) {
+    return { error: `Un utilisateur avec l'email médecin ${cleanDoctorEmail} existe déjà.` };
+  }
+
+  // Vérifier l'assistante si fournie
+  const cleanAssistantName = input.assistantName?.trim() || null;
+  const cleanAssistantEmail = input.assistantEmail?.trim().toLowerCase() || null;
+  const cleanAssistantPassword = input.assistantPassword?.trim() || null;
+
+  if (cleanAssistantEmail || cleanAssistantName || cleanAssistantPassword) {
+    if (!cleanAssistantName || !cleanAssistantEmail || !cleanAssistantPassword) {
+      return { error: "Veuillez renseigner le nom, l'email et le mot de passe de l'assistante." };
+    }
+    if (cleanAssistantPassword.length < 6) {
+      return { error: "Le mot de passe de l'assistante doit contenir au moins 6 caractères." };
+    }
+    if (cleanAssistantEmail === cleanDoctorEmail) {
+      return { error: "L'email de l'assistante doit être différent de celui du médecin." };
+    }
+    const [existingAssistant] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, cleanAssistantEmail))
+      .limit(1);
+    if (existingAssistant) {
+      return { error: `Un utilisateur avec l'email assistante ${cleanAssistantEmail} existe déjà.` };
+    }
+  }
+
+  // Génération et validation du sous-domaine (slug)
+  let baseSlug = input.slug?.trim() ? slugifyClinic(input.slug) : slugifyClinic(cleanClinicName);
+  if (!baseSlug || baseSlug.length < 2) {
+    baseSlug = slugifyClinic(cleanDoctorName) || "cabinet";
+  }
+
+  // Vérifier unicité du slug dans les cabinets existants
+  let candidateSlug = baseSlug;
+  let counter = 1;
+  while (true) {
+    const [existingSlug] = await db
+      .select({ id: clinics.id })
+      .from(clinics)
+      .where(eq(clinics.slug, candidateSlug))
+      .limit(1);
+    if (!existingSlug) break;
+    counter++;
+    candidateSlug = `${baseSlug}-${counter}`;
+  }
+
+  // Hachage sécurisé des mots de passe
+  const doctorHash = await bcrypt.hash(cleanDoctorPassword, 10);
+  const assistantHash = cleanAssistantPassword ? await bcrypt.hash(cleanAssistantPassword, 10) : null;
+
+  // 1. Créer le cabinet
+  const [newClinic] = await db
+    .insert(clinics)
+    .values({
+      name: cleanClinicName,
+      slug: candidateSlug,
+      city: cleanCity,
+      address: cleanAddress,
+      phone: cleanDoctorPhone,
+      status: "active",
+      isCommunityMember: false,
+    })
+    .returning({ id: clinics.id });
+
+  // 2. Créer l'utilisateur Médecin (isOnboarded: false pour qu'il configure son profil à sa 1ère connexion)
+  await db.insert(users).values({
+    clinicId: newClinic.id,
+    name: cleanDoctorName,
+    email: cleanDoctorEmail,
+    password: doctorHash,
+    role: "doctor",
+    phone: cleanDoctorPhone,
+    status: "active",
+    isOnboarded: false,
+  });
+
+  // 3. Créer l'utilisateur Assistante si renseignée
+  if (cleanAssistantEmail && assistantHash) {
+    await db.insert(users).values({
+      clinicId: newClinic.id,
+      name: cleanAssistantName || "Assistante",
+      email: cleanAssistantEmail,
+      password: assistantHash,
+      role: "assistant",
+      status: "active",
+      isOnboarded: false,
+    });
+  }
+
+  // 4. Initialiser les paramètres du cabinet
+  await db.insert(clinicSettings).values({
+    clinicId: newClinic.id,
+    clinicName: cleanClinicName,
+    doctorName: cleanDoctorName,
+    specialty: cleanSpecialty,
+    phone: cleanDoctorPhone || "",
+    email: cleanDoctorEmail,
+    city: cleanCity,
+    address: cleanAddress || "",
+    orderNumber: "",
+    taxId: "",
+    defaultFee: "250.00",
+  });
+
+  // 5. Si créé à partir d'une demande, marquer la demande comme validée
+  if (input.requestId) {
+    await db
+      .update(onboardingRequests)
+      .set({ status: "approved" })
+      .where(eq(onboardingRequests.id, input.requestId));
+  }
+
+  revalidatePath("/admin");
+
+  return {
+    success: true,
+    clinicId: newClinic.id,
+    slug: candidateSlug,
+    message: `Le cabinet ${cleanClinicName} a été créé avec succès ! Sous-domaine : https://${candidateSlug}.toncabinet.me`,
+  };
 }
 
 // Rejeter une demande

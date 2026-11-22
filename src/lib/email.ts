@@ -13,6 +13,160 @@ export interface SendOtpNotificationParams {
   requestId: number;
 }
 
+export interface NewRegistrationNotificationParams {
+  doctorName: string;
+  doctorEmail: string;
+  doctorPhone: string;
+  specialty: string;
+  clinicName: string;
+  clinicCity: string;
+  clinicAddress?: string | null;
+  assistantName?: string | null;
+  assistantEmail?: string | null;
+  requestId?: number;
+}
+
+export async function sendNewRegistrationRequestNotification(params: NewRegistrationNotificationParams) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const receiverEmail = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || "nahli-ami@upf.ac.ma";
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
+  const baseUrl = process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")
+    ? process.env.NEXTAUTH_URL
+    : process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : (process.env.NEXTAUTH_URL || "http://localhost:3000");
+
+  console.log(`[EMAIL] Notification nouvelle inscription pour Dr. ${params.doctorName} (${params.clinicName}) vers ${receiverEmail}...`);
+
+  if (!apiKey) {
+    console.warn("[EMAIL WARN] Clé RESEND_API_KEY absente dans .env. La demande est disponible directement sur le Dashboard Super Admin (/admin).");
+    return {
+      success: false,
+      warning: "Clé RESEND_API_KEY manquante dans .env. Demande visible sur /admin.",
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 24px; color: #334155; }
+          .container { max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+          .header { background: linear-gradient(135deg, #070e1c 0%, #0c1f3d 100%); padding: 32px 28px; text-align: center; color: white; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+          .header p { margin: 6px 0 0; font-size: 13px; color: #94a3b8; }
+          .content { padding: 32px 28px; }
+          .badge-alert { display: inline-block; background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 5px 14px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 16px; letter-spacing: 0.5px; }
+          .highlight-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; margin: 18px 0; }
+          .info-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+          .info-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; }
+          .info-table tr:last-child td { border-bottom: none; }
+          .info-table td.label { font-weight: 600; color: #64748b; width: 38%; }
+          .info-table td.val { font-weight: 700; color: #0f172a; }
+          .btn-container { text-align: center; margin-top: 26px; }
+          .btn { display: inline-block; background: #0284c7; color: #ffffff !important; text-decoration: none; padding: 13px 30px; border-radius: 12px; font-weight: 700; font-size: 13px; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.25); }
+          .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>MonCabinet</h1>
+            <p>Nouvelle Demande d'Inscription de Cabinet Médical</p>
+          </div>
+          <div class="content">
+            <span class="badge-alert">✨ Nouvelle Inscription • Délai 24H</span>
+            <p style="margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: #334155;">
+              Un nouveau médecin a rempli le formulaire d'inscription sur MonCabinet et attend la création et l'activation de son compte sous 24h.
+            </p>
+            
+            <div class="highlight-card">
+              <table class="info-table">
+                <tr>
+                  <td class="label">Médecin Praticien</td>
+                  <td class="val">${params.doctorName}</td>
+                </tr>
+                <tr>
+                  <td class="label">Spécialité</td>
+                  <td class="val">${params.specialty}</td>
+                </tr>
+                <tr>
+                  <td class="label">Email de Connexion</td>
+                  <td class="val"><a href="mailto:${params.doctorEmail}" style="color: #0284c7; text-decoration: none;">${params.doctorEmail}</a></td>
+                </tr>
+                <tr>
+                  <td class="label">Téléphone Portable</td>
+                  <td class="val"><a href="tel:${params.doctorPhone}" style="color: #0284c7; text-decoration: none;">${params.doctorPhone}</a></td>
+                </tr>
+                <tr>
+                  <td class="label">Nom du Cabinet</td>
+                  <td class="val">${params.clinicName}</td>
+                </tr>
+                <tr>
+                  <td class="label">Ville</td>
+                  <td class="val">${params.clinicCity}</td>
+                </tr>
+                ${params.clinicAddress ? `
+                <tr>
+                  <td class="label">Adresse</td>
+                  <td class="val">${params.clinicAddress}</td>
+                </tr>
+                ` : ''}
+                ${params.assistantName ? `
+                <tr>
+                  <td class="label">Assistante</td>
+                  <td class="val">${params.assistantName} (${params.assistantEmail || 'Sans email'})</td>
+                </tr>
+                ` : `
+                <tr>
+                  <td class="label">Assistante</td>
+                  <td class="val" style="color: #94a3b8; font-weight: normal;">Aucune assistante renseignée</td>
+                </tr>
+                `}
+              </table>
+            </div>
+
+            <p style="font-size: 13px; color: #64748b; margin-top: 14px; line-height: 1.4;">
+              Accédez à votre espace Super Admin pour créer son cabinet en 1 clic ou personnaliser son sous-domaine.
+            </p>
+
+            <div class="btn-container">
+              <a href="${baseUrl}/admin" class="btn" target="_blank">Créer & Activer le Cabinet sur l'Admin</a>
+            </div>
+          </div>
+          <div class="footer">
+            MonCabinet Platform • Notification d'inscription sécurisée transmise à l'administrateur
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: receiverEmail,
+      subject: `📋 [Nouvelle Inscription] Dr. ${params.doctorName} • ${params.clinicName} (${params.clinicCity})`,
+      html: emailHtml,
+    });
+
+    if (error) {
+      console.error("[RESEND ERROR]", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[RESEND SUCCESS] Email d'inscription envoyé avec succès à ${receiverEmail}. ID: ${data?.id}`);
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("[EMAIL EXCEPTION]", err);
+    return { success: false, error: err.message || "Erreur d'envoi d'email" };
+  }
+}
+
 export async function sendAdminOtpNotification(params: SendOtpNotificationParams) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const receiverEmail = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || "nahli-ami@upf.ac.ma";
