@@ -62,6 +62,9 @@ export default function AssistantOnboardingModal({
       const res = await completeAssistantOnboarding({ avatarUrl });
       if (res.success) {
         onClose();
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("moncabinet_start_tour"));
+        }, 350);
       } else {
         setError(res.error || "Erreur lors de la validation");
       }

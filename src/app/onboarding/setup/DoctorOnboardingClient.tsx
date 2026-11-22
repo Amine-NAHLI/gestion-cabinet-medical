@@ -153,7 +153,7 @@ export default function DoctorOnboardingClient({ initialData }: { initialData: I
       });
 
       if (res.success) {
-        window.location.href = "/dashboard";
+        window.location.href = "/dashboard?first_time=1";
       } else {
         setGeneralError(res.error || "Une erreur est survenue lors de l'enregistrement.");
       }

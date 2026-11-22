@@ -78,3 +78,11 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* Style typographie signature calligraphique italique */
+.font-signature {
+  font-family: 'Great Vibes', 'Alex Brush', 'Allura', 'Dancing Script', 'Satisfy', 'Segoe Script', 'Brush Script MT', 'Snell Roundhand', cursive, sans-serif;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}

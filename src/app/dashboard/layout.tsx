@@ -30,7 +30,7 @@ export default async function DashboardLayout({
   const userId = parseInt(userSession?.id || "0");
   const clinicId = await getTenantClinicId();
 
-  // Récupérer le statut utilisateur en direct (avatar, isOnboarded)
+  // Récupérer le statut utilisateur en direct (avatar, isOnboarded, hasSeenTour)
   const [currentUser] = await db
     .select({
       id: users.id,
@@ -39,10 +39,13 @@ export default async function DashboardLayout({
       avatarUrl: users.avatarUrl,
       isOnboarded: users.isOnboarded,
       role: users.role,
+      notificationPreferences: users.notificationPreferences,
     })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
+
+  const hasSeenTour = Boolean((currentUser?.notificationPreferences as any)?.hasSeenTour);
 
   // Si c'est un médecin et qu'il n'a pas encore fait son onboarding initial, redirection immédiate
   if (role === "doctor" && currentUser && !currentUser.isOnboarded) {
@@ -85,6 +88,7 @@ export default async function DashboardLayout({
         email: currentUser?.email || userSession?.email,
         avatarUrl: currentUser?.avatarUrl || null,
         isOnboarded: currentUser?.isOnboarded ?? true,
+        hasSeenTour,
       }}
     >
       {children}

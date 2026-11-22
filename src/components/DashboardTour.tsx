@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { markTourAsSeen } from "@/actions/onboarding-wizard";
 
 export interface TourStep {
   tourId: string;
@@ -14,6 +16,7 @@ export interface TourStep {
 interface DashboardTourProps {
   role: string;
   userEmail?: string | null;
+  hasSeenTour?: boolean;
   sidebarOpen: boolean;
   onEnsureSidebarOpen?: () => void;
 }
@@ -147,36 +150,58 @@ const ASSISTANT_STEPS: TourStep[] = [
 export default function DashboardTour({
   role,
   userEmail,
+  hasSeenTour,
   sidebarOpen,
   onEnsureSidebarOpen,
 }: DashboardTourProps) {
   const steps = useMemo(() => (role === "doctor" ? DOCTOR_STEPS : ASSISTANT_STEPS), [role]);
-  const storageKey = `moncabinet_tour_completed_${role}_${userEmail || "default"}_v2`;
+  const searchParams = useSearchParams();
+  const isFirstTime = searchParams?.get("first_time") === "1";
+  const storageKey = `moncabinet_tour_completed_${role}_${userEmail || "user"}_v3`;
 
   const [isOpen, setIsOpen] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
-  // Vérifier au montage si le tour doit être lancé automatiquement
+  // Vérifier au montage : S'affiche STRICTEMENT et UNIQUEMENT la première fois après la création de compte
   useEffect(() => {
+    // Si déjà vu en BDD, ne JAMAIS lancer automatiquement
+    if (hasSeenTour) return;
+
     try {
       const alreadyDone = localStorage.getItem(storageKey);
-      if (!alreadyDone) {
-        // Petit délai pour laisser le temps au DOM de s'afficher
-        const timer = setTimeout(() => {
-          setIsOpen(true);
-          if (onEnsureSidebarOpen && !sidebarOpen) {
-            onEnsureSidebarOpen();
-          }
-        }, 800);
-        return () => clearTimeout(timer);
-      }
+      if (alreadyDone) return;
     } catch {
       // ignore
     }
-  }, [storageKey, onEnsureSidebarOpen, sidebarOpen]);
 
-  // Écouter un événement global pour pouvoir relancer le guide depuis n'importe où
+    // Se lance UNIQUEMENT si l'utilisateur vient de finaliser la création/onboarding de son compte (?first_time=1)
+    if (isFirstTime) {
+      // Verrouiller immédiatement en localStorage et en BDD pour ne plus JAMAIS se répéter
+      try {
+        localStorage.setItem(storageKey, "true");
+      } catch {
+        // ignore
+      }
+      markTourAsSeen();
+
+      // Nettoyer l'URL de manière transparente sans recharger
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+
+      const timer = setTimeout(() => {
+        setIsOpen(true);
+        if (onEnsureSidebarOpen && !sidebarOpen) {
+          onEnsureSidebarOpen();
+        }
+      }, 700);
+
+      return () => clearTimeout(timer);
+    }
+  }, [hasSeenTour, isFirstTime, storageKey, onEnsureSidebarOpen, sidebarOpen]);
+
+  // Écouter un événement global pour pouvoir relancer le guide à la demande ("Visite guidée")
   useEffect(() => {
     const handleStartTour = () => {
       setCurrentStepIndex(0);
@@ -238,6 +263,7 @@ export default function DashboardTour({
     } catch {
       // ignore
     }
+    markTourAsSeen();
   };
 
   const handleNext = () => {

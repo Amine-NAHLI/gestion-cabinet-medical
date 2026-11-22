@@ -25,6 +25,7 @@ interface DashboardShellProps {
     email?: string | null;
     avatarUrl?: string | null;
     isOnboarded?: boolean;
+    hasSeenTour?: boolean;
   };
   children: React.ReactNode;
 }
@@ -533,6 +534,7 @@ export default function DashboardShell({
       <DashboardTour
         role={role}
         userEmail={user?.email}
+        hasSeenTour={user?.hasSeenTour}
         sidebarOpen={sidebarOpen}
         onEnsureSidebarOpen={() => setSidebarOpen(true)}
       />

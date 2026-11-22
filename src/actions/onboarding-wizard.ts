@@ -219,3 +219,35 @@ export async function completeAssistantOnboarding(data: { avatarUrl?: string | n
   revalidatePath("/dashboard", "layout");
   return { success: true };
 }
+
+export async function markTourAsSeen() {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false };
+
+  const userSession = session.user as { id?: string };
+  const userId = parseInt(userSession.id || "0");
+  if (!userId) return { success: false };
+
+  try {
+    const [user] = await db
+      .select({ notificationPreferences: users.notificationPreferences })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const prefs = (user?.notificationPreferences as any) || {};
+    await db
+      .update(users)
+      .set({
+        notificationPreferences: {
+          ...prefs,
+          hasSeenTour: true,
+        },
+      })
+      .where(eq(users.id, userId));
+
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
+}

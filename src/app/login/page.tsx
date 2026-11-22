@@ -29,12 +29,12 @@ export default function LoginPage() {
       <div />
 
       <div className="w-full max-w-[400px]">
-        {/* En-tête sobre */}
-        <div className="text-center mb-7">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        {/* En-tête style signature manuscrite italique */}
+        <div className="text-center mb-6">
+          <h1 className="font-signature text-5xl sm:text-6xl text-slate-900 tracking-wide select-none drop-shadow-xs leading-none">
             Mon<span className="text-sky-700">Cabinet</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-2.5 font-medium tracking-normal">
             Gestion médicale pour cabinets et cliniques
           </p>
         </div>
