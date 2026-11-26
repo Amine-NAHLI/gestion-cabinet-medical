@@ -297,30 +297,35 @@ export default function AdminDashboardClient({
   return (
     <div className="min-h-screen bg-[#F8F9FB] text-slate-900 flex flex-col">
       {/* TOP HEADER SOBRE */}
-      <header className="border-b border-slate-200/90 bg-white sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="font-semibold text-base tracking-tight text-slate-900">
+      {/* HEADER SUPER ADMIN MODERNE */}
+      <header className="border-b border-slate-200/90 bg-white sticky top-0 z-30 shadow-2xs">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="font-bold text-base tracking-tight text-slate-900 shrink-0">
               Mon<span className="text-sky-700">Cabinet</span>
             </span>
-            <span className="text-slate-300">/</span>
-            <span className="text-xs font-medium text-slate-500">Administration</span>
+            <span className="text-slate-300 shrink-0">/</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider shrink-0">
+              Administration
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             {/* Indicateur Temps Réel Actif */}
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold shadow-2xs">
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
-              <span>En direct (3s)</span>
+              <span className="hidden sm:inline">En direct (3s)</span>
+              <span className="sm:hidden">Live</span>
             </div>
 
             <button
               onClick={() => refreshData(false)}
               disabled={actionLoading === "refreshing"}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 shadow-2xs transition cursor-pointer disabled:opacity-50"
+              title="Rafraîchir les données en direct"
             >
               <span
                 className={`material-symbols-outlined text-[15px] text-slate-500 ${
@@ -329,16 +334,18 @@ export default function AdminDashboardClient({
               >
                 refresh
               </span>
-              <span className="hidden sm:inline">Actualiser</span>
+              <span className="hidden md:inline">Actualiser</span>
             </button>
 
-            <span className="hidden md:inline-block px-2.5 py-1.5 text-xs text-slate-500">
+            <span className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] font-medium text-slate-600 font-mono">
+              <span className="material-symbols-outlined text-[14px] text-slate-400">admin_panel_settings</span>
               {adminEmail}
             </span>
 
             <button
               onClick={handleAdminLogout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 text-xs font-medium transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 text-xs font-medium transition cursor-pointer"
+              title="Se déconnecter de l'administration"
             >
               <span className="material-symbols-outlined text-[16px]">logout</span>
               <span className="hidden sm:inline">Déconnexion</span>
@@ -346,72 +353,72 @@ export default function AdminDashboardClient({
           </div>
         </div>
 
-        {/* NAVIGATION DES 6 PAGES ADMIN (ONGLETS SOBRES À SOULIGNEMENT) */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 border-t border-slate-100">
-          <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
+        {/* NAVIGATION DES 6 PAGES ADMIN (ONGLETS PARFAITEMENT ADAPTÉS ET FLUIDES) */}
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100">
+          <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-1 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none]">
             <button
               onClick={() => setActivePage("stats")}
-              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
                 activePage === "stats"
-                  ? "border-slate-900 text-slate-900 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
+                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">bar_chart</span>
-              <span>Vue d'ensemble</span>
+              <span>Vue d&apos;ensemble</span>
             </button>
 
             <button
               onClick={() => setActivePage("neon")}
-              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
                 activePage === "neon"
-                  ? "border-sky-600 text-sky-800 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-sky-600 text-sky-800 font-bold bg-sky-50/50"
+                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
               }`}
             >
               <span className="material-symbols-outlined text-[17px] text-sky-600">database</span>
               <span>Infrastructure Neon</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[11px] font-semibold tabular-nums border border-sky-100">
+              <span className="px-1.5 py-0.2 rounded-md bg-sky-50 text-sky-700 text-[10px] font-semibold tabular-nums border border-sky-200">
                 1 Go • 100 CU-h
               </span>
             </button>
 
             <button
               onClick={() => setActivePage("doctors")}
-              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
                 activePage === "doctors"
-                  ? "border-slate-900 text-slate-900 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
+                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">medical_services</span>
               <span>Cabinets Médicaux</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
+              <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold tabular-nums">
                 {data.doctorsWithAssistants.length}
               </span>
             </button>
 
             <button
               onClick={() => setActivePage("users")}
-              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
                 activePage === "users"
-                  ? "border-slate-900 text-slate-900 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
+                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">group</span>
               <span>Gestion des Personnes</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
+              <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold tabular-nums">
                 {data.allUsers?.length || data.stats.totalUsers}
               </span>
             </button>
 
             <button
               onClick={() => setActivePage("database")}
-              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
                 activePage === "database"
-                  ? "border-slate-900 text-slate-900 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
+                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">table_rows</span>
@@ -420,20 +427,20 @@ export default function AdminDashboardClient({
 
             <button
               onClick={() => setActivePage("requests")}
-              className={`flex items-center gap-2 py-3 px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer ${
+              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
                 activePage === "requests"
-                  ? "border-slate-900 text-slate-900 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
+                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
               }`}
             >
               <span className="material-symbols-outlined text-[17px]">inbox</span>
               <span>Demandes d&apos;inscription</span>
               {data.stats.pendingCount > 0 ? (
-                <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[11px] font-semibold tabular-nums">
+                <span className="px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold tabular-nums animate-pulse">
                   {data.stats.pendingCount}
                 </span>
               ) : (
-                <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold tabular-nums">
+                <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold tabular-nums">
                   {data.allRequests.length}
                 </span>
               )}
@@ -472,7 +479,7 @@ export default function AdminDashboardClient({
       </AnimatePresence>
 
       {/* CONTENU PRINCIPAL */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-3.5 sm:px-6 py-5 sm:py-8 space-y-6">
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6">
         {/* ============================================================
             PAGE 1 : STATISTIQUES GLOBALES DE LA PLATEFORME
            ============================================================ */}
