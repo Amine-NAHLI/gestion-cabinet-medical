@@ -98,6 +98,36 @@ export async function getAdminDashboardData() {
     if (s.clinicId) settingsByClinic.set(s.clinicId, s);
   }
 
+  // Auto-activation des formules programmées arrivées à leur date d'échéance effective
+  for (const clinic of allClinicsRaw) {
+    const p = clinic.pendingPlanChange as any;
+    if (p && p.status === "scheduled" && p.effectiveAt && Date.now() >= new Date(p.effectiveAt).getTime()) {
+      const newPlan = p.requestedPlan || "pro";
+      const newCycle = p.requestedCycle || "monthly";
+      const newPrice = p.requestedPrice || 250;
+      const newExpiresAt = p.newExpiresAt ? new Date(p.newExpiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      await db
+        .update(clinics)
+        .set({
+          plan: newPlan,
+          billingCycle: newCycle,
+          planPrice: newPrice,
+          subscriptionExpiresAt: newExpiresAt,
+          subscriptionStatus: "active",
+          pendingPlanChange: null,
+        })
+        .where(eq(clinics.id, clinic.id));
+
+      clinic.plan = newPlan;
+      clinic.billingCycle = newCycle;
+      clinic.planPrice = newPrice;
+      clinic.subscriptionExpiresAt = newExpiresAt;
+      clinic.subscriptionStatus = "active";
+      clinic.pendingPlanChange = null;
+    }
+  }
+
   // Construire la vue structurée : Chaque Médecin + son Cabinet + ses Assistantes + ses stats
   const doctorsWithAssistants = allClinicsRaw.map((clinic) => {
     const clinicUsers = allUsersRaw.filter((u) => u.clinicId === clinic.id && u.role !== "superadmin");
@@ -1184,7 +1214,7 @@ export async function adminApprovePlanChange(clinicId: number) {
   if (!clinic) return { error: "Cabinet introuvable." };
 
   const pending = clinic.pendingPlanChange as any;
-  if (!pending || pending.status !== "pending") {
+  if (!pending || (pending.status !== "pending" && pending.status !== "scheduled")) {
     return { error: "Aucune demande de changement en attente pour ce cabinet." };
   }
 
@@ -1194,30 +1224,76 @@ export async function adminApprovePlanChange(clinicId: number) {
 
   // Recalculer l'échéance selon le cycle demandé
   const days = requestedCycle === "yearly" ? 365 : requestedCycle === "quarterly" ? 90 : 30;
-  const newExpiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
-  await db
-    .update(clinics)
-    .set({
-      plan: requestedPlan,
-      billingCycle: requestedCycle,
-      planPrice: requestedPrice,
-      subscriptionExpiresAt: newExpiresAt,
-      subscriptionStatus: "active",
-      pendingPlanChange: null,
-    })
-    .where(eq(clinics.id, clinicId));
+  const currentExpiry = clinic.subscriptionExpiresAt ? new Date(clinic.subscriptionExpiresAt).getTime() : 0;
+  const isCurrentlyActive = currentExpiry > Date.now();
 
-  revalidatePath("/admin");
-  revalidatePath("/dashboard/settings");
+  if (isCurrentlyActive) {
+    // Si l'abonnement actuel est encore actif :
+    // Le cabinet NE DOIT PAS perdre sa formule actuelle immédiatement.
+    // Le changement prend effet à la date exacte d'expiration de l'abonnement en cours.
+    const effectiveAt = new Date(currentExpiry);
+    const newExpiresAt = new Date(effectiveAt.getTime() + days * 24 * 60 * 60 * 1000);
 
-  return {
-    success: true,
-    message: `Le cabinet ${clinic.name} a été basculé avec succès sur la formule ${requestedPlan.toUpperCase()} (${requestedCycle === "yearly" ? "Annuel" : requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"}).`,
-  };
+    const scheduledPayload = {
+      requestedPlan,
+      requestedCycle,
+      requestedPrice,
+      requestedAt: pending.requestedAt || new Date().toISOString(),
+      requestedBy: pending.requestedBy || "Médecin",
+      status: "scheduled",
+      effectiveAt: effectiveAt.toISOString(),
+      newExpiresAt: newExpiresAt.toISOString(),
+      approvedAt: new Date().toISOString(),
+    };
+
+    await db
+      .update(clinics)
+      .set({
+        pendingPlanChange: scheduledPayload,
+      })
+      .where(eq(clinics.id, clinicId));
+
+    revalidatePath("/admin");
+    revalidatePath("/dashboard/settings");
+
+    const effectiveDateStr = effectiveAt.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
+    return {
+      success: true,
+      message: `Demande validée. Le cabinet conserve la formule ${clinic.plan.toUpperCase()} jusqu'au ${effectiveDateStr}. La formule ${requestedPlan.toUpperCase()} (${requestedCycle === "yearly" ? "Annuel" : requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"}) prendra effet automatiquement à cette date (+${days} jours ajoutés).`,
+    };
+  } else {
+    // L'abonnement actuel est déjà expiré ou en essai : activation immédiate
+    const newExpiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+    await db
+      .update(clinics)
+      .set({
+        plan: requestedPlan,
+        billingCycle: requestedCycle,
+        planPrice: requestedPrice,
+        subscriptionExpiresAt: newExpiresAt,
+        subscriptionStatus: "active",
+        pendingPlanChange: null,
+      })
+      .where(eq(clinics.id, clinicId));
+
+    revalidatePath("/admin");
+    revalidatePath("/dashboard/settings");
+
+    return {
+      success: true,
+      message: `Le cabinet ${clinic.name} a été basculé immédiatement sur la formule ${requestedPlan.toUpperCase()} (${requestedCycle === "yearly" ? "Annuel" : requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"}).`,
+    };
+  }
 }
 
-// 11. Refuser ou annuler la demande de changement de formule d'un cabinet
+// 11. Refuser ou annuler la demande ou la programmation de changement de formule d'un cabinet
 export async function adminRejectPlanChange(clinicId: number) {
   await verifySuperAdmin();
   const [clinic] = await db.select().from(clinics).where(eq(clinics.id, clinicId)).limit(1);
@@ -1235,6 +1311,6 @@ export async function adminRejectPlanChange(clinicId: number) {
 
   return {
     success: true,
-    message: "La demande de modification de formule a été rejetée/annulée.",
+    message: "La demande ou programmation de changement de formule a été retirée.",
   };
 }

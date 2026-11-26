@@ -27,11 +27,6 @@ export default async function StatsPage() {
   const platform = await getPlatformSettings();
 
   if (isStandard) {
-    const cleanWhatsapp = platform.supportWhatsapp.replace(/[^0-9]/g, "");
-    const whatsappUrl = `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(
-      "Bonjour, je souhaite activer la formule Pro pour débloquer les statistiques et le suivi financier de mon cabinet."
-    )}`;
-
     return (
       <div className="space-y-6 pb-8">
         <div>
@@ -101,23 +96,21 @@ export default async function StatsPage() {
 
             {/* Boutons d'action */}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition"
-              >
-                <span className="material-symbols-outlined text-[17px]">chat</span>
-                <span>Débloquer les Statistiques Pro sur WhatsApp</span>
-              </a>
-
               <Link
                 href="/dashboard/settings"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition"
+              >
+                <span className="material-symbols-outlined text-[17px] text-emerald-400">workspace_premium</span>
+                <span>Passer au Plan Pro dans mes Paramètres</span>
+              </Link>
+
+              <a
+                href={`mailto:${platform.supportEmail || "contact@toncabinet.me"}?subject=Demande%20de%20passage%20au%20Plan%20Pro`}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs border border-slate-200 transition"
               >
-                <span className="material-symbols-outlined text-[17px]">tune</span>
-                <span>Gérer mon abonnement</span>
-              </Link>
+                <span className="material-symbols-outlined text-[17px]">mail</span>
+                <span>Contacter l'équipe par email</span>
+              </a>
             </div>
           </div>
         </div>

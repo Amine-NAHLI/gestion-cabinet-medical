@@ -63,6 +63,7 @@ export async function getClinicSettings(targetClinicId?: number) {
   try {
     const [clinicRow] = await db
       .select({
+        id: clinics.id,
         plan: clinics.plan,
         billingCycle: clinics.billingCycle,
         planPrice: clinics.planPrice,
@@ -73,6 +74,38 @@ export async function getClinicSettings(targetClinicId?: number) {
       .from(clinics)
       .where(eq(clinics.id, clinicId))
       .limit(1);
+
+    // Auto-activation si une formule programmée a atteint sa date effective
+    if (clinicRow?.pendingPlanChange) {
+      const pending = clinicRow.pendingPlanChange as any;
+      if (pending && pending.status === "scheduled" && pending.effectiveAt) {
+        if (Date.now() >= new Date(pending.effectiveAt).getTime()) {
+          const newPlan = pending.requestedPlan || "pro";
+          const newCycle = pending.requestedCycle || "monthly";
+          const newPrice = pending.requestedPrice || 250;
+          const newExpiresAt = pending.newExpiresAt ? new Date(pending.newExpiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+          await db
+            .update(clinics)
+            .set({
+              plan: newPlan,
+              billingCycle: newCycle,
+              planPrice: newPrice,
+              subscriptionExpiresAt: newExpiresAt,
+              subscriptionStatus: "active",
+              pendingPlanChange: null,
+            })
+            .where(eq(clinics.id, clinicId));
+
+          clinicRow.plan = newPlan;
+          clinicRow.billingCycle = newCycle;
+          clinicRow.planPrice = newPrice;
+          clinicRow.subscriptionExpiresAt = newExpiresAt;
+          clinicRow.subscriptionStatus = "active";
+          clinicRow.pendingPlanChange = null;
+        }
+      }
+    }
 
     const subscription = {
       plan: clinicRow?.plan || "pro",

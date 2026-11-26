@@ -48,9 +48,6 @@ export default function HistoryClient({
   const [isExporting, setIsExporting] = useState(false);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
-  const cleanWhatsappNumber = supportWhatsapp.replace(/[^0-9]/g, "");
-  const whatsappUrl = `https://wa.me/${cleanWhatsappNumber}?text=${encodeURIComponent(supportWhatsappMessage)}`;
-
   const handleExport = async () => {
     try {
       setIsExporting(true);
@@ -183,13 +180,11 @@ export default function HistoryClient({
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noreferrer"
+              href="/dashboard/settings"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs"
             >
-              <span className="material-symbols-outlined text-[16px] text-emerald-400">lock_open</span>
-              <span>Débloquer l'historique à vie (Pro)</span>
+              <span className="material-symbols-outlined text-[16px] text-emerald-400">workspace_premium</span>
+              <span>Débloquer l'historique à vie (Plan Pro)</span>
             </a>
           </div>
         </div>

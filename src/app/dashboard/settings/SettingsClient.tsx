@@ -1466,6 +1466,14 @@ export default function SettingsClient({
                   ? 'Historique 30j + Export Excel'
                   : 'Historique permanent à vie'}
               </p>
+              {pendingPlanData?.status === "scheduled" && (
+                <div className="mt-2 text-[11px] font-semibold text-blue-700 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[13px]">event_upcoming</span>
+                  <span>
+                    Prochaine formule : {pendingPlanData.requestedPlan === "pro" ? "Plan Pro" : "Plan Standard"} dès le {new Date(pendingPlanData.effectiveAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* 2. Compte à rebours */}
@@ -1553,6 +1561,13 @@ export default function SettingsClient({
                   <span>Demande en cours de validation</span>
                 </div>
               )}
+
+              {pendingPlanData?.status === "scheduled" && (
+                <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-600 text-[16px]">event_available</span>
+                  <span>Nouvelle formule validée &amp; programmée</span>
+                </div>
+              )}
             </div>
 
             {pendingPlanData?.status === "pending" ? (
@@ -1561,7 +1576,22 @@ export default function SettingsClient({
                   Votre demande de changement vers la formule {pendingPlanData.requestedPlan === "pro" ? "Pro" : "Standard"} ({pendingPlanData.requestedCycle === "yearly" ? "Annuel" : pendingPlanData.requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"} - {pendingPlanData.requestedPrice} DH) a été transmise au Super Administrateur.
                 </p>
                 <p className="text-amber-800 text-[11px]">
-                  Votre formule active reste opérationnelle. Dès que l'administrateur valide votre règlement, votre compte sera automatiquement mis à jour.
+                  Votre formule active reste opérationnelle. Dès que l'administrateur valide votre règlement, la nouvelle formule sera programmée pour prendre effet automatiquement à votre date d'échéance.
+                </p>
+              </div>
+            ) : pendingPlanData?.status === "scheduled" ? (
+              <div className="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 text-emerald-950 text-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-700 text-base">verified</span>
+                  <span className="font-bold text-emerald-950">
+                    Changement de formule validé &amp; programmé
+                  </span>
+                </div>
+                <p className="text-emerald-900 text-xs leading-relaxed">
+                  Votre passage vers la formule <strong>{pendingPlanData.requestedPlan === "pro" ? "Plan Pro" : "Plan Standard"}</strong> ({pendingPlanData.requestedCycle === "yearly" ? "Annuel" : pendingPlanData.requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"} - {pendingPlanData.requestedPrice} DH) a été validé par l'administration.
+                </p>
+                <p className="text-emerald-800 text-[11px] leading-relaxed">
+                  Conformément à vos droits acquis, votre formule actuelle <strong>{initialSettings.subscription?.plan?.toUpperCase()}</strong> reste active jusqu&apos;au <strong>{new Date(pendingPlanData.effectiveAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</strong>. Votre nouveau forfait prendra effet automatiquement dès cette date d'échéance.
                 </p>
               </div>
             ) : (
@@ -1709,7 +1739,11 @@ export default function SettingsClient({
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>
-                    <span>Messagerie interne & Interphone cabinet</span>
+                    <span>
+                      {initialSettings.subscription?.plan === 'pro'
+                        ? 'Support prioritaire direct WhatsApp & Téléphone'
+                        : 'Support standard par Email'}
+                    </span>
                   </li>
                 </ul>
               </div>
@@ -1718,23 +1752,29 @@ export default function SettingsClient({
               <div className="p-4 rounded-xl bg-sky-50/70 border border-sky-100 flex flex-col justify-between space-y-3">
                 <div>
                   <span className="text-xs font-bold text-sky-950 uppercase tracking-wider block">
-                    Prolongation & Support Dédié
+                    {initialSettings.subscription?.plan === "pro"
+                      ? "Prolongation & Support Dédié WhatsApp"
+                      : "Assistance & Support Équipe"}
                   </span>
                   <p className="text-xs text-sky-900 mt-1 leading-relaxed">
-                    Pour prolonger votre abonnement ou échanger directement avec notre équipe support WhatsApp, contactez-nous sans attendre.
+                    {initialSettings.subscription?.plan === "pro"
+                      ? "Pour prolonger votre abonnement ou échanger directement avec notre équipe support WhatsApp prioritaire, contactez-nous sans attendre."
+                      : "Pour toute question ou demande d'assistance concernant votre compte, contactez notre équipe support par email."}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 pt-2">
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
-                  >
-                    <span className="material-symbols-outlined text-[15px]">chat</span>
-                    <span>Contacter par WhatsApp</span>
-                  </a>
+                  {initialSettings.subscription?.plan === "pro" && (
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">chat</span>
+                      <span>Contacter par WhatsApp</span>
+                    </a>
+                  )}
                   <a
                     href="mailto:contact@toncabinet.me?subject=Gestion%20Abonnement%20Cabinet%20Médical"
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition"

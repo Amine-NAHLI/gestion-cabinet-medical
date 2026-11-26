@@ -87,7 +87,7 @@ export default async function DashboardLayout({
       unreadChatCount={unreadChatCount}
       activeConsultation={activeConsultation}
       todayStr={todayStr}
-      plan={clinic?.plan || "pro"}
+      plan={settings?.subscription?.plan || clinic?.plan || "pro"}
       user={{
         name: currentUser?.name || userSession?.name,
         email: currentUser?.email || userSession?.email,

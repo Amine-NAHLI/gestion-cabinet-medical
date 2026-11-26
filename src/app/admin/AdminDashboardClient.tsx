@@ -892,6 +892,7 @@ export default function AdminDashboardClient({
                   <div className="space-y-2">
                     {pendingPlanChanges.map((item) => {
                       const p = item.clinic.pendingPlanChange as any;
+                      const isExpiryFuture = (item.clinic.daysRemaining || 0) > 0;
                       return (
                         <div
                           key={item.clinic.id}
@@ -906,6 +907,14 @@ export default function AdminDashboardClient({
                                 {p.requestedPlan} ({p.requestedCycle === "yearly" ? "Annuel" : p.requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"} - {p.requestedPrice} DH)
                               </strong>
                             </p>
+                            {isExpiryFuture && (
+                              <p className="text-[11px] text-amber-800 mt-0.5 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[13px]">info</span>
+                                <span>
+                                  Prise d'effet à l'échéance : la formule {item.clinic.plan?.toUpperCase()} reste active jusqu'au {item.clinic.subscriptionExpiresAt ? new Date(item.clinic.subscriptionExpiresAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "terme"}.
+                                </span>
+                              </p>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
@@ -913,9 +922,13 @@ export default function AdminDashboardClient({
                               type="button"
                               disabled={actionLoading === `approve-plan-${item.clinic.id}`}
                               onClick={() => handleApprovePlanChange(item.clinic.id)}
-                              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-xs"
                             >
-                              {actionLoading === `approve-plan-${item.clinic.id}` ? "Validation..." : "Accepter & Mettre à jour"}
+                              {actionLoading === `approve-plan-${item.clinic.id}`
+                                ? "Validation..."
+                                : isExpiryFuture
+                                ? "Accepter (Prend effet à l'échéance)"
+                                : "Accepter & Activer immédiatement"}
                             </button>
 
                             <button
@@ -1133,6 +1146,34 @@ export default function AdminDashboardClient({
                         </button>
                       </div>
                     </div>
+
+                    {/* Formule programmée pour l'échéance */}
+                    {item.clinic.pendingPlanChange && (item.clinic.pendingPlanChange as any).status === "scheduled" && (
+                      <div className="px-5 py-3 bg-blue-50/90 border-t border-blue-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-[16px]">event_upcoming</span>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-blue-950">
+                              Formule validée &amp; programmée : Plan {(item.clinic.pendingPlanChange as any).requestedPlan?.toUpperCase()} ({(item.clinic.pendingPlanChange as any).requestedCycle === "yearly" ? "Annuel" : (item.clinic.pendingPlanChange as any).requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"} - {(item.clinic.pendingPlanChange as any).requestedPrice} DH)
+                            </p>
+                            <p className="text-[11px] text-blue-800">
+                              Prendra effet automatiquement le {new Date((item.clinic.pendingPlanChange as any).effectiveAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} dès l'expiration de la formule {item.clinic.plan?.toUpperCase()} actuelle.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={actionLoading === `reject-plan-${item.clinic.id}`}
+                          onClick={() => handleRejectPlanChange(item.clinic.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-rose-700 hover:bg-rose-100/70 border border-rose-200 text-[11px] font-semibold transition cursor-pointer self-start sm:self-auto shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">cancel</span>
+                          <span>Annuler programmation</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
