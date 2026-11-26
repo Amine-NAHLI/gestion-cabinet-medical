@@ -107,7 +107,6 @@ export default function ConsultationClient({
   const [activeTab, setActiveTab] = useState<"history" | "dossier" | "ordonnance" | "cloture">("dossier");
   const [historySearch, setHistorySearch] = useState("");
   const [expandedVisits, setExpandedVisits] = useState<Record<number, boolean>>(() => {
-    // Ouvrir automatiquement les 3 visites les plus récentes pour lecture immédiate
     const initial: Record<number, boolean> = {};
     pastVisits.slice(0, 3).forEach((v) => {
       initial[v.id] = true;
@@ -150,6 +149,7 @@ export default function ConsultationClient({
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [isSavingDossier, setIsSavingDossier] = useState(false);
   const [printDoc, setPrintDoc] = useState<"prescription" | "receipt" | null>(null);
 
   function triggerPrint(docType: "prescription" | "receipt", afterCallback?: () => void) {
@@ -178,12 +178,9 @@ export default function ConsultationClient({
     setExpandedVisits((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  // IMC dynamique
-  const weightField = consultationFields.find((f) => f.systemKey === "weight" || f.id === "weight");
-  const heightField = consultationFields.find((f) => f.systemKey === "height" || f.id === "height");
-  const weightVal = weightField ? fieldValues[weightField.id] || fieldValues.weight || "" : "";
-  const heightVal = heightField ? fieldValues[heightField.id] || fieldValues.height || "" : "";
-
+  // Calcul d'IMC dynamique
+  const weightVal = fieldValues.weight || "";
+  const heightVal = fieldValues.height || "";
   const bmi = (() => {
     const w = parseFloat(weightVal.replace(",", "."));
     const h = parseFloat(heightVal.replace(",", ".")) / 100;
@@ -220,35 +217,40 @@ export default function ConsultationClient({
     return null;
   };
 
-  async function handleSaveDossier(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const formData = new FormData();
-    const customSnapshot: CustomFieldValue[] = [];
+  async function handleSaveDossier(e?: React.FormEvent<HTMLFormElement>) {
+    if (e) e.preventDefault();
+    setIsSavingDossier(true);
+    try {
+      const formData = new FormData();
+      const customSnapshot: CustomFieldValue[] = [];
 
-    for (const field of consultationFields) {
-      const val = (
-        fieldValues[field.id] ??
-        (field.systemKey ? fieldValues[field.systemKey] : "") ??
-        ""
-      ).trim();
-      if (field.systemKey) {
-        formData.set(field.systemKey, val);
-      } else if (val !== "") {
-        customSnapshot.push({
-          id: field.id,
-          label: field.label,
-          value: val,
-          unit: field.unit,
-          type: field.type,
-          section: field.section,
-        });
+      for (const field of consultationFields) {
+        const val = (
+          fieldValues[field.id] ??
+          (field.systemKey ? fieldValues[field.systemKey] : "") ??
+          ""
+        ).trim();
+        if (field.systemKey) {
+          formData.set(field.systemKey, val);
+        } else if (val !== "") {
+          customSnapshot.push({
+            id: field.id,
+            label: field.label,
+            value: val,
+            unit: field.unit,
+            type: field.type,
+            section: field.section,
+          });
+        }
       }
-    }
 
-    formData.set("customData", JSON.stringify(customSnapshot));
-    await updateMedicalNotes(visitId, formData);
-    showToast("Examen clinique enregistré");
-    setActiveTab("ordonnance");
+      formData.set("customData", JSON.stringify(customSnapshot));
+      await updateMedicalNotes(visitId, formData);
+      showToast("Examen clinique enregistré");
+      setActiveTab("ordonnance");
+    } finally {
+      setIsSavingDossier(false);
+    }
   }
 
   function addMedicine() {
@@ -293,21 +295,24 @@ export default function ConsultationClient({
     }
   }
 
-  async function handleFinish(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleFinish(e?: React.FormEvent<HTMLFormElement>) {
+    if (e) e.preventDefault();
     setIsFinishing(true);
     try {
-      const formData = new FormData(e.currentTarget);
-      const nextDate = formData.get("nextAppointment") as string;
-      const nextTime = ((formData.get("nextAppointmentTime") as string) || "09:30").trim();
-      if (nextDate) {
-        await createAppointment(patient.id, nextDate, nextTime, "Consultation de contrôle");
-      }
-
       const parsedAmount =
         amount.trim() !== "" && !isNaN(Number(amount)) && Number(amount) >= 0
           ? Number(amount)
           : null;
+
+      const formEl = document.getElementById("consultation-finish-form") as HTMLFormElement | null;
+      if (formEl) {
+        const formData = new FormData(formEl);
+        const nextDate = formData.get("nextAppointment") as string;
+        const nextTime = ((formData.get("nextAppointmentTime") as string) || "09:30").trim();
+        if (nextDate) {
+          await createAppointment(patient.id, nextDate, nextTime, "Consultation de contrôle");
+        }
+      }
 
       await finishConsultation(visitId, parsedAmount, paymentMethod);
       router.push("/dashboard/history");
@@ -336,568 +341,394 @@ export default function ConsultationClient({
   });
 
   const tabs: {
-    id: "history" | "dossier" | "ordonnance" | "cloture";
+    id: "dossier" | "ordonnance" | "cloture" | "history";
+    step: string;
     label: string;
     icon: string;
     badge?: number;
   }[] = [
+    { id: "dossier", step: "1", label: "Examen clinique", icon: "stethoscope" },
+    {
+      id: "ordonnance",
+      step: "2",
+      label: "Prescription / Ordonnance",
+      icon: "prescriptions",
+      badge: medicines.filter((m) => m.name.trim()).length || undefined,
+    },
+    { id: "cloture", step: "3", label: "Honoraires & Clôture", icon: "payments" },
     ...(hasHistory
-      ? [{ id: "history" as const, label: "Historique patient", icon: "history_edu", badge: pastVisits.length }]
+      ? [{ id: "history" as const, step: "Dossier", label: "Historique patient", icon: "history_edu", badge: pastVisits.length }]
       : []),
-    { id: "dossier", label: "1. Examen", icon: "stethoscope" },
-    { id: "ordonnance", label: "2. Ordonnance", icon: "prescriptions", badge: medicines.length > 0 ? medicines.length : undefined },
-    { id: "cloture", label: "3. Clôture", icon: "payments" },
   ];
 
   const vitalsFields = consultationFields.filter((f) => f.section === "vitals");
-  const clinicalFields = consultationFields.filter((f) => f.section === "clinical");
-
-  const renderDynamicInput = (field: ConsultationFieldConfig, compact = false) => {
-    const val =
-      fieldValues[field.id] ?? (field.systemKey ? fieldValues[field.systemKey] : "") ?? "";
-    const baseCls = compact
-      ? "w-full px-3 py-2 text-sm font-medium bg-white rounded-lg border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 transition"
-      : "w-full px-3.5 py-2.5 text-sm bg-white rounded-lg border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 transition";
-
-    if (field.type === "select") {
-      return (
-        <select
-          value={val}
-          required={Boolean(field.required)}
-          onChange={(e) => setFieldValue(field.id, e.target.value)}
-          className={baseCls}
-        >
-          <option value="">Sélectionner...</option>
-          {(field.options || []).map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-      );
-    }
-
-    if (field.type === "textarea") {
-      return (
-        <textarea
-          rows={3}
-          value={val}
-          required={Boolean(field.required)}
-          onChange={(e) => setFieldValue(field.id, e.target.value)}
-          placeholder={field.placeholder || ""}
-          className={`${baseCls} resize-y leading-relaxed`}
-        />
-      );
-    }
-
-    if (field.type === "checkbox") {
-      const checked = val === "Oui";
-      return (
-        <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-slate-200 bg-white cursor-pointer hover:border-slate-300 transition">
-          <input
-            type="checkbox"
-            checked={checked}
-            required={Boolean(field.required)}
-            onChange={(e) => setFieldValue(field.id, e.target.checked ? "Oui" : "")}
-            className="w-4 h-4 rounded text-slate-900"
-          />
-          <span className="text-sm font-medium text-slate-700">{checked ? "Oui" : "Non"}</span>
-        </label>
-      );
-    }
-
-    return (
-      <input
-        type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-        step={field.type === "number" ? "any" : undefined}
-        value={val}
-        required={Boolean(field.required)}
-        onChange={(e) => setFieldValue(field.id, e.target.value)}
-        placeholder={field.placeholder || ""}
-        className={baseCls}
-      />
-    );
-  };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden relative">
-      {/* Toast discret */}
+    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden relative">
+      {/* Toast discret de confirmation */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            exit={{ opacity: 0, y: -12 }}
             className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
           >
-            <div className="bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-xs font-medium">
-              <span className="material-symbols-outlined text-emerald-400 text-[16px]">check_circle</span>
+            <div className="bg-slate-900 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold">
+              <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
               <span>{toastMessage}</span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Bandeau rapide patient suivi (uniquement si historique présent et pas déjà sur l'onglet historique) */}
-      {hasHistory && activeTab !== "history" && (
-        <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <p className="text-xs text-slate-600 truncate">
-            <span className="font-semibold text-slate-900">
-              {pastVisits.length} consultation{pastVisits.length > 1 ? "s" : ""} précédente{pastVisits.length > 1 ? "s" : ""}
-            </span>
-            <span className="mx-1.5 text-slate-300">|</span>
-            Dernière le {formatShortDate(pastVisits[0].date)}
-            {pastVisits[0].disease ? ` — ${pastVisits[0].disease}` : ""}
-          </p>
-          <button
-            type="button"
-            onClick={() => setActiveTab("history")}
-            className="text-xs font-semibold text-sky-700 hover:text-sky-900 inline-flex items-center gap-1 cursor-pointer self-start sm:self-center shrink-0"
-          >
-            <span>Ouvrir l'historique</span>
-            <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
-          </button>
-        </div>
-      )}
+      {/* ============================================================
+          1. COCKPIT SUPÉRIEUR UNIFIÉ : PATIENT + ALERTES + ACTIONS CLÉS
+          (Aucun besoin de défiler en bas : le bouton d'action principal
+           est TOUJOURS visible et cliquable immédiatement ici !)
+         ============================================================ */}
+      <div className="px-4 sm:px-6 py-3.5 bg-white border-b border-slate-200/90 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        {/* Identité Patient & Repères Cliniques */}
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+            {patient.firstName[0]}
+            {patient.lastName[0]}
+          </div>
 
-      {/* Onglets sobres à soulignement */}
-      <div className="flex overflow-x-auto border-b border-slate-200/80 px-3 sm:px-6 gap-1">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 py-3 px-3 text-xs sm:text-[13px] whitespace-nowrap border-b-2 -mb-px transition-colors cursor-pointer ${
-                isActive
-                  ? "border-slate-900 text-slate-900 font-semibold"
-                  : "border-transparent text-slate-500 font-medium hover:text-slate-800"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[17px]">{tab.icon}</span>
-              <span>{tab.label}</span>
-              {tab.badge !== undefined && (
-                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-semibold tabular-nums">
-                  {tab.badge}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 truncate">
+                {patient.lastName} {patient.firstName}
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-semibold tabular-nums">
+                Visite #{visitId}
+              </span>
+
+              {hasHistory ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(activeTab === "history" ? "dossier" : "history")}
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                    activeTab === "history"
+                      ? "bg-slate-900 text-white"
+                      : "bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200"
+                  }`}
+                  title="Voir les consultations précédentes de ce patient"
+                >
+                  <span className="material-symbols-outlined text-[14px]">history_edu</span>
+                  <span>Historique ({pastVisits.length})</span>
+                </button>
+              ) : (
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+                  1ère visite
                 </span>
               )}
+
+              {/* Alertes médicales critiques visibles dès l'en-tête */}
+              {patient.allergies && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold"
+                  title={`Allergies : ${patient.allergies}`}
+                >
+                  <span className="material-symbols-outlined text-[13px] text-rose-600">warning</span>
+                  <span className="truncate max-w-[160px]">Allergie : {patient.allergies}</span>
+                </span>
+              )}
+
+              {patient.antecedents && !patient.allergies && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold"
+                  title={`Antécédents : ${patient.antecedents}`}
+                >
+                  <span className="material-symbols-outlined text-[13px] text-amber-600">info</span>
+                  <span className="truncate max-w-[160px]">Antécédent : {patient.antecedents}</span>
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-slate-500 mt-0.5">
+              <span className="font-medium text-slate-700">{patient.age} ans</span>
+              {patient.gender && (
+                <span>• {patient.gender === "F" ? "Femme" : "Homme"}</span>
+              )}
+              <span>•</span>
+              <span className="whitespace-nowrap tabular-nums font-medium text-slate-700">
+                Tél. {patient.phone}
+              </span>
+              {patient.bloodGroup && (
+                <>
+                  <span>•</span>
+                  <span className="font-semibold text-rose-700">Groupe {patient.bloodGroup}</span>
+                </>
+              )}
+              {patient.mutuelle && (
+                <>
+                  <span>•</span>
+                  <span className="font-medium text-slate-700">{patient.mutuelle}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Controls & LE BOUTON D'ACTION PRINCIPAL (Visible sans scroller !) */}
+        <div className="flex items-center gap-2.5 self-end lg:self-center shrink-0">
+          {activeTab === "dossier" && (
+            <button
+              type="button"
+              disabled={isSavingDossier}
+              onClick={() => handleSaveDossier()}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 whitespace-nowrap disabled:opacity-50"
+            >
+              <span>{isSavingDossier ? "Enregistrement..." : "Enregistrer & Ordonnance"}</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
-          );
-        })}
+          )}
+
+          {activeTab === "ordonnance" && (
+            <button
+              type="button"
+              onClick={() => handleSavePrescription("none")}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 whitespace-nowrap"
+            >
+              <span>Passer à la clôture</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+          )}
+
+          {activeTab === "cloture" && (
+            <button
+              type="button"
+              disabled={isFinishing}
+              onClick={() => handleFinish()}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 whitespace-nowrap disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[16px]">check_circle</span>
+              <span>{isFinishing ? "Clôture en cours..." : "Clôturer la visite"}</span>
+            </button>
+          )}
+
+          {activeTab === "history" && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("dossier")}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-[16px]">edit_note</span>
+              <span>Reprendre l'examen</span>
+            </button>
+          )}
+
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold transition cursor-pointer whitespace-nowrap"
+            title="Sortir de la consultation (reste active jusqu'à clôture)"
+          >
+            <span className="material-symbols-outlined text-[16px]">logout</span>
+            <span className="hidden sm:inline">Quitter</span>
+          </Link>
+        </div>
       </div>
 
       {/* ============================================================
-          ONGLET 0 : HISTORIQUE MÉDICAL COMPLET (LECTURE RAPIDE & CLAIRE)
+          2. STEPPER DE NAVIGATION UNIFIÉ (ÉTAPES 1 -> 2 -> 3)
          ============================================================ */}
-      {activeTab === "history" && hasHistory && (
-        <div className="divide-y divide-slate-200/80">
-          {/* ZONE 1 : FICHE SYNTHÈSE PATIENT (SANS BOÎTES IMBRIQUÉES) */}
-          <div className="p-4 sm:p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Fiche médicale de {patient.lastName} {patient.firstName}
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {patient.createdAt ? `Patient suivi depuis le ${formatShortDate(patient.createdAt)} • ` : ""}
-                  {pastVisits.length} visite{pastVisits.length > 1 ? "s" : ""} archivée{pastVisits.length > 1 ? "s" : ""}
-                </p>
-              </div>
+      <div className="px-4 sm:px-6 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between overflow-x-auto gap-2">
+        <div className="flex items-center gap-1 -mb-px">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
               <button
+                key={tab.id}
                 type="button"
-                onClick={() => setActiveTab("dossier")}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition cursor-pointer self-start sm:self-center"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? "border-slate-900 text-slate-900 bg-white shadow-2xs rounded-t-lg"
+                    : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg"
+                }`}
               >
-                <span className="material-symbols-outlined text-[16px]">edit_note</span>
-                <span>Retour à la consultation du jour</span>
+                <span className={`w-4.5 h-4.5 rounded-full flex items-center justify-center text-[10px] font-extrabold ${
+                  isActive ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-600"
+                }`}>
+                  {tab.step}
+                </span>
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      isActive ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-700"
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
               </button>
-            </div>
+            );
+          })}
+        </div>
 
-            {/* Tableau synthèse 1 ligne propre */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-slate-200/80 border border-slate-200/90 rounded-lg overflow-hidden">
-              <div className="bg-white px-3.5 py-2.5">
-                <p className="text-[11px] text-slate-500">Âge & Sexe</p>
-                <p className="text-xs font-semibold text-slate-900 mt-0.5">
-                  {patient.age} ans{patient.gender ? ` • ${patient.gender === "F" ? "Femme" : "Homme"}` : ""}
-                </p>
-              </div>
-              <div className="bg-white px-3.5 py-2.5">
-                <p className="text-[11px] text-slate-500">Téléphone / CIN</p>
-                <p className="text-xs font-semibold text-slate-900 tabular-nums mt-0.5 truncate">
-                  {patient.phone}
-                  {patient.cin ? ` • ${patient.cin}` : ""}
-                </p>
-              </div>
-              <div className="bg-white px-3.5 py-2.5">
-                <p className="text-[11px] text-slate-500">Mutuelle</p>
-                <p className="text-xs font-semibold text-slate-900 mt-0.5 truncate">
-                  {patient.mutuelle || "—"}
-                </p>
-              </div>
-              <div className="bg-white px-3.5 py-2.5">
-                <p className="text-[11px] text-slate-500">Groupe sanguin</p>
-                <p className={`text-xs font-semibold mt-0.5 ${patient.bloodGroup ? "text-rose-700" : "text-slate-400"}`}>
-                  {patient.bloodGroup || "Non renseigné"}
-                </p>
-              </div>
-            </div>
+        <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-400 pr-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Fiche active enregistrée en direct</span>
+        </div>
+      </div>
 
-            {/* Allergies & Antécédents : sobres si vides, accentués UNIQUEMENT si renseignés */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div
-                className={`px-3.5 py-2.5 rounded-lg border-l-[3px] border ${
-                  patient.allergies
-                    ? "border-red-200 border-l-red-600 bg-red-50/40"
-                    : "border-slate-200/80 border-l-slate-300 bg-slate-50/50"
-                }`}
-              >
-                <span className={`font-semibold block ${patient.allergies ? "text-red-800" : "text-slate-500"}`}>
-                  Allergies
+      {/* ============================================================
+          ONGLET 1 : EXAMEN DU JOUR (LAYOUT ZERO-SCROLL EN 2 COLONNES)
+         ============================================================ */}
+      {activeTab === "dossier" && (
+        <form
+          id="consultation-dossier-form"
+          onSubmit={handleSaveDossier}
+          className="p-4 sm:p-5 space-y-3.5"
+        >
+          {/* Bandeau Constantes vitales ultra-compact (1 seule ligne horizontale propre) */}
+          {vitalsFields.length > 0 && (
+            <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-2.5 shadow-2xs">
+              <div className="flex items-center justify-between mb-1.5 px-1">
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-slate-500">
+                    monitor_heart
+                  </span>
+                  <span>Constantes & Mesures</span>
                 </span>
-                <p className={`mt-0.5 ${patient.allergies ? "text-red-950 font-medium" : "text-slate-500"}`}>
-                  {patient.allergies || "Aucune allergie signalée"}
-                </p>
+
+                <div className="flex items-center gap-3">
+                  {bmi && (
+                    <span className="text-xs font-bold text-sky-700 tabular-nums bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
+                      IMC : {bmi} kg/m²
+                    </span>
+                  )}
+                  <Link
+                    href="/dashboard/settings"
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 inline-flex items-center gap-0.5"
+                    title="Gérer les constantes médicales du cabinet"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">tune</span>
+                    <span>Gérer</span>
+                  </Link>
+                </div>
               </div>
 
-              <div
-                className={`px-3.5 py-2.5 rounded-lg border-l-[3px] border ${
-                  patient.antecedents
-                    ? "border-amber-200 border-l-amber-500 bg-amber-50/40"
-                    : "border-slate-200/80 border-l-slate-300 bg-slate-50/50"
-                }`}
-              >
-                <span className={`font-semibold block ${patient.antecedents ? "text-amber-900" : "text-slate-500"}`}>
-                  Antécédents médicaux
-                </span>
-                <p className={`mt-0.5 ${patient.antecedents ? "text-amber-950 font-medium" : "text-slate-500"}`}>
-                  {patient.antecedents || "Aucun antécédent enregistré"}
-                </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {vitalsFields.map((field) => (
+                  <div key={field.id} className="relative">
+                    <span className="absolute left-2.5 top-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {field.label} {field.unit ? `(${field.unit})` : ""}
+                    </span>
+                    <input
+                      type={field.type === "number" ? "number" : "text"}
+                      value={
+                        fieldValues[field.id] ??
+                        (field.systemKey ? fieldValues[field.systemKey] : "") ??
+                        ""
+                      }
+                      onChange={(e) => setFieldValue(field.id, e.target.value)}
+                      placeholder={field.placeholder || ""}
+                      className="w-full pt-5 pb-1.5 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-slate-900 transition shadow-2xs tabular-nums"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
-          {/* ZONE 2 : CHRONOLOGIE DES CONSULTATIONS (CLAIRE, STRUCTURÉE, SCANNABLE EN 2 SECONDES) */}
-          <div className="p-4 sm:p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Consultations précédentes ({filteredPastVisits.length})
-              </h3>
-              <div className="relative w-full sm:w-72">
-                <span className="material-symbols-outlined text-[17px] text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">
-                  search
-                </span>
+          {/* Espace Clinique Ergonomique en 2 Colonnes (tout tient sur l'écran sans scroller !) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+            {/* Colonne Gauche : Motif & Diagnostic */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-slate-500">
+                    stethoscope
+                  </span>
+                  <span>Motif de consultation & Symptômes</span>
+                </label>
                 <input
                   type="text"
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                  placeholder="Filtrer par date, diagnostic, médicament..."
-                  className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-900"
+                  value={fieldValues.disease || ""}
+                  onChange={(e) => setFieldValue("disease", e.target.value)}
+                  placeholder="Ex: Céphalées aiguës, fièvre depuis 48h, bilan de contrôle..."
+                  className="w-full px-3 py-2 text-xs font-medium bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-slate-500">
+                    clinical_notes
+                  </span>
+                  <span>Diagnostic & Examen Clinique</span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={fieldValues.diagnosis || ""}
+                  onChange={(e) => setFieldValue("diagnosis", e.target.value)}
+                  placeholder="Observations cliniques, auscultation, palpation, conclusions..."
+                  className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs resize-y leading-relaxed"
                 />
               </div>
             </div>
 
-            {filteredPastVisits.length === 0 ? (
-              <div className="py-10 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-lg">
-                Aucune consultation ne correspond à « {historySearch} ».
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredPastVisits.map((pv, idx) => {
-                  const isOpen = expandedVisits[pv.id] ?? false;
-                  const pastBmi = computePastBmi(pv.weight, pv.height);
-                  const vitalsList = [
-                    pv.bloodPressure ? { label: "Tension", val: `${pv.bloodPressure} mmHg` } : null,
-                    pv.heartRate ? { label: "Pouls", val: `${pv.heartRate} bpm` } : null,
-                    pv.temperature ? { label: "Temp.", val: `${pv.temperature} °C` } : null,
-                    pv.weight ? { label: "Poids", val: `${pv.weight} kg` } : null,
-                    pv.height ? { label: "Taille", val: `${pv.height} cm` } : null,
-                    pastBmi ? { label: "IMC", val: pastBmi } : null,
-                  ].filter(Boolean) as { label: string; val: string }[];
-
-                  return (
-                    <div
-                      key={pv.id}
-                      className="rounded-xl border border-slate-200/90 bg-white overflow-hidden"
-                    >
-                      {/* Barre de date cliquable (ouvrir/fermer) */}
-                      <button
-                        type="button"
-                        onClick={() => toggleVisitExpand(pv.id)}
-                        className="w-full px-4 py-3 bg-slate-50/90 hover:bg-slate-100/70 border-b border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left transition cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="w-6 h-6 rounded-md bg-slate-900 text-white text-[11px] font-semibold flex items-center justify-center tabular-nums shrink-0">
-                            {pastVisits.length - idx}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">
-                              {formatVisitDateTime(pv.date)}
-                            </p>
-                            {!isOpen && pv.disease && (
-                              <p className="text-xs text-slate-500 truncate mt-0.5">
-                                {pv.disease}
-                                {pv.medicines.length > 0 ? ` • ${pv.medicines.length} méd.` : ""}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pl-9 sm:pl-0">
-                          <div className="flex items-center gap-2 text-xs">
-                            {pv.amountToPay && (
-                              <span className="font-semibold text-slate-800 tabular-nums">
-                                {parseFloat(pv.amountToPay).toFixed(0)} DH
-                              </span>
-                            )}
-                            <span
-                              className={`inline-flex items-center gap-1 font-medium ${
-                                pv.paymentStatus === "paid" ? "text-emerald-700" : "text-amber-700"
-                              }`}
-                            >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  pv.paymentStatus === "paid" ? "bg-emerald-500" : "bg-amber-500"
-                                }`}
-                              />
-                              {pv.paymentStatus === "paid"
-                                ? `Payé${pv.paymentMethod ? ` (${PAYMENT_LABELS[pv.paymentMethod] || pv.paymentMethod})` : ""}`
-                                : "À encaisser"}
-                            </span>
-                          </div>
-                          <span className="material-symbols-outlined text-[18px] text-slate-400">
-                            {isOpen ? "expand_less" : "expand_more"}
-                          </span>
-                        </div>
-                      </button>
-
-                      {/* Détails structurés par séparateurs fins (zéro boîtes dans des boîtes) */}
-                      {isOpen && (
-                        <div className="divide-y divide-slate-100">
-                          {/* 1. Bandeau Constantes vitales (tableau horizontal propre) */}
-                          {vitalsList.length > 0 && (
-                            <div className="px-4 py-3 flex flex-wrap gap-x-6 gap-y-2 bg-white">
-                              {vitalsList.map((vt) => (
-                                <div key={vt.label}>
-                                  <span className="block text-[11px] text-slate-400">{vt.label}</span>
-                                  <span className="text-xs font-semibold text-slate-900 tabular-nums">
-                                    {vt.val}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* 2. Examen clinique : Motif, Diagnostic, Notes */}
-                          {(pv.disease || pv.diagnosis || pv.notes) && (
-                            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                              <div className="space-y-3">
-                                {pv.disease && (
-                                  <div>
-                                    <p className="text-[11px] font-medium text-slate-400 mb-0.5">
-                                      Motif / Pathologie
-                                    </p>
-                                    <p className="text-sm font-medium text-slate-900">{pv.disease}</p>
-                                  </div>
-                                )}
-                                {pv.diagnosis && (
-                                  <div>
-                                    <p className="text-[11px] font-medium text-slate-400 mb-0.5">
-                                      Diagnostic clinique
-                                    </p>
-                                    <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">
-                                      {pv.diagnosis}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-
-                              {pv.notes && (
-                                <div>
-                                  <p className="text-[11px] font-medium text-slate-400 mb-0.5">
-                                    Notes & observations
-                                  </p>
-                                  <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">
-                                    {pv.notes}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* 3. Champs personnalisés (si présents) */}
-                          {pv.customData && pv.customData.length > 0 && (
-                            <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5 text-xs">
-                              {pv.customData.map((cf, cIdx) => (
-                                <div key={`${cf.id}-${cIdx}`}>
-                                  <span className="block text-[11px] text-slate-400">{cf.label}</span>
-                                  <span className="font-medium text-slate-900 whitespace-pre-line">
-                                    {cf.value}
-                                    {cf.unit ? ` ${cf.unit}` : ""}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* 4. Ordonnance prescrite ce jour */}
-                          <div className="px-4 py-3.5 bg-slate-50/40">
-                            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                              <p className="text-xs font-semibold text-slate-800">
-                                Ordonnance ({pv.medicines.length})
-                              </p>
-                              {pv.medicines.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRenewPrescription(pv.medicines)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 text-xs font-medium transition cursor-pointer"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                                  <span>Reconduire</span>
-                                </button>
-                              )}
-                            </div>
-
-                            {pv.medicines.length === 0 ? (
-                              <p className="text-xs text-slate-400">
-                                Aucun médicament prescrit lors de cette visite.
-                              </p>
-                            ) : (
-                              <ol className="space-y-1.5">
-                                {pv.medicines.map((med, mIdx) => (
-                                  <li key={mIdx} className="text-xs flex items-baseline gap-2">
-                                    <span className="text-slate-400 font-mono text-[11px] tabular-nums shrink-0">
-                                      {String(mIdx + 1).padStart(2, "0")}.
-                                    </span>
-                                    <span className="text-slate-900 font-semibold">{med.name}</span>
-                                    {med.instructions && (
-                                      <span className="text-slate-500">— {med.instructions}</span>
-                                    )}
-                                  </li>
-                                ))}
-                              </ol>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* ZONE 3 : RENDEZ-VOUS DU PATIENT (SI PRÉSENTS) */}
-          {pastAppointments.length > 0 && (
-            <div className="p-4 sm:p-6 space-y-3">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Rendez-vous ({pastAppointments.length})
-              </h3>
-              <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-lg overflow-hidden">
-                {pastAppointments.map((a) => (
-                  <div
-                    key={a.id}
-                    className="px-4 py-2.5 bg-white flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <span className="font-semibold text-slate-900 tabular-nums">
-                        {formatShortDate(a.date)} à {a.time}
-                      </span>
-                      <span className="text-slate-500 ml-2">{a.reason}</span>
-                    </div>
-                    <span
-                      className={`text-[11px] font-medium shrink-0 ${
-                        a.status === "admitted"
-                          ? "text-emerald-700"
-                          : a.status === "cancelled"
-                          ? "text-red-600"
-                          : "text-sky-700"
-                      }`}
-                    >
-                      {a.status === "admitted"
-                        ? "Honoré"
-                        : a.status === "cancelled"
-                        ? "Annulé"
-                        : "Planifié"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ============================================================
-          ONGLET 1 : EXAMEN & CONSTANTES DU JOUR
-         ============================================================ */}
-      {activeTab === "dossier" && (
-        <form onSubmit={handleSaveDossier} className="p-4 sm:p-6 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">Examen du jour</h2>
-              <p className="text-xs text-slate-500">
-                Tous les champs restent libres, remplissez uniquement ceux utiles.
-              </p>
-            </div>
-            <Link
-              href="/dashboard/settings"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white transition"
-            >
-              <span className="material-symbols-outlined text-[15px]">tune</span>
-              <span>Modifier mes cases</span>
-            </Link>
-          </div>
-
-          {/* Bloc Constantes / Mesures */}
-          {vitalsFields.length > 0 && (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold text-slate-700">Constantes & mesures</h3>
-                {bmi && (
-                  <span className="text-xs font-semibold text-sky-700 tabular-nums">
-                    IMC calculé : {bmi}
+            {/* Colonne Droite : Notes confidentielles + Repères Terrain */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[15px] text-slate-500">
+                    lock
                   </span>
-                )}
+                  <span>Notes Personnelles & Recommandations (Confidentiel)</span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={fieldValues.notes || ""}
+                  onChange={(e) => setFieldValue("notes", e.target.value)}
+                  placeholder="Notes de suivi interne, bilans prescrits, consignes..."
+                  className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs resize-y leading-relaxed"
+                />
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
-                {vitalsFields.map((field) => (
-                  <div key={field.id}>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
-                      {field.label}
-                      {field.unit ? <span className="text-slate-400"> ({field.unit})</span> : ""}
-                      {field.required && <span className="text-red-500 ml-0.5">*</span>}
-                    </label>
-                    {renderDynamicInput(field, true)}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Bloc Examen Clinique */}
-          {clinicalFields.length > 0 && (
-            <div className="space-y-4">
-              {clinicalFields.map((field) => (
-                <div key={field.id}>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    {field.label}
-                    {field.unit ? <span className="text-slate-400 font-normal"> ({field.unit})</span> : ""}
-                    {field.required && <span className="text-red-500 ml-0.5">*</span>}
-                  </label>
-                  {renderDynamicInput(field, false)}
+              {/* Repères Terrain sous les yeux du médecin */}
+              <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 text-xs space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Repères terrain patient
+                </span>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-slate-600">
+                  <span>
+                    Groupe : <strong>{patient.bloodGroup || "Non renseigné"}</strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Allergies :{" "}
+                    <strong className={patient.allergies ? "text-rose-700" : "text-slate-700"}>
+                      {patient.allergies || "Aucune"}
+                    </strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Antécédents :{" "}
+                    <strong className={patient.antecedents ? "text-amber-800" : "text-slate-700"}>
+                      {patient.antecedents || "Aucun"}
+                    </strong>
+                  </span>
                 </div>
-              ))}
+              </div>
             </div>
-          )}
+          </div>
 
-          <div className="pt-4 border-t border-slate-200/80 flex justify-end">
+          {/* Pied de formulaire Examen */}
+          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs text-slate-400 hidden sm:inline">
+              Remplissez les champs nécessaires puis passez à l'étape suivante.
+            </span>
             <button
               type="submit"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition cursor-pointer"
+              disabled={isSavingDossier}
+              className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer shadow-xs ml-auto disabled:opacity-50"
             >
-              <span>Enregistrer et passer à l'ordonnance</span>
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              <span>{isSavingDossier ? "Enregistrement..." : "Enregistrer et passer à l'ordonnance"}</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
           </div>
         </form>
@@ -907,51 +738,101 @@ export default function ConsultationClient({
           ONGLET 2 : ORDONNANCE MÉDICALE
          ============================================================ */}
       {activeTab === "ordonnance" && (
-        <div className="p-4 sm:p-6 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/80">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">Prescription médicale</h2>
-              <p className="text-xs text-slate-500">
-                Saisissez les premières lettres d'un médicament pour l'autocomplétion.
-              </p>
-            </div>
+        <div className="p-4 sm:p-5 space-y-4">
+          {/* Barre d'outils Ordonnance (Ajout + Impression + PDF) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
             <div className="flex items-center gap-2">
-              {settings?.prescriptionTemplateUrl ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Template perso actif
-                </span>
-              ) : (
-                <Link
-                  href="/dashboard/settings"
-                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md transition"
-                >
-                  <span className="material-symbols-outlined text-[14px]">upload_file</span>
-                  Ajouter mon template
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {medicines.length === 0 ? (
-            <div className="py-10 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 space-y-3">
-              <p className="text-sm font-medium text-slate-700">Aucun médicament ajouté</p>
               <button
                 type="button"
                 onClick={addMedicine}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer shadow-xs"
               >
                 <span className="material-symbols-outlined text-[16px]">add</span>
-                <span>Ajouter le premier médicament</span>
+                <span>Ajouter un médicament</span>
+              </button>
+
+              {settings?.prescriptionTemplateUrl && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Template personnalisé
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleSavePrescription("none")}
+                className="px-3 py-1.5 text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+              >
+                Enregistrer
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSavePrescription("pdf")}
+                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-2xs"
+              >
+                <span className="material-symbols-outlined text-[15px]">picture_as_pdf</span>
+                <span>Télécharger PDF</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSavePrescription("print")}
+                className="inline-flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-2xs"
+              >
+                <span className="material-symbols-outlined text-[15px]">print</span>
+                <span>Imprimer</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSavePrescription("none")}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                <span>Passer à la clôture</span>
+                <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
               </button>
             </div>
+          </div>
+
+          {/* Liste des médicaments */}
+          {medicines.length === 0 ? (
+            <div className="py-12 px-4 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <span className="material-symbols-outlined text-2xl">prescriptions</span>
+              </div>
+              <p className="text-xs font-bold text-slate-700">Aucun médicament prescrit</p>
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={addMedicine}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span>Ajouter le premier médicament</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("cloture")}
+                  className="px-4 py-2 text-slate-600 font-semibold text-xs hover:bg-slate-100 rounded-xl border border-slate-200 transition cursor-pointer"
+                >
+                  Sans ordonnance →
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {medicines.map((med, i) => (
                 <div
                   key={i}
-                  className="p-3.5 rounded-xl border border-slate-200/90 bg-slate-50/40 flex flex-col sm:flex-row items-stretch sm:items-end gap-3"
+                  className="p-3 rounded-xl border border-slate-200/90 bg-slate-50/50 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5"
                 >
+                  <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center shrink-0">
+                    {i + 1}
+                  </span>
+
                   <div className="flex-1 min-w-0">
                     <MedicalAutocomplete
                       value={med.name}
@@ -959,90 +840,52 @@ export default function ConsultationClient({
                       onSelectInstruction={(inst) => updateMedicine(i, "instructions", inst)}
                     />
                   </div>
+
                   <div className="flex-1 min-w-0">
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Posologie & durée
-                    </label>
                     <input
                       type="text"
                       value={med.instructions}
                       onChange={(e) => updateMedicine(i, "instructions", e.target.value)}
-                      placeholder="Ex: 1 cp matin et soir pendant 7 jours"
+                      placeholder="Posologie & durée (ex: 1 cp matin et soir pendant 7 jours)"
                       className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-slate-900"
                     />
                   </div>
+
                   <button
                     type="button"
                     onClick={() => setMedicines(medicines.filter((_, idx) => idx !== i))}
-                    className="self-end p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer shrink-0"
-                    title="Retirer ce médicament"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer shrink-0 self-end sm:self-center"
+                    title="Supprimer ce médicament"
                   >
                     <span className="material-symbols-outlined text-[18px]">delete</span>
                   </button>
                 </div>
               ))}
-
-              <button
-                type="button"
-                onClick={addMedicine}
-                className="inline-flex items-center gap-1.5 text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-lg font-medium text-xs transition cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">add</span>
-                <span>Ajouter un médicament</span>
-              </button>
             </div>
           )}
-
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-end items-center gap-2.5 border-t border-slate-200/80 pt-5">
-            <button
-              type="button"
-              onClick={() => setActiveTab("cloture")}
-              className="px-3.5 py-2.5 text-slate-600 font-medium text-xs hover:bg-slate-100 rounded-lg border border-slate-200 sm:border-transparent transition cursor-pointer text-center"
-            >
-              Sans ordonnance
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSavePrescription("none")}
-              className="px-3.5 py-2.5 text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg font-medium text-xs transition cursor-pointer text-center"
-            >
-              Enregistrer
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSavePrescription("pdf")}
-              className="inline-flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg font-medium text-xs transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-              <span>Télécharger PDF</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSavePrescription("print")}
-              className="inline-flex items-center justify-center gap-1.5 bg-sky-700 hover:bg-sky-600 text-white px-4 py-2.5 rounded-lg font-medium text-xs transition cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">print</span>
-              <span>Imprimer</span>
-            </button>
-          </div>
         </div>
       )}
 
       {/* ============================================================
-          ONGLET 3 : HONORAIRES & CLÔTURE
+          ONGLET 3 : HONORAIRES & CLÔTURE DE CONSULTATION
          ============================================================ */}
       {activeTab === "cloture" && (
-        <form onSubmit={handleFinish} className="p-4 sm:p-6 max-w-lg mx-auto space-y-6">
-          <div className="pb-4 border-b border-slate-200/80">
-            <h2 className="text-base font-semibold text-slate-900">Honoraires et clôture</h2>
+        <form
+          id="consultation-finish-form"
+          onSubmit={handleFinish}
+          className="p-4 sm:p-6 max-w-xl mx-auto space-y-5"
+        >
+          <div className="pb-3 border-b border-slate-200/80">
+            <h2 className="text-sm font-bold text-slate-900">Honoraires & Clôture de la visite</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Le tarif sera transmis automatiquement à l'assistante pour encaissement.
+              Le montant sera transmis automatiquement à l'accueil pour encaissement par l'assistante.
             </p>
           </div>
 
           <div className="space-y-4">
+            {/* Montant des honoraires avec raccourcis rapides en 1 clic */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
                 Montant des honoraires (DH)
               </label>
               <div className="relative">
@@ -1054,31 +897,51 @@ export default function ConsultationClient({
                   autoComplete="off"
                   placeholder="250"
                   step="10"
-                  className="w-full pr-14 pl-4 py-3 text-xl font-semibold text-slate-900 bg-white border border-slate-200 rounded-lg focus:border-slate-900 focus:outline-none tabular-nums"
+                  className="w-full pr-14 pl-4 py-2.5 text-xl font-bold text-slate-900 bg-white border border-slate-200 rounded-xl focus:border-slate-900 focus:outline-none tabular-nums shadow-2xs"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                   DH
                 </span>
               </div>
+
+              {/* Raccourcis montants en 1 clic */}
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="text-[11px] text-slate-400 mr-1">Tarifs usuels :</span>
+                {["150", "200", "250", "300", "400"].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setAmount(preset)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      amount === preset
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    }`}
+                  >
+                    {preset} DH
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* Mode de règlement prévu */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
                 Mode de règlement prévu
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: "cash", label: "Espèces", icon: "payments" },
-                  { id: "card", label: "Carte", icon: "credit_card" },
+                  { id: "card", label: "Carte bancaire", icon: "credit_card" },
                   { id: "check", label: "Chèque", icon: "fact_check" },
                 ].map((m) => (
                   <button
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id)}
-                    className={`py-2.5 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
                       paymentMethod === m.id
-                        ? "bg-slate-900 border-slate-900 text-white"
+                        ? "bg-slate-900 border-slate-900 text-white shadow-2xs"
                         : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                   >
@@ -1089,48 +952,180 @@ export default function ConsultationClient({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-200/80 space-y-2">
-              <label className="block text-xs font-semibold text-slate-700">
+            {/* Prochain RDV de contrôle */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <label className="block text-xs font-bold text-slate-800">
                 Prochain rendez-vous de contrôle <span className="text-slate-400 font-normal">(optionnel)</span>
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type="date"
                   name="nextAppointment"
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:border-slate-900 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:border-slate-900 focus:outline-none"
                 />
                 <input
                   type="time"
                   name="nextAppointmentTime"
                   defaultValue="10:00"
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:border-slate-900 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:border-slate-900 focus:outline-none"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2.5">
+          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row gap-2.5">
             <button
               type="button"
               onClick={() => triggerPrint("receipt")}
-              className="sm:w-auto px-4 py-3 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-medium text-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+              <span className="material-symbols-outlined text-[16px]">receipt_long</span>
               <span>Imprimer reçu</span>
             </button>
+
             <button
               type="submit"
               disabled={isFinishing}
-              className="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-medium text-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 shadow-xs"
             >
-              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-              <span>{isFinishing ? "Clôture en cours..." : "Clôturer et archiver la consultation"}</span>
+              <span className="material-symbols-outlined text-[16px]">check_circle</span>
+              <span>{isFinishing ? "Clôture en cours..." : "Clôturer et envoyer à l'assistante"}</span>
             </button>
           </div>
         </form>
       )}
 
-      {/* Impression Invisible Ordonnance (isolée pour ne jamais entrer en collision avec le reçu) */}
+      {/* ============================================================
+          ONGLET 0 : HISTORIQUE PATIENT & VISITES ANTÉRIEURES
+         ============================================================ */}
+      {activeTab === "history" && hasHistory && (
+        <div className="p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                Historique des visites antérieures ({filteredPastVisits.length})
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Consultez les ordonnances, diagnostics et constantes des visites passées.
+              </p>
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <span className="material-symbols-outlined text-[16px] text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">
+                search
+              </span>
+              <input
+                type="text"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Rechercher..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-slate-900"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {filteredPastVisits.map((pv, idx) => {
+              const isOpen = expandedVisits[pv.id] ?? false;
+              const pastBmi = computePastBmi(pv.weight, pv.height);
+              const vitalsList = [
+                pv.bloodPressure ? { label: "Tension", val: `${pv.bloodPressure} mmHg` } : null,
+                pv.heartRate ? { label: "Pouls", val: `${pv.heartRate} bpm` } : null,
+                pv.temperature ? { label: "Temp.", val: `${pv.temperature} °C` } : null,
+                pv.weight ? { label: "Poids", val: `${pv.weight} kg` } : null,
+                pv.height ? { label: "Taille", val: `${pv.height} cm` } : null,
+                pastBmi ? { label: "IMC", val: pastBmi } : null,
+              ].filter(Boolean) as { label: string; val: string }[];
+
+              return (
+                <div key={pv.id} className="rounded-xl border border-slate-200/90 bg-white overflow-hidden shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => toggleVisitExpand(pv.id)}
+                    className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 flex items-center justify-between gap-2 text-left transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-5 h-5 rounded-md bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                        {pastVisits.length - idx}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-900">
+                          {formatVisitDateTime(pv.date)}
+                        </span>
+                        {pv.disease && (
+                          <span className="text-xs text-slate-500 ml-2 font-medium">
+                            — {pv.disease}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {pv.medicines.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 text-[11px] font-semibold">
+                          {pv.medicines.length} médicament{pv.medicines.length > 1 ? "s" : ""}
+                        </span>
+                      )}
+                      <span className="material-symbols-outlined text-[18px] text-slate-400">
+                        {isOpen ? "expand_less" : "expand_more"}
+                      </span>
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div className="p-4 space-y-3 border-t border-slate-100 text-xs">
+                      {vitalsList.length > 0 && (
+                        <div className="flex flex-wrap gap-4 p-2.5 rounded-lg bg-slate-50">
+                          {vitalsList.map((vt) => (
+                            <div key={vt.label}>
+                              <span className="text-[10px] text-slate-400 block">{vt.label}</span>
+                              <span className="font-bold text-slate-900">{vt.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {pv.diagnosis && (
+                        <div>
+                          <span className="font-bold text-slate-700 block mb-0.5">Diagnostic :</span>
+                          <p className="text-slate-800 leading-relaxed whitespace-pre-line">{pv.diagnosis}</p>
+                        </div>
+                      )}
+
+                      {pv.medicines.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-bold text-slate-700">Prescription :</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRenewPrescription(pv.medicines)}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                              <span>Reconduire dans l'ordonnance</span>
+                            </button>
+                          </div>
+                          <ul className="space-y-1">
+                            {pv.medicines.map((m, mIdx) => (
+                              <li key={mIdx} className="flex items-baseline gap-1.5">
+                                <span className="text-slate-400">•</span>
+                                <strong className="text-slate-900">{m.name}</strong>
+                                {m.instructions && <span className="text-slate-500">— {m.instructions}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Impression Invisible Ordonnance */}
       {printDoc === "prescription" && (
         <PrescriptionPDF
           patient={patient}
@@ -1140,7 +1135,7 @@ export default function ConsultationClient({
         />
       )}
 
-      {/* Impression Invisible Reçu / Quittance */}
+      {/* Impression Invisible Reçu */}
       {printDoc === "receipt" && (
         <ReceiptPDF
           patient={patient}

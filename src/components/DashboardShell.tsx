@@ -350,13 +350,20 @@ export default function DashboardShell({
               <p className="text-[11px] text-slate-500 mb-2.5">
                 {currentConsultation.patientAge} ans
               </p>
-              <Link
-                href={`/dashboard/consultation/${currentConsultation.visitId}`}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
-              >
-                <span>Reprendre</span>
-                <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
-              </Link>
+              {pathname === `/dashboard/consultation/${currentConsultation.visitId}` ? (
+                <div className="w-full py-1.5 px-2 rounded-lg bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-[11px] font-bold text-center flex items-center justify-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                  <span>Fiche ouverte</span>
+                </div>
+              ) : (
+                <Link
+                  href={`/dashboard/consultation/${currentConsultation.visitId}`}
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+                >
+                  <span>Reprendre</span>
+                  <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+                </Link>
+              )}
             </div>
           ) : (
             <Link
