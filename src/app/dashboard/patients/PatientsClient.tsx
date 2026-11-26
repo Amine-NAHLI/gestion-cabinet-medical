@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { createVisitForExistingPatient, updatePatient } from "@/actions/patients";
+import { createVisitForExistingPatient, updatePatient, deletePatient } from "@/actions/patients";
 import AddPatientModal from "@/components/AddPatientModal";
 import Link from "next/link";
 
@@ -46,6 +46,7 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
   const [selectedPatient, setSelectedPatient] = useState<PatientWithHistory | null>(null);
   const [editingPatient, setEditingPatient] = useState<PatientWithHistory | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Synchronisation automatique lorsque de nouveaux patients arrivent en direct
@@ -60,6 +61,31 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
+  }
+
+  async function handleDeletePatient(patientId: number, name: string) {
+    if (
+      !confirm(
+        `Êtes-vous sûr de vouloir supprimer définitivement le dossier de ${name} ?\nToutes les consultations associées seront également effacées.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingId(patientId);
+    try {
+      const res = await deletePatient(patientId);
+      if (res && res.success) {
+        showToast(`Dossier de ${name} supprimé avec succès.`);
+        setPatientsList((prev) => prev.filter((p) => p.id !== patientId));
+        if (selectedPatient?.id === patientId) setSelectedPatient(null);
+        if (editingPatient?.id === patientId) setEditingPatient(null);
+      } else {
+        showToast(res?.error || "Erreur lors de la suppression.");
+      }
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   const filtered = useMemo(() => {
@@ -259,6 +285,18 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                       <span className="material-symbols-outlined text-[16px]">queue</span>
                       <span>{loadingId === patient.id ? "Admission..." : "Admettre"}</span>
                     </button>
+
+                    <button
+                      type="button"
+                      disabled={deletingId === patient.id}
+                      onClick={() => handleDeletePatient(patient.id, `${patient.lastName} ${patient.firstName}`)}
+                      className="p-2 sm:p-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition cursor-pointer shrink-0 disabled:opacity-50"
+                      title="Supprimer définitivement la fiche patient"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        {deletingId === patient.id ? "progress_activity" : "delete"}
+                      </span>
+                    </button>
                   </div>
                 </div>
               );
@@ -301,12 +339,33 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedPatient(null)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer shrink-0"
-                >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={deletingId === selectedPatient.id}
+                    onClick={() =>
+                      handleDeletePatient(
+                        selectedPatient.id,
+                        `${selectedPatient.lastName} ${selectedPatient.firstName}`
+                      )
+                    }
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                    title="Supprimer définitivement la fiche de ce patient"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">
+                      {deletingId === selectedPatient.id ? "progress_activity" : "delete"}
+                    </span>
+                    <span className="hidden sm:inline">Supprimer fiche</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedPatient(null)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">close</span>
+                  </button>
+                </div>
               </div>
 
               {/* Contenu Scrollable */}

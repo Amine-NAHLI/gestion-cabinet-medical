@@ -9,6 +9,7 @@ import Link from "next/link";
 import AddPatientModal from "@/components/AddPatientModal";
 import AddAppointmentModal from "@/components/AddAppointmentModal";
 import PatientHistoryButton from "@/components/PatientHistoryButton";
+import CancelVisitButton from "@/components/CancelVisitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -302,6 +303,12 @@ export default async function DashboardIndex() {
                   <span>Ouvrir la consultation</span>
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </Link>
+
+                <CancelVisitButton
+                  variant="button"
+                  visitId={readyPatient.id}
+                  patientName={`${readyPatient.patient.lastName} ${readyPatient.patient.firstName}`}
+                />
               </div>
             </div>
           ) : (

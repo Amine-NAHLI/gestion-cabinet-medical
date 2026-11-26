@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { patients, visits, prescriptions } from "@/db/schema";
+import { patients, visits, prescriptions, appointments } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { ilike, or, eq, desc, and, inArray, ne } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
@@ -262,6 +262,45 @@ export async function cancelVisit(visitId: number) {
   } catch (error) {
     console.error("Erreur annulation visite:", error);
     return { success: false, error: "Erreur lors de l'annulation de la visite." };
+  }
+}
+
+export async function deletePatient(patientId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
+  const clinicId = await getTenantClinicId();
+
+  try {
+    const patientVisits = await db
+      .select({ id: visits.id })
+      .from(visits)
+      .where(and(eq(visits.patientId, patientId), eq(visits.clinicId, clinicId)));
+
+    const visitIds = patientVisits.map((v) => v.id);
+    if (visitIds.length > 0) {
+      await db.delete(prescriptions).where(inArray(prescriptions.visitId, visitIds));
+      await db
+        .delete(visits)
+        .where(and(eq(visits.patientId, patientId), eq(visits.clinicId, clinicId)));
+    }
+
+    await db
+      .delete(appointments)
+      .where(and(eq(appointments.patientId, patientId), eq(appointments.clinicId, clinicId)));
+
+    await db
+      .delete(patients)
+      .where(and(eq(patients.id, patientId), eq(patients.clinicId, clinicId)));
+
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/patients");
+    revalidatePath("/dashboard/queue");
+    revalidatePath("/dashboard/history");
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur suppression patient:", error);
+    return { success: false, error: "Erreur lors de la suppression de la fiche patient." };
   }
 }
 

@@ -2,15 +2,61 @@
 
 import { useState } from "react";
 import { cancelVisit } from "@/actions/patients";
+import { useRouter } from "next/navigation";
 
-export default function CancelVisitButton({ visitId }: { visitId: number }) {
+interface CancelVisitButtonProps {
+  visitId: number;
+  patientName?: string;
+  variant?: "icon" | "button";
+  className?: string;
+}
+
+export default function CancelVisitButton({
+  visitId,
+  patientName,
+  variant = "icon",
+  className = "",
+}: CancelVisitButtonProps) {
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   async function handleCancel() {
-    if (!confirm("Voulez-vous retirer ce patient de la file d'attente ?")) return;
+    const nameStr = patientName ? ` (${patientName})` : "";
+    if (
+      !confirm(
+        `Voulez-vous retirer ce patient${nameStr} de la file d'attente ?\nLa visite sera annulée sans être facturée.`
+      )
+    ) {
+      return;
+    }
     setLoading(true);
-    await cancelVisit(visitId);
-    setLoading(false);
+    try {
+      await cancelVisit(visitId);
+      router.refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (variant === "button") {
+    return (
+      <button
+        type="button"
+        onClick={handleCancel}
+        disabled={loading}
+        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-700 hover:border-rose-300 text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50 ${className}`}
+        title="Retirer le patient de la file (patient parti ou admission annulée)"
+      >
+        <span
+          className={`material-symbols-outlined text-[16px] text-rose-500 ${
+            loading ? "animate-spin" : ""
+          }`}
+        >
+          {loading ? "progress_activity" : "person_remove"}
+        </span>
+        <span>{loading ? "Retrait..." : "Retirer de la file"}</span>
+      </button>
+    );
   }
 
   return (
@@ -18,10 +64,16 @@ export default function CancelVisitButton({ visitId }: { visitId: number }) {
       type="button"
       onClick={handleCancel}
       disabled={loading}
-      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer disabled:opacity-50"
-      title="Retirer de la file (patient parti ou annulé)"
+      className={`p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer disabled:opacity-50 flex items-center justify-center ${className}`}
+      title="Retirer de la file d'attente (patient parti ou annulé)"
     >
-      <span className="material-symbols-outlined text-base">close</span>
+      <span
+        className={`material-symbols-outlined text-[18px] ${
+          loading ? "animate-spin text-rose-500" : ""
+        }`}
+      >
+        {loading ? "progress_activity" : "close"}
+      </span>
     </button>
   );
 }

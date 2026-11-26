@@ -122,6 +122,10 @@ export default async function QueuePage() {
                         <span>Ouvrir la consultation</span>
                         <span className="material-symbols-outlined text-base">arrow_forward</span>
                       </Link>
+                      <CancelVisitButton
+                        visitId={visit.id}
+                        patientName={`${visit.patient.lastName} ${visit.patient.firstName}`}
+                      />
                     </div>
                   </div>
                 );
@@ -235,7 +239,10 @@ export default async function QueuePage() {
                       {role === 'assistant' ? (
                         <>
                           <SendToDoctorButton visitId={visit.id} />
-                          <CancelVisitButton visitId={visit.id} />
+                          <CancelVisitButton
+                            visitId={visit.id}
+                            patientName={`${visit.patient.lastName} ${visit.patient.firstName}`}
+                          />
                         </>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -250,6 +257,10 @@ export default async function QueuePage() {
                           <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-medium">
                             En attente
                           </span>
+                          <CancelVisitButton
+                            visitId={visit.id}
+                            patientName={`${visit.patient.lastName} ${visit.patient.firstName}`}
+                          />
                         </div>
                       )}
                     </div>

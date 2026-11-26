@@ -166,7 +166,9 @@ export default function DashboardTour({
     if (hasSeenTour) return;
 
     try {
-      const alreadyDone = localStorage.getItem(storageKey);
+      const alreadyDone =
+        localStorage.getItem(storageKey) ||
+        localStorage.getItem("moncabinet_tour_completed_universal");
       if (alreadyDone) return;
     } catch {
       // ignore
@@ -177,6 +179,14 @@ export default function DashboardTour({
       if (onEnsureSidebarOpen && !sidebarOpen) {
         onEnsureSidebarOpen();
       }
+      // Dès l'apparition initiale, verrouiller IMMÉDIATEMENT en BDD et en localStorage
+      try {
+        localStorage.setItem(storageKey, "true");
+        localStorage.setItem("moncabinet_tour_completed_universal", "true");
+      } catch {
+        // ignore
+      }
+      markTourAsSeen();
     }, 600);
 
     return () => clearTimeout(timer);
@@ -241,6 +251,7 @@ export default function DashboardTour({
     setIsOpen(false);
     try {
       localStorage.setItem(storageKey, "true");
+      localStorage.setItem("moncabinet_tour_completed_universal", "true");
     } catch {
       // ignore
     }

@@ -264,8 +264,10 @@ export async function markTourAsSeen() {
       })
       .where(eq(users.id, userId));
 
+    revalidatePath("/dashboard", "layout");
     return { success: true };
-  } catch {
+  } catch (err) {
+    console.error("[MARK TOUR ERROR]", err);
     return { success: false };
   }
 }
