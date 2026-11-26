@@ -134,7 +134,7 @@ export async function sendNewRegistrationRequestNotification(params: NewRegistra
                 <tr>
                   <td class="label">Formule Choisie</td>
                   <td class="val" style="color: ${params.selectedPlan === 'standard' ? '#0369a1' : '#047857'}; font-weight: 800;">
-                    ${params.selectedPlan === 'standard' ? 'STANDARD (Historique 30 jours + Export Excel)' : '⭐ PRO (Historique Permanent à Vie)'}
+                    ${params.selectedPlan === 'standard' ? 'STANDARD (Historique 30 jours + Export Excel)' : 'PRO (Historique Permanent à Vie)'}
                   </td>
                 </tr>
                 <tr>
@@ -166,7 +166,7 @@ export async function sendNewRegistrationRequestNotification(params: NewRegistra
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: receiverEmail,
-      subject: `📋 [Nouvelle Inscription] Dr. ${params.doctorName} • ${params.clinicCity} • Plan ${params.selectedPlan === 'standard' ? 'STANDARD' : 'PRO'} (${params.selectedPrice || (params.selectedPlan === 'standard' ? 200 : 250)} DH)`,
+      subject: `[Nouvelle Inscription] Dr. ${params.doctorName} • ${params.clinicCity} • Plan ${params.selectedPlan === 'standard' ? 'STANDARD' : 'PRO'} (${params.selectedPrice || (params.selectedPlan === 'standard' ? 200 : 250)} DH)`,
       html: emailHtml,
     });
 

@@ -452,7 +452,7 @@ export default function SettingsClient({
                 ? 'bg-sky-100 text-sky-800'
                 : 'bg-emerald-100 text-emerald-800'
             }`}>
-              {initialSettings.subscription?.plan === 'standard' ? 'Standard' : 'Pro ⭐'}
+              {initialSettings.subscription?.plan === 'standard' ? 'Standard' : 'Pro'}
             </span>
           </button>
         )}
@@ -1391,7 +1391,7 @@ export default function SettingsClient({
                   <span className="material-symbols-outlined text-[15px]">
                     {initialSettings.subscription?.plan === 'standard' ? 'history' : 'star'}
                   </span>
-                  <span>{initialSettings.subscription?.plan === 'standard' ? 'STANDARD' : '⭐ PLAN PRO'}</span>
+                  <span>{initialSettings.subscription?.plan === 'standard' ? 'STANDARD' : 'PLAN PRO'}</span>
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-2 font-medium">

@@ -1023,7 +1023,7 @@ export default function AdminDashboardClient({
                           className="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50 ml-1"
                           title="Basculer entre Plan Standard et Plan Pro"
                         >
-                          Passer en {item.clinic.plan === "standard" ? "PRO ⭐" : "STANDARD"}
+                          Passer en {item.clinic.plan === "standard" ? "PRO" : "STANDARD"}
                         </button>
                       </div>
                     </div>
@@ -1250,7 +1250,7 @@ export default function AdminDashboardClient({
                               <span className="material-symbols-outlined text-[13px]">
                                 {(req as any).selectedPlan === 'standard' ? 'history' : 'star'}
                               </span>
-                              <span>{(req as any).selectedPlan === 'standard' ? 'STANDARD (30j)' : '⭐ PRO (À vie)'}</span>
+                              <span>{(req as any).selectedPlan === 'standard' ? 'STANDARD (30j)' : 'PRO (À vie)'}</span>
                             </span>
                             <span className="text-slate-700 font-semibold">
                               {(req as any).selectedCycle === 'yearly' ? '1 An' : (req as any).selectedCycle === 'quarterly' ? '3 Mois' : '1 Mois'}
@@ -1378,7 +1378,7 @@ export default function AdminDashboardClient({
                             ? { text: "Rejetée", cls: "bg-red-50 text-red-700 border-red-200" }
                             : { text: "Expirée", cls: "bg-slate-100 text-slate-600 border-slate-200" };
 
-                        const planLabel = (req as any).selectedPlan === "standard" ? "STANDARD" : "PRO ⭐";
+                        const planLabel = (req as any).selectedPlan === "standard" ? "STANDARD" : "PRO";
                         const cycleLabel = (req as any).selectedCycle === "yearly" ? "1 An" : (req as any).selectedCycle === "quarterly" ? "3 Mois" : "1 Mois";
 
                         return (
