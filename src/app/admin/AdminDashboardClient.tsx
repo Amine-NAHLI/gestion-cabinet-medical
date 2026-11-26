@@ -8,6 +8,7 @@ import {
   adminUpdateUserPassword,
   adminDeleteClinic,
   adminRunVacuum,
+  adminRenewSubscription,
   getAdminDashboardData,
 } from "@/actions/admin";
 import { signOut } from "next-auth/react";
@@ -123,6 +124,27 @@ export default function AdminDashboardClient({
       }
     } catch {
       showFeedback("error", "Erreur lors de l'optimisation.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRenewSubscription = async (
+    clinicId: number,
+    duration: "1month" | "3months" | "1year" | "change_plan",
+    newPlan?: "standard" | "pro"
+  ) => {
+    setActionLoading(`renew-${clinicId}`);
+    try {
+      const res = await adminRenewSubscription(clinicId, duration, newPlan);
+      if (res?.error) {
+        showFeedback("error", res.error);
+      } else {
+        showFeedback("success", res.message || "Abonnement mis à jour !");
+        await refreshData(true);
+      }
+    } catch (err: any) {
+      showFeedback("error", err?.message || "Erreur de prolongation");
     } finally {
       setActionLoading(null);
     }
@@ -920,6 +942,92 @@ export default function AdminDashboardClient({
                       </div>
                     </div>
 
+                    {/* BARRE D'ABONNEMENT & VALIDITÉ DU CABINET */}
+                    <div className="px-5 py-2.5 bg-slate-100/60 border-b border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-bold text-[11px] ${
+                          item.clinic.plan === 'standard'
+                            ? 'bg-sky-50 text-sky-800 border border-sky-200'
+                            : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                        }`}>
+                          <span className="material-symbols-outlined text-[13px]">
+                            {item.clinic.plan === 'standard' ? 'history' : 'star'}
+                          </span>
+                          <span>{item.clinic.plan === 'standard' ? 'Plan STANDARD (30j)' : 'Plan PRO (À vie)'}</span>
+                        </span>
+
+                        <span className="text-slate-600 font-medium">
+                          {item.clinic.billingCycle === 'yearly' ? 'Annuel' : item.clinic.billingCycle === 'quarterly' ? 'Trimestriel' : 'Mensuel'} • <strong>{item.clinic.planPrice || (item.clinic.plan === 'standard' ? 200 : 250)} DH</strong>
+                        </span>
+
+                        {/* Compte à rebours / Jours restants */}
+                        {item.clinic.daysRemaining !== null ? (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                            item.clinic.daysRemaining > 15
+                              ? 'bg-emerald-100/70 text-emerald-800'
+                              : item.clinic.daysRemaining > 0
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            <span className="material-symbols-outlined text-[13px]">
+                              {item.clinic.daysRemaining > 0 ? 'timer' : 'warning'}
+                            </span>
+                            <span>
+                              {item.clinic.daysRemaining > 0
+                                ? `Reste ${item.clinic.daysRemaining} jour${item.clinic.daysRemaining > 1 ? 's' : ''}`
+                                : 'Abonnement expiré'}
+                            </span>
+                            {item.clinic.subscriptionExpiresAt && (
+                              <span className="opacity-75 font-normal">
+                                (jusqu'au {new Date(item.clinic.subscriptionExpiresAt).toLocaleDateString('fr-FR')})
+                              </span>
+                            )}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {/* Boutons rapides de prolongation */}
+                      <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+                        <span className="text-[11px] text-slate-500 font-medium mr-1">Prolonger :</span>
+                        <button
+                          type="button"
+                          disabled={actionLoading === `renew-${item.clinic.id}`}
+                          onClick={() => handleRenewSubscription(item.clinic.id, "1month")}
+                          className="px-2 py-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
+                          title="Ajouter 30 jours à l'abonnement"
+                        >
+                          +1 Mois
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoading === `renew-${item.clinic.id}`}
+                          onClick={() => handleRenewSubscription(item.clinic.id, "3months")}
+                          className="px-2 py-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
+                          title="Ajouter 90 jours à l'abonnement"
+                        >
+                          +3 Mois
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoading === `renew-${item.clinic.id}`}
+                          onClick={() => handleRenewSubscription(item.clinic.id, "1year")}
+                          className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
+                          title="Ajouter 365 jours à l'abonnement"
+                        >
+                          +1 An
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoading === `renew-${item.clinic.id}`}
+                          onClick={() => handleRenewSubscription(item.clinic.id, "change_plan", item.clinic.plan === "standard" ? "pro" : "standard")}
+                          className="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50 ml-1"
+                          title="Basculer entre Plan Standard et Plan Pro"
+                        >
+                          Passer en {item.clinic.plan === "standard" ? "PRO ⭐" : "STANDARD"}
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Corps : Médecin | Assistante(s) séparés par une fine bordure */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80">
                       {/* Colonne Médecin */}
@@ -1131,6 +1239,28 @@ export default function AdminDashboardClient({
                           </div>
                         </div>
 
+                        {/* Formule Choisie */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded font-bold text-[11px] ${
+                              (req as any).selectedPlan === 'standard'
+                                ? 'bg-sky-50 text-sky-800 border border-sky-200'
+                                : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                            }`}>
+                              <span className="material-symbols-outlined text-[13px]">
+                                {(req as any).selectedPlan === 'standard' ? 'history' : 'star'}
+                              </span>
+                              <span>{(req as any).selectedPlan === 'standard' ? 'STANDARD (30j)' : '⭐ PRO (À vie)'}</span>
+                            </span>
+                            <span className="text-slate-700 font-semibold">
+                              {(req as any).selectedCycle === 'yearly' ? '1 An' : (req as any).selectedCycle === 'quarterly' ? '3 Mois' : '1 Mois'}
+                            </span>
+                          </div>
+                          <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                            {(req as any).selectedPrice || ((req as any).selectedPlan === 'standard' ? 200 : 250)} DH
+                          </span>
+                        </div>
+
                         {/* Actions : Créer le compte avec pré-remplissage / Rejeter */}
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
                           <button
@@ -1231,6 +1361,7 @@ export default function AdminDashboardClient({
                         <th className="px-5 py-3">Cabinet & Ville</th>
                         <th className="px-5 py-3">Médecin</th>
                         <th className="px-5 py-3">Assistante</th>
+                        <th className="px-5 py-3">Formule</th>
                         <th className="px-5 py-3">Date</th>
                         <th className="px-5 py-3">Statut</th>
                         <th className="px-5 py-3 text-right">Action</th>
@@ -1246,6 +1377,9 @@ export default function AdminDashboardClient({
                             : req.status === "rejected"
                             ? { text: "Rejetée", cls: "bg-red-50 text-red-700 border-red-200" }
                             : { text: "Expirée", cls: "bg-slate-100 text-slate-600 border-slate-200" };
+
+                        const planLabel = (req as any).selectedPlan === "standard" ? "STANDARD" : "PRO ⭐";
+                        const cycleLabel = (req as any).selectedCycle === "yearly" ? "1 An" : (req as any).selectedCycle === "quarterly" ? "3 Mois" : "1 Mois";
 
                         return (
                           <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
@@ -1266,6 +1400,15 @@ export default function AdminDashboardClient({
                               <p className="text-xs text-slate-500">
                                 {req.assistantEmail || "—"}
                               </p>
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                                (req as any).selectedPlan === 'standard'
+                                  ? 'bg-sky-50 text-sky-800 border border-sky-200'
+                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                              }`}>
+                                {planLabel} • {cycleLabel}
+                              </span>
                             </td>
                             <td className="px-5 py-3.5 text-slate-500 tabular-nums whitespace-nowrap">
                               {formatDate(req.createdAt)}

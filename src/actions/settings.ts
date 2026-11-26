@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { clinicSettings, clinics, users } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { clinicSettings, clinics, users, patients, visits } from "@/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
@@ -60,6 +60,29 @@ export async function getClinicSettings(targetClinicId?: number) {
   if (!clinicId) clinicId = 1;
 
   try {
+    const [clinicRow] = await db
+      .select({
+        plan: clinics.plan,
+        billingCycle: clinics.billingCycle,
+        planPrice: clinics.planPrice,
+        subscriptionExpiresAt: clinics.subscriptionExpiresAt,
+        subscriptionStatus: clinics.subscriptionStatus,
+      })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId))
+      .limit(1);
+
+    const subscription = {
+      plan: clinicRow?.plan || "pro",
+      billingCycle: clinicRow?.billingCycle || "monthly",
+      planPrice: clinicRow?.planPrice || 250,
+      subscriptionExpiresAt: clinicRow?.subscriptionExpiresAt ? clinicRow.subscriptionExpiresAt.toISOString() : null,
+      subscriptionStatus: clinicRow?.subscriptionStatus || "active",
+      daysRemaining: clinicRow?.subscriptionExpiresAt
+        ? Math.max(0, Math.ceil((new Date(clinicRow.subscriptionExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        : 30,
+    };
+
     const list = await db
       .select()
       .from(clinicSettings)
@@ -76,6 +99,7 @@ export async function getClinicSettings(targetClinicId?: number) {
       const row = list[0];
       return {
         ...row,
+        subscription,
         avatarUrl: doctorUser?.avatarUrl || null,
         bio: doctorUser?.bio || "",
         consultationFields: normalizeConsultationFields(row.consultationFields),
@@ -89,6 +113,7 @@ export async function getClinicSettings(targetClinicId?: number) {
     return {
       id: clinicId,
       ...defaults,
+      subscription,
       updatedAt: new Date(),
     };
   } catch (e) {
@@ -110,6 +135,14 @@ export async function getClinicSettings(targetClinicId?: number) {
       prescriptionTemplateUrl: null,
       prescriptionTemplateName: null,
       prescriptionTemplateLayout: DEFAULT_PRESCRIPTION_LAYOUT,
+      subscription: {
+        plan: "pro",
+        billingCycle: "monthly",
+        planPrice: 250,
+        subscriptionExpiresAt: null,
+        subscriptionStatus: "active",
+        daysRemaining: 30,
+      },
       updatedAt: new Date(),
     };
   }
@@ -330,4 +363,64 @@ export async function updatePrescriptionTemplate(payload: {
     console.error("Erreur sauvegarde template ordonnance:", error);
     return { success: false, error: "Impossible d'enregistrer le template d'ordonnance." };
   }
+}
+
+// Export des dossiers et patients au format Excel (CSV encodé UTF-8 BOM)
+export async function exportClinicPatientsData() {
+  const clinicId = await getTenantClinicId(true);
+  const clinicPatients = await db
+    .select()
+    .from(patients)
+    .where(eq(patients.clinicId, clinicId))
+    .orderBy(desc(patients.createdAt));
+
+  const allClinicVisits = await db
+    .select()
+    .from(visits)
+    .where(eq(visits.clinicId, clinicId))
+    .orderBy(desc(visits.createdAt));
+
+  const header = [
+    "ID Patient",
+    "Nom",
+    "Prénom",
+    "CIN",
+    "Téléphone",
+    "Âge",
+    "Genre",
+    "Mutuelle",
+    "Total Consultations",
+    "Dernière Consultation",
+    "Date Inscription",
+  ];
+
+  const rows = clinicPatients.map((p) => {
+    const pVisits = allClinicVisits.filter((v) => v.patientId === p.id);
+    const lastVisit = pVisits[0]?.createdAt
+      ? new Date(pVisits[0].createdAt).toLocaleDateString("fr-FR")
+      : "Aucune";
+    return [
+      p.id,
+      `"${(p.lastName || "").replace(/"/g, '""')}"`,
+      `"${(p.firstName || "").replace(/"/g, '""')}"`,
+      `"${(p.cin || "").replace(/"/g, '""')}"`,
+      `"${(p.phone || "").replace(/"/g, '""')}"`,
+      p.age || "",
+      p.gender || "",
+      `"${(p.mutuelle || "").replace(/"/g, '""')}"`,
+      pVisits.length,
+      lastVisit,
+      new Date(p.createdAt).toLocaleDateString("fr-FR"),
+    ].join(";");
+  });
+
+  const csvContent = "\uFEFF" + [header.join(";"), ...rows].join("\r\n");
+  const filename = `sauvegarde_cabinet_patients_${new Date().toISOString().split("T")[0]}.csv`;
+
+  return {
+    success: true,
+    csv: csvContent,
+    count: clinicPatients.length,
+    filename,
+  };
 }

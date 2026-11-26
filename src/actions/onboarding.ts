@@ -18,6 +18,9 @@ export async function registerClinic(data: {
   clinicAddress?: string;
   assistantName: string;
   assistantEmail: string;
+  selectedPlan?: "standard" | "pro";
+  selectedCycle?: "monthly" | "quarterly" | "yearly";
+  selectedPrice?: number;
 }) {
   try {
     const cleanDoctorEmail = data.doctorEmail.trim().toLowerCase();
@@ -44,6 +47,11 @@ export async function registerClinic(data: {
         error: "L'adresse email de l'assistante doit être différente de celle du médecin.",
       };
     }
+
+    // Déterminer le plan, le cycle et le montant
+    const plan = data.selectedPlan === "standard" ? "standard" : "pro";
+    const cycle = data.selectedCycle === "yearly" ? "yearly" : data.selectedCycle === "quarterly" ? "quarterly" : "monthly";
+    const price = data.selectedPrice || (plan === "standard" ? (cycle === "yearly" ? 1900 : cycle === "quarterly" ? 550 : 200) : (cycle === "yearly" ? 2500 : cycle === "quarterly" ? 700 : 250));
 
     // Vérifier si l'email de l'assistante existe déjà
     const existingAssistant = await db
@@ -97,6 +105,9 @@ export async function registerClinic(data: {
         expiresAt,
         status: "pending",
         attempts: 0,
+        selectedPlan: plan,
+        selectedCycle: cycle,
+        selectedPrice: price,
       })
       .returning({ id: onboardingRequests.id });
 
@@ -112,6 +123,9 @@ export async function registerClinic(data: {
       assistantName: cleanAssistantName || null,
       assistantEmail: cleanAssistantEmail || null,
       requestId: insertedRequest.id,
+      selectedPlan: plan,
+      selectedCycle: cycle,
+      selectedPrice: price,
     }).catch((err) => {
       console.error("[ONBOARDING ERROR] Notification email admin non bloquante :", err);
     });
@@ -292,7 +306,14 @@ export async function activateClinicFromRequest(
     candidateSlug = `${baseSlug}-${counter}`;
   }
 
-  // 1. Créer le cabinet avec sous-domaine
+  // Déterminer le plan, cycle et date d'échéance selon la demande
+  const plan = request.selectedPlan === "standard" ? "standard" : "pro";
+  const cycle = request.selectedCycle === "yearly" ? "yearly" : request.selectedCycle === "quarterly" ? "quarterly" : "monthly";
+  const price = request.selectedPrice || (plan === "standard" ? (cycle === "yearly" ? 1900 : cycle === "quarterly" ? 550 : 200) : (cycle === "yearly" ? 2500 : cycle === "quarterly" ? 700 : 250));
+  const daysToAdd = cycle === "yearly" ? 365 : cycle === "quarterly" ? 90 : 30;
+  const subscriptionExpiresAt = new Date(Date.now() + daysToAdd * 24 * 60 * 60 * 1000);
+
+  // 1. Créer le cabinet avec sous-domaine & abonnement
   const [newClinic] = await db
     .insert(clinics)
     .values({
@@ -302,6 +323,11 @@ export async function activateClinicFromRequest(
       address: request.clinicAddress,
       phone: request.doctorPhone,
       status: "active",
+      plan,
+      billingCycle: cycle,
+      planPrice: price,
+      subscriptionExpiresAt,
+      subscriptionStatus: "active",
       isCommunityMember: false,
     })
     .returning({ id: clinics.id });
@@ -315,6 +341,11 @@ export async function activateClinicFromRequest(
     role: "doctor",
     phone: request.doctorPhone,
     status: "active",
+    plan,
+    billingCycle: cycle,
+    planPrice: price,
+    subscriptionExpiresAt,
+    subscriptionStatus: "active",
     isOnboarded: false,
   });
 

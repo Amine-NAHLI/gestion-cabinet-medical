@@ -14,6 +14,11 @@ export const clinics = pgTable("clinics", {
   quickMessagesDoctor: json("quick_messages_doctor"), // Raccourcis personnalisés médecin (ex: ['Faites entrer le patient'])
   quickMessagesAssistant: json("quick_messages_assistant"), // Raccourcis personnalisés assistante
   status: text("status").notNull().default("active"), // 'active', 'suspended'
+  plan: text("plan").default("pro").notNull(), // 'standard' | 'pro'
+  billingCycle: text("billing_cycle").default("monthly").notNull(), // 'monthly' | 'quarterly' | 'yearly'
+  planPrice: integer("plan_price").default(250).notNull(), // Montant en DH
+  subscriptionExpiresAt: timestamp("subscription_expires_at"), // Échéance de l'abonnement
+  subscriptionStatus: text("subscription_status").default("active").notNull(), // 'active', 'trial', 'expired'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -31,6 +36,11 @@ export const users = pgTable("users", {
   isOnboarded: boolean("is_onboarded").default(false).notNull(), // A complété le parcours d'accueil
   notificationPreferences: json("notification_preferences"), // Préférences alertes & notifications
   status: text("status").notNull().default("active"), // 'active', 'suspended'
+  plan: text("plan").default("pro").notNull(), // 'standard' | 'pro'
+  billingCycle: text("billing_cycle").default("monthly").notNull(), // 'monthly' | 'quarterly' | 'yearly'
+  planPrice: integer("plan_price").default(250).notNull(), // Montant en DH
+  subscriptionExpiresAt: timestamp("subscription_expires_at"), // Échéance de l'abonnement
+  subscriptionStatus: text("subscription_status").default("active").notNull(), // 'active', 'trial', 'expired'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -55,7 +65,9 @@ export const onboardingRequests = pgTable("onboarding_requests", {
   expiresAt: timestamp("expires_at").notNull(), // Date.now() + 5 minutes
   status: text("status").notNull().default("pending"), // 'pending', 'verified', 'approved', 'expired', 'rejected'
   attempts: integer("attempts").default(0).notNull(), // Limité à 5 tentatives
-  
+  selectedPlan: text("selected_plan").default("pro"), // 'standard' | 'pro'
+  selectedCycle: text("selected_cycle").default("monthly"), // 'monthly' | 'quarterly' | 'yearly'
+  selectedPrice: integer("selected_price").default(250), // DH
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

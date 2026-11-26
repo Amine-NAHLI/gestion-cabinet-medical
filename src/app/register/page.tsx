@@ -12,6 +12,9 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  const [selectedPlan, setSelectedPlan] = useState<"standard" | "pro">("pro");
+  const [selectedCycle, setSelectedCycle] = useState<"monthly" | "quarterly" | "yearly">("yearly");
+
   const [formData, setFormData] = useState({
     doctorName: "",
     doctorEmail: "",
@@ -23,6 +26,21 @@ export default function RegisterPage() {
     assistantName: "",
     assistantEmail: "",
   });
+
+  const PRICING = {
+    standard: {
+      monthly: 200,
+      quarterly: 550,
+      yearly: 1900,
+    },
+    pro: {
+      monthly: 250,
+      quarterly: 700,
+      yearly: 2500,
+    },
+  };
+
+  const currentPrice = PRICING[selectedPlan][selectedCycle];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -66,6 +84,9 @@ export default function RegisterPage() {
         clinicAddress: formData.clinicAddress,
         assistantName: formData.assistantName,
         assistantEmail: formData.assistantEmail,
+        selectedPlan,
+        selectedCycle,
+        selectedPrice: currentPrice,
       };
 
       const res: any = await registerClinic(payload);
@@ -85,7 +106,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen w-full bg-[#F8F9FB] text-slate-900 py-8 sm:py-12 px-4 sm:px-6">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         
         {/* Navigation retour & Logo */}
         <div className="mb-6 flex items-center justify-between">
@@ -152,6 +173,17 @@ export default function RegisterPage() {
                   <span className="text-slate-500 block">Assistante médicale :</span>
                   <span className="font-semibold text-slate-900">{formData.assistantName} ({formData.assistantEmail})</span>
                 </div>
+                <div className="sm:col-span-2 pt-2 border-t border-slate-200">
+                  <span className="text-slate-500 block">Formule & durée choisies :</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold ${selectedPlan === 'standard' ? 'bg-sky-50 text-sky-800 border border-sky-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}>
+                      {selectedPlan === "standard" ? "Plan STANDARD (Historique 30 jours + Export Excel)" : "⭐ Plan PRO (Historique Permanent à Vie)"}
+                    </span>
+                    <span className="text-xs font-bold text-slate-900">
+                      {selectedCycle === "yearly" ? "1 An" : selectedCycle === "quarterly" ? "3 Mois" : "1 Mois"} — {currentPrice} DH
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -159,7 +191,7 @@ export default function RegisterPage() {
             <div className="p-4 rounded-xl bg-sky-50/70 border border-sky-100 text-xs text-sky-900 flex items-center gap-3 text-left">
               <span className="material-symbols-outlined text-xl text-sky-600 shrink-0">schedule</span>
               <p className="leading-relaxed">
-                <strong>Délai moyen de validation :</strong> Moins de 24h. Vous recevrez un email de confirmation contenant votre lien de connexion sécurisé dès que votre espace est actif.
+                <strong>Délai moyen de validation :</strong> Moins de 24h. Vous recevrez un email de confirmation contenant votre lien de connexion sécurisé dès que votre espace est actif. Le règlement s'effectue après validation de votre compte.
               </p>
             </div>
 
@@ -177,11 +209,15 @@ export default function RegisterPage() {
           /* FORMULAIRE D'INSCRIPTION */
           <div className="bg-white rounded-2xl border border-slate-200/90 p-7 sm:p-9 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
             <div className="mb-7 text-center sm:text-left">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-800 text-xs font-semibold mb-2">
+                <span className="material-symbols-outlined text-[14px]">local_hospital</span>
+                Solution clé en main pour praticiens & cabinets médicaux
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 Inscrire mon cabinet médical
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
-                Renseignez les informations de votre cabinet pour recevoir vos accès sécurisés sous 24h.
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Choisissez votre formule selon vos besoins d'archivage et renseignez les informations de votre cabinet pour recevoir vos accès sécurisés sous 24h.
               </p>
             </div>
 
@@ -192,14 +228,226 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-8">
+
+              {/* SECTION 0: CHOIX DU PLAN ET DE LA DURÉE */}
+              <div className="space-y-4 bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sky-600 text-lg">loyalty</span>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        1. Choisissez votre Formule & Période
+                      </h3>
+                      <p className="text-[11px] text-slate-500">Sans engagement initial. Règlement après validation de votre espace.</p>
+                    </div>
+                  </div>
+
+                  {/* Boutons switch de période */}
+                  <div className="inline-flex p-1 rounded-xl bg-slate-200/80 text-xs font-semibold self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCycle("monthly")}
+                      className={`px-3 py-1.5 rounded-lg transition cursor-pointer text-xs ${
+                        selectedCycle === "monthly"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      1 Mois
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCycle("quarterly")}
+                      className={`px-3 py-1.5 rounded-lg transition cursor-pointer text-xs flex items-center gap-1 ${
+                        selectedCycle === "quarterly"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <span>3 Mois</span>
+                      <span className="text-[10px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">-50 DH</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCycle("yearly")}
+                      className={`px-3 py-1.5 rounded-lg transition cursor-pointer text-xs flex items-center gap-1 ${
+                        selectedCycle === "yearly"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-slate-700 hover:text-slate-900 font-bold"
+                      }`}
+                    >
+                      <span>1 An</span>
+                      <span className={`text-[10px] px-1 py-0.2 rounded font-bold ${selectedCycle === "yearly" ? "bg-white text-emerald-700" : "bg-emerald-100 text-emerald-800"}`}>
+                        2 mois offerts ⭐
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2 Cartes de Plan (Standard vs Pro) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* CARTE STANDARD */}
+                  <div
+                    onClick={() => setSelectedPlan("standard")}
+                    className={`relative rounded-xl p-4 sm:p-5 transition cursor-pointer border-2 bg-white flex flex-col justify-between ${
+                      selectedPlan === "standard"
+                        ? "border-sky-600 shadow-md ring-2 ring-sky-500/10"
+                        : "border-slate-200 hover:border-slate-300 opacity-90 hover:opacity-100"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-[11px] font-bold uppercase tracking-wider">
+                          Formule Standard
+                        </span>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${selectedPlan === "standard" ? "border-sky-600 bg-sky-600 text-white" : "border-slate-300 bg-white"}`}>
+                          {selectedPlan === "standard" && <span className="material-symbols-outlined text-[14px]">check</span>}
+                        </div>
+                      </div>
+
+                      <div className="my-2">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-black text-slate-900">
+                            {selectedCycle === "yearly" ? "1 900" : selectedCycle === "quarterly" ? "550" : "200"}
+                          </span>
+                          <span className="text-xs font-bold text-slate-500">DH</span>
+                          <span className="text-xs text-slate-500 font-medium ml-1">
+                            {selectedCycle === "yearly" ? "/ an (soit ~158 DH/mois)" : selectedCycle === "quarterly" ? "/ 3 mois (soit ~183 DH/mois)" : "/ mois"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Idéal pour les cabinets médicaux qui souhaitent archiver leurs dossiers localement.
+                        </p>
+                      </div>
+
+                      <ul className="space-y-2 text-xs text-slate-600 mt-4 border-t border-slate-100 pt-3">
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-sky-600 text-[16px] shrink-0 mt-0.5">history</span>
+                          <span><strong>Historique 30 jours</strong> (consultation des dossiers des 30 derniers jours)</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-emerald-600 text-[16px] shrink-0 mt-0.5">download_for_offline</span>
+                          <span><strong>Export Excel illimité</strong> pour sauvegarder et archiver vos consultations</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-slate-500 text-[16px] shrink-0 mt-0.5">check_circle</span>
+                          <span>Salle d'attente connectée & Cockpit consultation complet</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-slate-500 text-[16px] shrink-0 mt-0.5">check_circle</span>
+                          <span>Ordonnances personnalisées & impression PDF</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-slate-500 text-[16px] shrink-0 mt-0.5">check_circle</span>
+                          <span>Messagerie interne & Interphone cabinet</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <span className={`block text-center py-2 rounded-lg text-xs font-bold transition ${
+                        selectedPlan === "standard"
+                          ? "bg-sky-600 text-white"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}>
+                        {selectedPlan === "standard" ? "✓ Formule Standard sélectionnée" : "Choisir la formule Standard"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CARTE PRO */}
+                  <div
+                    onClick={() => setSelectedPlan("pro")}
+                    className={`relative rounded-xl p-4 sm:p-5 transition cursor-pointer border-2 bg-white flex flex-col justify-between ${
+                      selectedPlan === "pro"
+                        ? "border-emerald-600 shadow-md ring-2 ring-emerald-500/10 bg-emerald-50/10"
+                        : "border-slate-200 hover:border-slate-300 opacity-90 hover:opacity-100"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-300 text-[11px] font-black uppercase tracking-wider flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px] text-amber-500">star</span>
+                          Recommandé • Formule Pro
+                        </span>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${selectedPlan === "pro" ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white"}`}>
+                          {selectedPlan === "pro" && <span className="material-symbols-outlined text-[14px]">check</span>}
+                        </div>
+                      </div>
+
+                      <div className="my-2">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-black text-slate-900">
+                            {selectedCycle === "yearly" ? "2 500" : selectedCycle === "quarterly" ? "700" : "250"}
+                          </span>
+                          <span className="text-xs font-bold text-slate-500">DH</span>
+                          <span className="text-xs text-slate-500 font-medium ml-1">
+                            {selectedCycle === "yearly" ? "/ an (soit ~208 DH/mois)" : selectedCycle === "quarterly" ? "/ 3 mois (soit ~233 DH/mois)" : "/ mois"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Tranquillité totale : vos dossiers et antécédents médicaux sont conservés à vie.
+                        </p>
+                      </div>
+
+                      <ul className="space-y-2 text-xs text-slate-700 mt-4 border-t border-slate-100 pt-3">
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-emerald-600 text-[16px] shrink-0 mt-0.5">all_inclusive</span>
+                          <span><strong className="text-emerald-900 font-bold">Historique permanent à vie</strong> (zéro suppression, suivi sans limite)</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-emerald-600 text-[16px] shrink-0 mt-0.5">download_for_offline</span>
+                          <span><strong>Export Excel illimité</strong> à tout moment en 1 clic</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-slate-500 text-[16px] shrink-0 mt-0.5">check_circle</span>
+                          <span>Salle d'attente connectée & Cockpit consultation complet</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-slate-500 text-[16px] shrink-0 mt-0.5">check_circle</span>
+                          <span>Ordonnances personnalisées (en-tête & logo) + Recettes</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-slate-500 text-[16px] shrink-0 mt-0.5">check_circle</span>
+                          <span>Messagerie interne médecin-assistante en temps réel</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-amber-600 text-[16px] shrink-0 mt-0.5">support_agent</span>
+                          <span><strong>Support prioritaire WhatsApp 7j/7</strong> & assistance démarrage</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <span className={`block text-center py-2 rounded-lg text-xs font-bold transition ${
+                        selectedPlan === "pro"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}>
+                        {selectedPlan === "pro" ? "✓ Formule Pro sélectionnée" : "Choisir la formule Pro"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sky-600 text-base">verified</span>
+                    <span>
+                      Votre choix : <strong>{selectedPlan === "pro" ? "Formule PRO" : "Formule STANDARD"}</strong> • <strong>{selectedCycle === "yearly" ? "1 An" : selectedCycle === "quarterly" ? "3 Mois" : "1 Mois"}</strong> ({currentPrice} DH)
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">Paiement activé après validation de vos accès</span>
+                </div>
+              </div>
               
-              {/* SECTION 1: CABINET */}
+              {/* SECTION 2: CABINET */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-1.5 border-b border-slate-100">
                   <span className="material-symbols-outlined text-sky-600 text-base">domain</span>
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    1. Coordonnées du Cabinet
+                    2. Coordonnées du Cabinet
                   </h3>
                 </div>
 
@@ -243,12 +491,12 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* SECTION 2: MÉDECIN */}
+              {/* SECTION 3: MÉDECIN */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-1.5 border-b border-slate-100">
                   <span className="material-symbols-outlined text-teal-600 text-base">stethoscope</span>
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    2. Médecin Titulaire (Praticien)
+                    3. Médecin Titulaire (Praticien)
                   </h3>
                 </div>
 
@@ -325,12 +573,12 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* SECTION 3: ASSISTANTE (OBLIGATOIRE) */}
+              {/* SECTION 4: ASSISTANTE (OBLIGATOIRE) */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-1.5 border-b border-slate-100">
                   <span className="material-symbols-outlined text-emerald-600 text-base">support_agent</span>
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    3. Assistante Médicale / Secrétariat *
+                    4. Assistante Médicale / Secrétariat *
                   </h3>
                 </div>
 

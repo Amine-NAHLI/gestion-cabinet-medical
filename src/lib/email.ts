@@ -24,6 +24,9 @@ export interface NewRegistrationNotificationParams {
   assistantName?: string | null;
   assistantEmail?: string | null;
   requestId?: number;
+  selectedPlan?: string | null;
+  selectedCycle?: string | null;
+  selectedPrice?: number | null;
 }
 
 export async function sendNewRegistrationRequestNotification(params: NewRegistrationNotificationParams) {
@@ -128,6 +131,19 @@ export async function sendNewRegistrationRequestNotification(params: NewRegistra
                   <td class="val" style="color: #94a3b8; font-weight: normal;">Aucune assistante renseignée</td>
                 </tr>
                 `}
+                <tr>
+                  <td class="label">Formule Choisie</td>
+                  <td class="val" style="color: ${params.selectedPlan === 'standard' ? '#0369a1' : '#047857'}; font-weight: 800;">
+                    ${params.selectedPlan === 'standard' ? 'STANDARD (Historique 30 jours + Export Excel)' : '⭐ PRO (Historique Permanent à Vie)'}
+                  </td>
+                </tr>
+                <tr>
+                  <td class="label">Périodicité & Montant</td>
+                  <td class="val" style="font-weight: 800; color: #0f172a;">
+                    ${params.selectedCycle === 'yearly' ? '1 An (Annuel - 2 mois offerts)' : params.selectedCycle === 'quarterly' ? '3 Mois (Trimestriel)' : '1 Mois (Mensuel)'} 
+                    — <span style="color: #0284c7;">${params.selectedPrice || (params.selectedPlan === 'standard' ? 200 : 250)} DH</span>
+                  </td>
+                </tr>
               </table>
             </div>
 
@@ -150,7 +166,7 @@ export async function sendNewRegistrationRequestNotification(params: NewRegistra
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: receiverEmail,
-      subject: `📋 [Nouvelle Inscription] Dr. ${params.doctorName} • ${params.clinicName} (${params.clinicCity})`,
+      subject: `📋 [Nouvelle Inscription] Dr. ${params.doctorName} • ${params.clinicCity} • Plan ${params.selectedPlan === 'standard' ? 'STANDARD' : 'PRO'} (${params.selectedPrice || (params.selectedPlan === 'standard' ? 200 : 250)} DH)`,
       html: emailHtml,
     });
 

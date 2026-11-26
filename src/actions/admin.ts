@@ -119,10 +119,19 @@ export async function getAdminDashboardData() {
       clinic: {
         id: clinic.id,
         name: clinic.name,
+        slug: clinic.slug,
         city: clinic.city,
         address: clinic.address || settings?.address || "",
         phone: clinic.phone || doctor?.phone || settings?.phone || "",
         specialty: settings?.specialty || "Médecine Générale",
+        plan: clinic.plan || "pro",
+        billingCycle: clinic.billingCycle || "monthly",
+        planPrice: clinic.planPrice || 250,
+        subscriptionExpiresAt: clinic.subscriptionExpiresAt ? clinic.subscriptionExpiresAt.toISOString() : null,
+        subscriptionStatus: clinic.subscriptionStatus || "active",
+        daysRemaining: clinic.subscriptionExpiresAt
+          ? Math.max(0, Math.ceil((new Date(clinic.subscriptionExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+          : null,
         createdAt: clinic.createdAt.toISOString(),
       },
       doctor: doctor
@@ -1101,4 +1110,48 @@ export async function sendManualNeonReport() {
     console.error("[MANUAL NEON REPORT ERROR]", err);
     return { success: false, error: err.message || "Erreur lors de l'envoi du rapport." };
   }
+}
+
+// 9. Renouvellement ou prolongation de l'abonnement d'un cabinet
+export async function adminRenewSubscription(
+  clinicId: number,
+  duration: "1month" | "3months" | "1year" | "change_plan",
+  newPlan?: "standard" | "pro"
+) {
+  await verifySuperAdmin();
+  const [clinic] = await db.select().from(clinics).where(eq(clinics.id, clinicId)).limit(1);
+  if (!clinic) return { error: "Cabinet introuvable." };
+
+  const updateValues: Record<string, any> = {};
+
+  if (duration === "change_plan" && newPlan) {
+    updateValues.plan = newPlan;
+    const cycle = clinic.billingCycle || "monthly";
+    const price = newPlan === "standard"
+      ? (cycle === "yearly" ? 1900 : cycle === "quarterly" ? 550 : 200)
+      : (cycle === "yearly" ? 2500 : cycle === "quarterly" ? 700 : 250);
+    updateValues.planPrice = price;
+  } else {
+    const days = duration === "1year" ? 365 : duration === "3months" ? 90 : 30;
+    const currentExpiry = clinic.subscriptionExpiresAt ? new Date(clinic.subscriptionExpiresAt).getTime() : 0;
+    const baseTime = currentExpiry > Date.now() ? currentExpiry : Date.now();
+    const newExpiry = new Date(baseTime + days * 24 * 60 * 60 * 1000);
+    updateValues.subscriptionExpiresAt = newExpiry;
+    updateValues.subscriptionStatus = "active";
+  }
+
+  await db.update(clinics).set(updateValues).where(eq(clinics.id, clinicId));
+
+  // Synchro des utilisateurs de ce cabinet
+  await db.update(users).set(updateValues).where(eq(users.clinicId, clinicId));
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard/settings");
+
+  return {
+    success: true,
+    message: duration === "change_plan"
+      ? `Plan modifié en ${newPlan?.toUpperCase()} avec succès.`
+      : `Abonnement prolongé avec succès (+${duration === "1year" ? "1 An" : duration === "3months" ? "3 Mois" : "1 Mois"}).`,
+  };
 }

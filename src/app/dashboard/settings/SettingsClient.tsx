@@ -5,6 +5,7 @@ import {
   updateClinicSettings,
   updateConsultationFields,
   updatePrescriptionTemplate,
+  exportClinicPatientsData,
 } from "@/actions/settings";
 import {
   ConsultationFieldConfig,
@@ -38,6 +39,14 @@ interface SettingsClientProps {
     prescriptionTemplateUrl: string | null;
     prescriptionTemplateName: string | null;
     prescriptionTemplateLayout: PrescriptionTemplateLayout;
+    subscription?: {
+      plan: string;
+      billingCycle: string;
+      planPrice: number;
+      subscriptionExpiresAt: string | null;
+      subscriptionStatus: string;
+      daysRemaining: number;
+    };
   };
 }
 
@@ -55,8 +64,9 @@ export default function SettingsClient({
   initialSettings,
 }: SettingsClientProps) {
   const isDoctor = role === "doctor";
-  const [activeTab, setActiveTab] = useState<"general" | "fields" | "template">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "fields" | "template" | "subscription">("general");
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   const [fields, setFields] = useState<ConsultationFieldConfig[]>(
@@ -321,6 +331,30 @@ export default function SettingsClient({
     });
   }
 
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const res = await exportClinicPatientsData();
+      if (!res?.success || !res.csv) {
+        showToast("Erreur lors de l'export des données.", "error");
+        return;
+      }
+      const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", res.filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast(`Export de ${res.count} patients réussi !`);
+    } catch (err: any) {
+      showToast(err?.message || "Erreur lors de l'exportation.", "error");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const demoDateStr = new Date().toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "long",
@@ -398,6 +432,29 @@ export default function SettingsClient({
               {templateUrl && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
             </button>
           </>
+        )}
+
+        {/* ONGLET 4 : ABONNEMENT (VISIBLE PAR LE PRATICIEN) */}
+        {isDoctor && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("subscription")}
+            className={`flex items-center gap-2 pb-3 px-3 text-xs sm:text-[13px] border-b-2 -mb-px transition cursor-pointer whitespace-nowrap ${
+              activeTab === "subscription"
+                ? "border-slate-900 text-slate-900 font-semibold"
+                : "border-transparent text-slate-500 font-medium hover:text-slate-800"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[17px]">verified</span>
+            <span>Mon Abonnement</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+              initialSettings.subscription?.plan === 'standard'
+                ? 'bg-sky-100 text-sky-800'
+                : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              {initialSettings.subscription?.plan === 'standard' ? 'Standard' : 'Pro ⭐'}
+            </span>
+          </button>
         )}
       </div>
 
@@ -1309,6 +1366,201 @@ export default function SettingsClient({
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+          ONGLET 4 : MON ABONNEMENT & GESTION DES ARCHIVES
+         ============================================================ */}
+      {activeTab === "subscription" && (
+        <div className="space-y-6">
+          {/* Grille des indicateurs d'abonnement */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Formule */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Formule en cours
+              </span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black ${
+                  initialSettings.subscription?.plan === 'standard'
+                    ? 'bg-sky-50 text-sky-800 border border-sky-200'
+                    : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                }`}>
+                  <span className="material-symbols-outlined text-[15px]">
+                    {initialSettings.subscription?.plan === 'standard' ? 'history' : 'star'}
+                  </span>
+                  <span>{initialSettings.subscription?.plan === 'standard' ? 'STANDARD' : '⭐ PLAN PRO'}</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-2 font-medium">
+                {initialSettings.subscription?.plan === 'standard'
+                  ? 'Historique 30j + Export Excel'
+                  : 'Historique permanent à vie'}
+              </p>
+            </div>
+
+            {/* 2. Compte à rebours */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Validité restante
+              </span>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className={`text-2xl font-black tabular-nums ${
+                  (initialSettings.subscription?.daysRemaining || 0) > 15
+                    ? 'text-emerald-700'
+                    : (initialSettings.subscription?.daysRemaining || 0) > 0
+                    ? 'text-amber-600'
+                    : 'text-rose-600'
+                }`}>
+                  {initialSettings.subscription?.daysRemaining ?? 30}
+                </span>
+                <span className="text-xs font-bold text-slate-500">jours</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {(initialSettings.subscription?.daysRemaining || 0) > 0 ? "Abonnement actif" : "Échéance dépassée"}
+              </p>
+            </div>
+
+            {/* 3. Périodicité & Tarif */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Tarif & Cycle
+              </span>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl font-black text-slate-900 tabular-nums">
+                  {initialSettings.subscription?.planPrice || (initialSettings.subscription?.plan === 'standard' ? 200 : 250)}
+                </span>
+                <span className="text-xs font-bold text-slate-500">DH</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 font-medium capitalize">
+                {initialSettings.subscription?.billingCycle === 'yearly'
+                  ? 'Facturation Annuelle'
+                  : initialSettings.subscription?.billingCycle === 'quarterly'
+                  ? 'Facturation Trimestrielle'
+                  : 'Facturation Mensuelle'}
+              </p>
+            </div>
+
+            {/* 4. Date d'échéance */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Date d'échéance
+              </span>
+              <div className="text-base font-bold text-slate-900 mt-1.5 tabular-nums">
+                {initialSettings.subscription?.subscriptionExpiresAt
+                  ? new Date(initialSettings.subscription.subscriptionExpiresAt).toLocaleDateString("fr-FR", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })
+                  : "30 jours après activation"}
+              </div>
+              <p className="text-xs text-slate-400 mt-1">Renouvellement automatique</p>
+            </div>
+          </div>
+
+          {/* Section d'archivage & Export Excel (indispensable pour le plan Standard) */}
+          <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-600 text-xl">table_chart</span>
+                  <span>Sauvegarde locale & Export Excel complet</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-xl leading-relaxed">
+                  {initialSettings.subscription?.plan === 'standard'
+                    ? "Votre formule STANDARD conserve un historique de 30 jours en direct sur la plateforme. Vous pouvez télécharger à tout moment l'intégralité de votre patientèle et de vos antécédents au format Excel / CSV pour conserver vos archives locales complètes sans aucune perte."
+                    : "Votre formule PRO conserve vos données à vie en illimité. Vous pouvez également générer à tout moment un export Excel de vos patients et consultations pour vos sauvegardes comptables ou administratives."}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={isExporting}
+                onClick={handleExportData}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                {isExporting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Génération de l'export...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-base">download</span>
+                    <span>Télécharger l'export Excel (.CSV)</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Tableau comparatif des garanties du plan */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                  Inclus dans votre formule active
+                </span>
+                <ul className="space-y-1.5 text-xs text-slate-600">
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>
+                    <span>
+                      {initialSettings.subscription?.plan === 'standard'
+                        ? 'Historique patient glissant de 30 jours'
+                        : 'Historique médical complet et permanent à vie'}
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>
+                    <span>Export Excel illimité à tout moment</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>
+                    <span>Salle d'attente en temps réel & File active</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>
+                    <span>Ordonnances personnalisées & impression PDF</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>
+                    <span>Messagerie interne & Interphone cabinet</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Assistance & Renouvellement */}
+              <div className="p-4 rounded-xl bg-sky-50/70 border border-sky-100 flex flex-col justify-between space-y-3">
+                <div>
+                  <span className="text-xs font-bold text-sky-950 uppercase tracking-wider block">
+                    Prolongation & Support Dédié
+                  </span>
+                  <p className="text-xs text-sky-900 mt-1 leading-relaxed">
+                    Pour prolonger votre abonnement, modifier votre cycle (passer à l'annuel pour bénéficier de 2 mois offerts) ou basculer sur la formule Pro, contactez notre équipe support direct.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-2">
+                  <a
+                    href="https://wa.me/212600000000?text=Bonjour,%20je%20souhaite%20des%20informations%20sur%20mon%20abonnement%20MonCabinet"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">chat</span>
+                    <span>Contacter par WhatsApp</span>
+                  </a>
+                  <a
+                    href="mailto:nahli-ami@upf.ac.ma?subject=Gestion%20Abonnement%20Cabinet%20Médical"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">mail</span>
+                    <span>Envoyer un email</span>
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
