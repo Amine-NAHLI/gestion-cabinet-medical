@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { getTenantClinicId } from "@/lib/tenant";
+import { sendPlanChangeRequestNotification } from "@/lib/email";
 import {
   ConsultationFieldConfig,
   PrescriptionTemplateLayout,
@@ -67,6 +68,7 @@ export async function getClinicSettings(targetClinicId?: number) {
         planPrice: clinics.planPrice,
         subscriptionExpiresAt: clinics.subscriptionExpiresAt,
         subscriptionStatus: clinics.subscriptionStatus,
+        pendingPlanChange: clinics.pendingPlanChange,
       })
       .from(clinics)
       .where(eq(clinics.id, clinicId))
@@ -78,6 +80,7 @@ export async function getClinicSettings(targetClinicId?: number) {
       planPrice: clinicRow?.planPrice || 250,
       subscriptionExpiresAt: clinicRow?.subscriptionExpiresAt ? clinicRow.subscriptionExpiresAt.toISOString() : null,
       subscriptionStatus: clinicRow?.subscriptionStatus || "active",
+      pendingPlanChange: (clinicRow?.pendingPlanChange as any) || null,
       daysRemaining: clinicRow?.subscriptionExpiresAt
         ? Math.max(0, Math.ceil((new Date(clinicRow.subscriptionExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
         : 30,
@@ -423,4 +426,80 @@ export async function exportClinicPatientsData() {
     count: clinicPatients.length,
     filename,
   };
+}
+
+export async function requestSubscriptionChange(input: {
+  plan: "standard" | "pro";
+  cycle: "monthly" | "quarterly" | "yearly";
+}) {
+  try {
+    const session = await getServerSession(authOptions);
+    const user = session?.user as { role?: string; email?: string; name?: string } | undefined;
+    if (!user || user.role !== "doctor") {
+      return { error: "Action réservée au praticien titulaire du cabinet." };
+    }
+
+    const clinicId = await getTenantClinicId(true);
+    const [clinic] = await db.select().from(clinics).where(eq(clinics.id, clinicId)).limit(1);
+    if (!clinic) {
+      return { error: "Cabinet introuvable." };
+    }
+
+    const plan = input.plan === "standard" ? "standard" : "pro";
+    const cycle = input.cycle === "yearly" ? "yearly" : input.cycle === "quarterly" ? "quarterly" : "monthly";
+
+    // Tarifs officiels MonCabinet
+    const price =
+      plan === "standard"
+        ? cycle === "yearly"
+          ? 1900
+          : cycle === "quarterly"
+          ? 550
+          : 200
+        : cycle === "yearly"
+        ? 2500
+        : cycle === "quarterly"
+        ? 700
+        : 250;
+
+    const pendingPayload = {
+      requestedPlan: plan,
+      requestedCycle: cycle,
+      requestedPrice: price,
+      requestedAt: new Date().toISOString(),
+      status: "pending",
+      requestedBy: user.email || user.name || "Médecin",
+    };
+
+    await db
+      .update(clinics)
+      .set({
+        pendingPlanChange: pendingPayload,
+      })
+      .where(eq(clinics.id, clinicId));
+
+    // Envoyer la notification email à l'administrateur
+    sendPlanChangeRequestNotification({
+      clinicName: clinic.name,
+      doctorName: user.name || "Dr. Praticien",
+      doctorEmail: user.email || clinic.phone || "",
+      doctorPhone: clinic.phone || "",
+      currentPlan: clinic.plan || "standard",
+      currentCycle: clinic.billingCycle || "monthly",
+      requestedPlan: plan,
+      requestedCycle: cycle,
+      requestedPrice: price,
+    }).catch((err) => console.error("[EMAIL NOTIF ERROR]", err));
+
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/admin");
+
+    return {
+      success: true,
+      message: "Votre demande de modification d'abonnement a été transmise à l'administrateur.",
+    };
+  } catch (error: any) {
+    console.error("[REQUEST_SUBSCRIPTION_CHANGE_ERROR]", error);
+    return { error: error.message || "Erreur lors de la demande de modification." };
+  }
 }

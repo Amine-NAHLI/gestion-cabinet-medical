@@ -30,6 +30,7 @@ interface DashboardShellProps {
   unreadChatCount?: number;
   activeConsultation?: ActiveConsultationInfo | null;
   todayStr: string;
+  plan?: string;
   user?: {
     name?: string | null;
     email?: string | null;
@@ -49,6 +50,7 @@ export default function DashboardShell({
   unreadChatCount = 0,
   activeConsultation = null,
   todayStr,
+  plan = "pro",
   user,
   children,
 }: DashboardShellProps) {
@@ -245,7 +247,14 @@ export default function DashboardShell({
 
   const secondaryItems = [
     { href: "/dashboard/history", label: "Historique", icon: "history", exact: false, tourId: "history" },
-    { href: "/dashboard/stats", label: "Statistiques", icon: "bar_chart", exact: false, tourId: "stats" },
+    {
+      href: "/dashboard/stats",
+      label: "Statistiques",
+      icon: "bar_chart",
+      exact: false,
+      tourId: "stats",
+      badgeText: plan === "standard" ? "PRO" : undefined,
+    },
     { href: "/dashboard/settings", label: "Paramètres", icon: "tune", exact: false, tourId: "settings" },
   ];
 
@@ -268,6 +277,7 @@ export default function DashboardShell({
       exact: boolean;
       tourId?: string;
       badgeCount?: number;
+      badgeText?: string;
     }[],
     expanded: boolean,
     sectionTitle?: string
@@ -309,6 +319,11 @@ export default function DashboardShell({
               {item.icon}
             </span>
             {expanded && <span className="truncate flex-1">{item.label}</span>}
+            {expanded && item.badgeText ? (
+              <span className="px-1.5 py-0.2 rounded bg-slate-900 text-white text-[9px] font-bold uppercase tracking-wider shrink-0 shadow-2xs">
+                {item.badgeText}
+              </span>
+            ) : null}
             {item.badgeCount && item.badgeCount > 0 ? (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white shadow-2xs shrink-0 animate-pulse tabular-nums">
                 {item.badgeCount}

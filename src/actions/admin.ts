@@ -24,6 +24,7 @@ import { slugifyClinic } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
 import { getNeonClusterMetrics } from "@/lib/neonTelemetry";
 import { sendNeonTelemetryReportEmail } from "@/lib/email";
+import { getPlatformSettings } from "./platform";
 
 async function verifySuperAdmin() {
   const session = await getServerSession(authOptions);
@@ -129,6 +130,7 @@ export async function getAdminDashboardData() {
         planPrice: clinic.planPrice || 250,
         subscriptionExpiresAt: clinic.subscriptionExpiresAt ? clinic.subscriptionExpiresAt.toISOString() : null,
         subscriptionStatus: clinic.subscriptionStatus || "active",
+        pendingPlanChange: (clinic.pendingPlanChange as any) || null,
         daysRemaining: clinic.subscriptionExpiresAt
           ? Math.max(0, Math.ceil((new Date(clinic.subscriptionExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
           : null,
@@ -468,12 +470,15 @@ export async function getAdminDashboardData() {
     createdAt: c.createdAt.toISOString(),
   }));
 
+  const platformSettingsData = await getPlatformSettings();
+
   return {
     pendingRequests,
     allRequests,
     doctorsWithAssistants,
     allUsers: allUsersFormatted,
     allClinics: allClinicsFormatted,
+    platformSettings: platformSettingsData,
     stats: {
       totalClinics: allClinicsRaw.length,
       totalDoctors,
@@ -1169,5 +1174,67 @@ export async function adminRenewSubscription(
       : duration === "add_trial_days"
       ? "Période d'essai prolongée de +7 jours avec succès."
       : `Abonnement prolongé avec succès (+${duration === "1year" ? "1 An" : duration === "3months" ? "3 Mois" : "1 Mois"}).`,
+  };
+}
+
+// 10. Valider la demande de changement de formule d'un cabinet
+export async function adminApprovePlanChange(clinicId: number) {
+  await verifySuperAdmin();
+  const [clinic] = await db.select().from(clinics).where(eq(clinics.id, clinicId)).limit(1);
+  if (!clinic) return { error: "Cabinet introuvable." };
+
+  const pending = clinic.pendingPlanChange as any;
+  if (!pending || pending.status !== "pending") {
+    return { error: "Aucune demande de changement en attente pour ce cabinet." };
+  }
+
+  const requestedPlan = pending.requestedPlan || "pro";
+  const requestedCycle = pending.requestedCycle || "monthly";
+  const requestedPrice = pending.requestedPrice || (requestedPlan === "standard" ? 200 : 250);
+
+  // Recalculer l'échéance selon le cycle demandé
+  const days = requestedCycle === "yearly" ? 365 : requestedCycle === "quarterly" ? 90 : 30;
+  const newExpiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+  await db
+    .update(clinics)
+    .set({
+      plan: requestedPlan,
+      billingCycle: requestedCycle,
+      planPrice: requestedPrice,
+      subscriptionExpiresAt: newExpiresAt,
+      subscriptionStatus: "active",
+      pendingPlanChange: null,
+    })
+    .where(eq(clinics.id, clinicId));
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard/settings");
+
+  return {
+    success: true,
+    message: `Le cabinet ${clinic.name} a été basculé avec succès sur la formule ${requestedPlan.toUpperCase()} (${requestedCycle === "yearly" ? "Annuel" : requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"}).`,
+  };
+}
+
+// 11. Refuser ou annuler la demande de changement de formule d'un cabinet
+export async function adminRejectPlanChange(clinicId: number) {
+  await verifySuperAdmin();
+  const [clinic] = await db.select().from(clinics).where(eq(clinics.id, clinicId)).limit(1);
+  if (!clinic) return { error: "Cabinet introuvable." };
+
+  await db
+    .update(clinics)
+    .set({
+      pendingPlanChange: null,
+    })
+    .where(eq(clinics.id, clinicId));
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard/settings");
+
+  return {
+    success: true,
+    message: "La demande de modification de formule a été rejetée/annulée.",
   };
 }

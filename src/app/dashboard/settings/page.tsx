@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { getClinicSettings } from "@/actions/settings";
+import { getPlatformSettings } from "@/actions/platform";
 import SettingsClient from "./SettingsClient";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   const role = (session?.user as { role?: string } | undefined)?.role || "assistant";
   const settings = await getClinicSettings();
+  const platform = await getPlatformSettings();
 
   return (
     <div className="space-y-6">
@@ -42,6 +44,9 @@ export default async function SettingsPage() {
           prescriptionTemplateUrl: settings.prescriptionTemplateUrl,
           prescriptionTemplateName: settings.prescriptionTemplateName,
           prescriptionTemplateLayout: settings.prescriptionTemplateLayout,
+          subscription: (settings as any).subscription || null,
+          supportWhatsapp: platform.supportWhatsapp,
+          supportWhatsappMessage: platform.supportWhatsappMessage,
         }}
       />
     </div>

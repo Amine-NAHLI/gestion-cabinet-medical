@@ -53,13 +53,14 @@ export default async function DashboardLayout({
     redirect("/onboarding/setup");
   }
 
-  // Récupérer les personnalisations de la clinique (logo, couleur, communauté)
+  // Récupérer les personnalisations de la clinique (logo, couleur, communauté, formule)
   const [clinic] = await db
     .select({
       name: clinics.name,
       logoUrl: clinics.logoUrl,
       primaryColor: clinics.primaryColor,
       isCommunityMember: clinics.isCommunityMember,
+      plan: clinics.plan,
     })
     .from(clinics)
     .where(eq(clinics.id, clinicId))
@@ -86,6 +87,7 @@ export default async function DashboardLayout({
       unreadChatCount={unreadChatCount}
       activeConsultation={activeConsultation}
       todayStr={todayStr}
+      plan={clinic?.plan || "pro"}
       user={{
         name: currentUser?.name || userSession?.name,
         email: currentUser?.email || userSession?.email,

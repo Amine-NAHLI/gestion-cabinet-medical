@@ -19,6 +19,7 @@ export const clinics = pgTable("clinics", {
   planPrice: integer("plan_price").default(250).notNull(), // Montant en DH
   subscriptionExpiresAt: timestamp("subscription_expires_at"), // Échéance de l'abonnement
   subscriptionStatus: text("subscription_status").default("active").notNull(), // 'active', 'trial', 'expired'
+  pendingPlanChange: json("pending_plan_change"), // Demande de changement d'abonnement en attente de validation admin
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -204,4 +205,16 @@ export const communityMessages = pgTable("community_messages", {
   content: text("content").notNull(),
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Platform Settings table (Global Admin Settings: WhatsApp support, emails, hotline)
+export const platformSettings = pgTable("platform_settings", {
+  id: serial("id").primaryKey(),
+  supportWhatsapp: text("support_whatsapp").default("+212600000000").notNull(),
+  supportWhatsappMessage: text("support_whatsapp_message")
+    .default("Bonjour, je vous contacte concernant l'abonnement de mon cabinet MonCabinet.")
+    .notNull(),
+  supportEmail: text("support_email").default("contact@toncabinet.me").notNull(),
+  supportPhone: text("support_phone").default("+212600000000"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -5,7 +5,7 @@ import {
   updateClinicSettings,
   updateConsultationFields,
   updatePrescriptionTemplate,
-  exportClinicPatientsData,
+  requestSubscriptionChange,
 } from "@/actions/settings";
 import {
   ConsultationFieldConfig,
@@ -39,6 +39,8 @@ interface SettingsClientProps {
     prescriptionTemplateUrl: string | null;
     prescriptionTemplateName: string | null;
     prescriptionTemplateLayout: PrescriptionTemplateLayout;
+    supportWhatsapp?: string;
+    supportWhatsappMessage?: string;
     subscription?: {
       plan: string;
       billingCycle: string;
@@ -46,6 +48,7 @@ interface SettingsClientProps {
       subscriptionExpiresAt: string | null;
       subscriptionStatus: string;
       daysRemaining: number;
+      pendingPlanChange?: any;
     };
   };
 }
@@ -66,8 +69,19 @@ export default function SettingsClient({
   const isDoctor = role === "doctor";
   const [activeTab, setActiveTab] = useState<"general" | "fields" | "template" | "subscription">("general");
   const [isLoading, setIsLoading] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
+  // Gestion du changement de formule
+  const [changePlan, setChangePlan] = useState<"standard" | "pro">(
+    initialSettings.subscription?.plan === "standard" ? "pro" : "standard"
+  );
+  const [changeCycle, setChangeCycle] = useState<"monthly" | "quarterly" | "yearly">(
+    (initialSettings.subscription?.billingCycle as any) || "monthly"
+  );
+  const [isSubmittingChange, setIsSubmittingChange] = useState(false);
+  const [pendingPlanData, setPendingPlanData] = useState<any>(
+    initialSettings.subscription?.pendingPlanChange || null
+  );
 
   const [fields, setFields] = useState<ConsultationFieldConfig[]>(
     initialSettings.consultationFields?.length > 0
@@ -331,27 +345,43 @@ export default function SettingsClient({
     });
   }
 
-  const handleExportData = async () => {
-    setIsExporting(true);
+  const cleanWhatsappNumber = (initialSettings.supportWhatsapp || "+212600000000").replace(/[^0-9]/g, "");
+  const whatsappUrl = `https://wa.me/${cleanWhatsappNumber}?text=${encodeURIComponent(
+    initialSettings.supportWhatsappMessage || "Bonjour, je vous contacte concernant l'abonnement de mon cabinet MonCabinet."
+  )}`;
+
+  const calculatedChangePrice =
+    changePlan === "standard"
+      ? changeCycle === "yearly"
+        ? 1900
+        : changeCycle === "quarterly"
+        ? 550
+        : 200
+      : changeCycle === "yearly"
+      ? 2500
+      : changeCycle === "quarterly"
+      ? 700
+      : 250;
+
+  const handleRequestPlanChange = async () => {
+    setIsSubmittingChange(true);
     try {
-      const res = await exportClinicPatientsData();
-      if (!res?.success || !res.csv) {
-        showToast("Erreur lors de l'export des données.", "error");
-        return;
+      const res = await requestSubscriptionChange({ plan: changePlan, cycle: changeCycle });
+      if (res?.error) {
+        showToast(res.error, "error");
+      } else {
+        showToast("Demande de modification transmise avec succès à l'administration !");
+        setPendingPlanData({
+          requestedPlan: changePlan,
+          requestedCycle: changeCycle,
+          requestedPrice: calculatedChangePrice,
+          status: "pending",
+        });
       }
-      const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", res.filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showToast(`Export de ${res.count} patients réussi !`);
     } catch (err: any) {
-      showToast(err?.message || "Erreur lors de l'exportation.", "error");
+      showToast(err?.message || "Erreur lors de la demande.", "error");
     } finally {
-      setIsExporting(false);
+      setIsSubmittingChange(false);
     }
   };
 
@@ -1504,40 +1534,151 @@ export default function SettingsClient({
             </div>
           </div>
 
-          {/* Section d'archivage & Export Excel (indispensable pour le plan Standard) */}
-          <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)] space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          {/* Section Changement d'Abonnement (Initiée par le Praticien) */}
+          <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)] space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-600 text-xl">table_chart</span>
-                  <span>Sauvegarde locale & Export Excel complet</span>
+                  <span className="material-symbols-outlined text-slate-700 text-xl">swap_horiz</span>
+                  <span>Changer de formule ou de durée</span>
                 </h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-xl leading-relaxed">
-                  {initialSettings.subscription?.plan === 'standard'
-                    ? "Votre formule STANDARD conserve un historique de 30 jours en direct sur la plateforme. Vous pouvez télécharger à tout moment l'intégralité de votre patientèle et de vos antécédents au format Excel / CSV pour conserver vos archives locales complètes sans aucune perte."
-                    : "Votre formule PRO conserve vos données à vie en illimité. Vous pouvez également générer à tout moment un export Excel de vos patients et consultations pour vos sauvegardes comptables ou administratives."}
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Faites évoluer votre abonnement à tout moment selon les besoins de votre cabinet.
                 </p>
               </div>
 
-              <button
-                type="button"
-                disabled={isExporting}
-                onClick={handleExportData}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition cursor-pointer disabled:opacity-50 shrink-0"
-              >
-                {isExporting ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Génération de l'export...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-base">download</span>
-                    <span>Télécharger l'export Excel (.CSV)</span>
-                  </>
-                )}
-              </button>
+              {pendingPlanData?.status === "pending" && (
+                <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                  <span>Demande en cours de validation</span>
+                </div>
+              )}
             </div>
+
+            {pendingPlanData?.status === "pending" ? (
+              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-950 text-xs space-y-1.5">
+                <p className="font-bold">
+                  Votre demande de changement vers la formule {pendingPlanData.requestedPlan === "pro" ? "Pro" : "Standard"} ({pendingPlanData.requestedCycle === "yearly" ? "Annuel" : pendingPlanData.requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"} - {pendingPlanData.requestedPrice} DH) a été transmise au Super Administrateur.
+                </p>
+                <p className="text-amber-800 text-[11px]">
+                  Votre formule active reste opérationnelle. Dès que l'administrateur valide votre règlement, votre compte sera automatiquement mis à jour.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Choix du Plan */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                      Nouvelle Formule souhaitée
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setChangePlan("standard")}
+                        className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                          changePlan === "standard"
+                            ? "border-slate-900 bg-slate-50 text-slate-900 ring-1 ring-slate-900"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        <span className="text-xs font-bold block">Standard</span>
+                        <span className="text-[11px] text-slate-500 block mt-0.5">Historique 30 jours</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setChangePlan("pro")}
+                        className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                          changePlan === "pro"
+                            ? "border-emerald-600 bg-emerald-50/50 text-emerald-950 ring-1 ring-emerald-600"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        <span className="text-xs font-bold block text-emerald-900">Plan Pro</span>
+                        <span className="text-[11px] text-emerald-700 block mt-0.5">Historique à vie + Stats</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Choix de la Durée */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                      Durée d'engagement
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setChangeCycle("monthly")}
+                        className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
+                          changeCycle === "monthly"
+                            ? "border-slate-900 bg-slate-50 text-slate-900 font-bold"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 text-xs"
+                        }`}
+                      >
+                        <span className="text-xs block">1 Mois</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setChangeCycle("quarterly")}
+                        className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
+                          changeCycle === "quarterly"
+                            ? "border-slate-900 bg-slate-50 text-slate-900 font-bold"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 text-xs"
+                        }`}
+                      >
+                        <span className="text-xs block">3 Mois</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setChangeCycle("yearly")}
+                        className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
+                          changeCycle === "yearly"
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-900 font-bold"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 text-xs"
+                        }`}
+                      >
+                        <span className="text-xs block">1 An</span>
+                        <span className="text-[10px] text-emerald-700 block font-medium">2 mois off.</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-medium">Nouveau tarif calculé :</span>
+                    <div className="flex items-baseline gap-1.5 mt-0.5">
+                      <span className="text-xl font-bold text-slate-900 tabular-nums">{calculatedChangePrice} DH</span>
+                      <span className="text-xs text-slate-500">
+                        {changeCycle === "yearly" ? "/ an" : changeCycle === "quarterly" ? "/ 3 mois" : "/ mois"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isSubmittingChange}
+                    onClick={handleRequestPlanChange}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {isSubmittingChange ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Transmission...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[17px]">send</span>
+                        <span>Demander la modification de formule</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Tableau comparatif des garanties du plan */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
@@ -1556,7 +1697,7 @@ export default function SettingsClient({
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>
-                    <span>Export Excel illimité à tout moment</span>
+                    <span>Export Excel illimité (disponible dans l'onglet Historique)</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-emerald-600 text-[16px]">check_circle</span>
@@ -1580,13 +1721,13 @@ export default function SettingsClient({
                     Prolongation & Support Dédié
                   </span>
                   <p className="text-xs text-sky-900 mt-1 leading-relaxed">
-                    Pour prolonger votre abonnement, modifier votre cycle (passer à l'annuel pour bénéficier de 2 mois offerts) ou basculer sur la formule Pro, contactez notre équipe support direct.
+                    Pour prolonger votre abonnement ou échanger directement avec notre équipe support WhatsApp, contactez-nous sans attendre.
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 pt-2">
                   <a
-                    href="https://wa.me/212600000000?text=Bonjour,%20je%20souhaite%20des%20informations%20sur%20mon%20abonnement%20MonCabinet"
+                    href={whatsappUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
@@ -1595,7 +1736,7 @@ export default function SettingsClient({
                     <span>Contacter par WhatsApp</span>
                   </a>
                   <a
-                    href="mailto:nahli-ami@upf.ac.ma?subject=Gestion%20Abonnement%20Cabinet%20Médical"
+                    href="mailto:contact@toncabinet.me?subject=Gestion%20Abonnement%20Cabinet%20Médical"
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition"
                   >
                     <span className="material-symbols-outlined text-[15px]">mail</span>

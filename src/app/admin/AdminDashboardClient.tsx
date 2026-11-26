@@ -9,6 +9,8 @@ import {
   adminDeleteClinic,
   adminRunVacuum,
   adminRenewSubscription,
+  adminApprovePlanChange,
+  adminRejectPlanChange,
   getAdminDashboardData,
 } from "@/actions/admin";
 import { signOut } from "next-auth/react";
@@ -18,6 +20,7 @@ import AdminUsersManagement from "@/components/admin/AdminUsersManagement";
 import AdminDatabaseExplorer from "@/components/admin/AdminDatabaseExplorer";
 import AdminClinicEditModal from "@/components/admin/AdminClinicEditModal";
 import AdminCreateClinicModal from "@/components/admin/AdminCreateClinicModal";
+import AdminPlatformSupport from "@/components/admin/AdminPlatformSupport";
 import { slugifyClinic } from "@/lib/slug";
 
 interface AdminDashboardClientProps {
@@ -25,7 +28,7 @@ interface AdminDashboardClientProps {
   adminEmail: string;
 }
 
-type AdminPage = "stats" | "neon" | "doctors" | "users" | "database" | "requests";
+type AdminPage = "stats" | "doctors" | "requests" | "users" | "platform" | "neon" | "database";
 
 export default function AdminDashboardClient({
   initialData,
@@ -35,6 +38,7 @@ export default function AdminDashboardClient({
   const [activePage, setActivePage] = useState<AdminPage>(
     initialData.stats.pendingCount > 0 ? "requests" : "stats"
   );
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [doctorSearch, setDoctorSearch] = useState("");
   const [requestSearch, setRequestSearch] = useState("");
   const [requestStatusFilter, setRequestStatusFilter] = useState<"all" | "approved" | "rejected" | "expired">("all");
@@ -70,7 +74,7 @@ export default function AdminDashboardClient({
     visitsCount: number;
   } | null>(null);
 
-  // Polling automatique en temps réel toutes les 3.5 secondes (demandes OTP, télémétrie Neon et statistiques)
+  // Polling automatique en temps réel toutes les 3.5 secondes
   useEffect(() => {
     const interval = setInterval(async () => {
       if (document.hidden) return;
@@ -145,6 +149,42 @@ export default function AdminDashboardClient({
       }
     } catch (err: any) {
       showFeedback("error", err?.message || "Erreur de prolongation");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Validation d'une demande de changement de plan
+  const handleApprovePlanChange = async (clinicId: number) => {
+    setActionLoading(`approve-plan-${clinicId}`);
+    try {
+      const res = await adminApprovePlanChange(clinicId);
+      if (res?.error) {
+        showFeedback("error", res.error);
+      } else {
+        showFeedback("success", res.message || "Demande de changement validée avec succès !");
+        await refreshData(true);
+      }
+    } catch {
+      showFeedback("error", "Erreur lors de la validation du changement de plan.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Rejet d'une demande de changement de plan
+  const handleRejectPlanChange = async (clinicId: number) => {
+    setActionLoading(`reject-plan-${clinicId}`);
+    try {
+      const res = await adminRejectPlanChange(clinicId);
+      if (res?.error) {
+        showFeedback("error", res.error);
+      } else {
+        showFeedback("success", "Demande de changement annulée.");
+        await refreshData(true);
+      }
+    } catch {
+      showFeedback("error", "Erreur lors du rejet.");
     } finally {
       setActionLoading(null);
     }
@@ -240,7 +280,7 @@ export default function AdminDashboardClient({
   const copyCredentials = () => {
     if (!passwordModalUser || !newPassword) return;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const text = `🏥 *Identifiants MonCabinet*\n👤 *Nom:* ${passwordModalUser.name} (${passwordModalUser.roleLabel})\n📧 *Email:* ${passwordModalUser.email}\n🔑 *Nouveau Mot de passe:* ${newPassword}\n🔗 *Lien:* ${origin}/login`;
+    const text = `Identifiants MonCabinet\nNom: ${passwordModalUser.name} (${passwordModalUser.roleLabel})\nEmail: ${passwordModalUser.email}\nNouveau Mot de passe: ${newPassword}\nLien: ${origin}/login`;
     navigator.clipboard.writeText(text);
     setCopiedNotice(true);
     setTimeout(() => setCopiedNotice(false), 2500);
@@ -263,6 +303,13 @@ export default function AdminDashboardClient({
 
   const formatMoney = (amount: number) =>
     `${Math.round(amount).toLocaleString("fr-FR")} DH`;
+
+  // Liste des demandes de changement de formule en attente
+  const pendingPlanChanges = useMemo(() => {
+    return data.doctorsWithAssistants.filter(
+      (item) => item.clinic.pendingPlanChange && (item.clinic.pendingPlanChange as any).status === "pending"
+    );
+  }, [data.doctorsWithAssistants]);
 
   // Filtrage des médecins & assistantes
   const filteredDoctors = useMemo(() => {
@@ -316,593 +363,637 @@ export default function AdminDashboardClient({
     ...data.stats.citiesBreakdown.map((c) => c.count)
   );
 
+  interface NavItem {
+    id: AdminPage;
+    label: string;
+    icon: string;
+    badge: string | number | null;
+    alertBadge?: string | null;
+    isWarning?: boolean;
+  }
+
+  interface NavGroup {
+    title: string;
+    items: NavItem[];
+  }
+
+  // Groupes de navigation pour la Sidebar
+  const navigationGroups: NavGroup[] = [
+    {
+      title: "SUPERVISION",
+      items: [
+        {
+          id: "stats",
+          label: "Vue d'ensemble",
+          icon: "dashboard",
+          badge: null,
+        },
+        {
+          id: "neon",
+          label: "Infrastructure Neon",
+          icon: "database",
+          badge: "1 Go",
+        },
+      ],
+    },
+    {
+      title: "GESTION MÉDICALE",
+      items: [
+        {
+          id: "doctors",
+          label: "Cabinets & Abonnements",
+          icon: "medical_services",
+          badge: data.doctorsWithAssistants.length,
+          alertBadge: pendingPlanChanges.length > 0 ? `${pendingPlanChanges.length} chgt` : null,
+        },
+        {
+          id: "requests",
+          label: "Demandes d'inscription",
+          icon: "inbox",
+          badge: data.stats.pendingCount > 0 ? data.stats.pendingCount : data.allRequests.length,
+          isWarning: data.stats.pendingCount > 0,
+        },
+      ],
+    },
+    {
+      title: "PERSONNES & RÔLES",
+      items: [
+        {
+          id: "users",
+          label: "Gestion des Personnes",
+          icon: "group",
+          badge: data.allUsers?.length || data.stats.totalUsers,
+        },
+      ],
+    },
+    {
+      title: "SYSTÈME & CONFIGURATION",
+      items: [
+        {
+          id: "platform",
+          label: "Support & WhatsApp",
+          icon: "chat",
+          badge: "Config",
+        },
+        {
+          id: "database",
+          label: "Explorateur BDD",
+          icon: "table_rows",
+          badge: null,
+        },
+      ],
+    },
+  ];
+
+  const getPageTitle = (page: AdminPage) => {
+    switch (page) {
+      case "stats":
+        return { title: "Vue d'ensemble", subtitle: "Indicateurs consolidés, chiffre d'affaires et santé globale de la plateforme." };
+      case "doctors":
+        return { title: "Cabinets Médicaux & Abonnements", subtitle: "Gestion des sous-domaines, renouvellements et demandes de changement de formule." };
+      case "requests":
+        return { title: "Demandes d'inscription", subtitle: "Contrôle des demandes d'onboarding, validation 1-clic et codes de confirmation." };
+      case "users":
+        return { title: "Gestion des Personnes", subtitle: "Administration des comptes praticiens, assistantes médicales et super administrateurs." };
+      case "platform":
+        return { title: "Support & WhatsApp", subtitle: "Numéro WhatsApp officiel, message pré-rempli et coordonnées d'assistance directe." };
+      case "neon":
+        return { title: "Infrastructure Neon PostgreSQL", subtitle: "Télémétrie serverless, consommation CU-heures et santé de la base de données." };
+      case "database":
+        return { title: "Explorateur de Base de Données", subtitle: "Inspection directe des tables relationnelles, métriques de taille et requêtes." };
+    }
+  };
+
+  const pageInfo = getPageTitle(activePage);
+
   return (
-    <div className="min-h-screen bg-[#F8F9FB] text-slate-900 flex flex-col">
-      {/* TOP HEADER SOBRE */}
-      {/* HEADER SUPER ADMIN MODERNE */}
-      <header className="border-b border-slate-200/90 bg-white sticky top-0 z-30 shadow-2xs">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="font-bold text-base tracking-tight text-slate-900 shrink-0">
-              Mon<span className="text-sky-700">Cabinet</span>
-            </span>
-            <span className="text-slate-300 shrink-0">/</span>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider shrink-0">
-              Administration
-            </span>
+    <div className="min-h-screen bg-[#F8F9FB] text-slate-900 flex flex-col md:flex-row">
+      {/* ============================================================
+          SIDEBAR GAUCHE MODERNE & FLUIDE (DESKTOP)
+         ============================================================ */}
+      <aside className="hidden md:flex w-64 lg:w-72 bg-white border-r border-slate-200/90 flex-col justify-between shrink-0 h-screen sticky top-0 z-30 shadow-xs">
+        <div className="flex flex-col h-full min-h-0">
+          {/* Header Sidebar Brand */}
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-xs">
+                MC
+              </div>
+              <div>
+                <span className="font-extrabold text-base tracking-tight text-slate-900 block leading-tight">
+                  Mon<span className="text-sky-700">Cabinet</span>
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">
+                  Super Admin Console
+                </span>
+              </div>
+            </div>
+
+            {/* Pastille Live */}
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200" title="Synchronisation continue toutes les 3.5s">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              <span>3.5s</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            {/* Indicateur Temps Réel Actif */}
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold shadow-2xs">
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span className="hidden sm:inline">En direct (3s)</span>
-              <span className="sm:hidden">Live</span>
+          {/* Navigation groupée & aérée */}
+          <nav className="flex-1 p-3.5 space-y-5 overflow-y-auto min-h-0">
+            {navigationGroups.map((group) => (
+              <div key={group.title} className="space-y-1">
+                <p className="px-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {group.title}
+                </p>
+                {group.items.map((item) => {
+                  const isActive = activePage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActivePage(item.id)}
+                      className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                        isActive
+                          ? "bg-slate-900 text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className={`material-symbols-outlined text-[19px] shrink-0 ${
+                            isActive ? "text-emerald-400" : "text-slate-400"
+                          }`}
+                        >
+                          {item.icon}
+                        </span>
+                        <span className="truncate">{item.label}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {item.alertBadge && (
+                          <span className="px-1.5 py-0.2 rounded-md bg-amber-500 text-white text-[10px] font-bold animate-pulse">
+                            {item.alertBadge}
+                          </span>
+                        )}
+                        {item.badge !== null && (
+                          <span
+                            className={`px-2 py-0.2 rounded-md text-[10px] font-bold tabular-nums ${
+                              isActive
+                                ? "bg-white/20 text-white"
+                                : item.isWarning
+                                ? "bg-amber-100 text-amber-900"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+
+          {/* Footer Sidebar Utilisateur */}
+          <div className="p-3.5 border-t border-slate-100 bg-slate-50/50 space-y-2">
+            <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
+                  SA
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900 truncate">Super Admin</p>
+                  <p className="text-[10px] text-slate-400 truncate">{adminEmail}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => refreshData(false)}
+                disabled={actionLoading === "refreshing"}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 transition cursor-pointer"
+                title="Actualiser en direct"
+              >
+                <span
+                  className={`material-symbols-outlined text-[16px] ${
+                    actionLoading === "refreshing" ? "animate-spin" : ""
+                  }`}
+                >
+                  refresh
+                </span>
+              </button>
             </div>
 
             <button
+              type="button"
+              onClick={handleAdminLogout}
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">logout</span>
+              <span>Déconnexion</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ============================================================
+          TOP HEADER MOBILE (AVEC TIROIR DE NAVIGATION)
+         ============================================================ */}
+      <div className="md:hidden bg-white border-b border-slate-200 sticky top-0 z-40 p-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-slate-900">MonCabinet</span>
+          <span className="text-slate-300">/</span>
+          <span className="text-xs text-slate-500 font-semibold">{pageInfo.title}</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-1.5 rounded-lg border border-slate-200 text-slate-700"
+        >
+          <span className="material-symbols-outlined text-[20px]">
+            {sidebarOpen ? "close" : "menu"}
+          </span>
+        </button>
+      </div>
+
+      {/* Drawer Mobile */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            className="md:hidden fixed inset-0 z-50 bg-white p-5 flex flex-col justify-between"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="font-bold text-slate-900 text-lg">Menu Administration</span>
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-1 rounded-lg text-slate-500"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {navigationGroups.flatMap((g) => g.items).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setActivePage(item.id);
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl text-xs font-semibold ${
+                      activePage === item.id ? "bg-slate-900 text-white" : "text-slate-700 bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge !== null && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/20">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAdminLogout}
+              className="w-full py-3 rounded-xl bg-rose-50 text-rose-700 font-bold text-xs"
+            >
+              Déconnexion
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================
+          ZONE PRINCIPALE & PAGES DÉDIÉES
+         ============================================================ */}
+      <main className="flex-1 min-w-0 flex flex-col min-h-screen">
+        {/* Top Header du Contenu */}
+        <div className="bg-white border-b border-slate-200/90 px-5 sm:px-8 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sticky top-0 z-20 shadow-2xs">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Console Super Admin
+              </span>
+              <span className="text-slate-300">/</span>
+              <span className="text-xs font-bold text-slate-700">{pageInfo.title}</span>
+            </div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5 tracking-tight">
+              {pageInfo.title}
+            </h1>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setCreateClinicPrefill(null);
+                setCreateClinicModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition shadow-xs cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              <span>Nouveau Cabinet</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => refreshData(false)}
               disabled={actionLoading === "refreshing"}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 shadow-2xs transition cursor-pointer disabled:opacity-50"
-              title="Rafraîchir les données en direct"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 transition cursor-pointer disabled:opacity-50"
             >
               <span
-                className={`material-symbols-outlined text-[15px] text-slate-500 ${
+                className={`material-symbols-outlined text-[15px] ${
                   actionLoading === "refreshing" ? "animate-spin" : ""
                 }`}
               >
                 refresh
               </span>
-              <span className="hidden md:inline">Actualiser</span>
-            </button>
-
-            <span className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] font-medium text-slate-600 font-mono">
-              <span className="material-symbols-outlined text-[14px] text-slate-400">admin_panel_settings</span>
-              {adminEmail}
-            </span>
-
-            <button
-              onClick={handleAdminLogout}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 text-xs font-medium transition cursor-pointer"
-              title="Se déconnecter de l'administration"
-            >
-              <span className="material-symbols-outlined text-[16px]">logout</span>
-              <span className="hidden sm:inline">Déconnexion</span>
+              <span>Actualiser</span>
             </button>
           </div>
         </div>
 
-        {/* NAVIGATION DES 6 PAGES ADMIN (ONGLETS PARFAITEMENT ADAPTÉS ET FLUIDES) */}
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100">
-          <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-1 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none]">
-            <button
-              onClick={() => setActivePage("stats")}
-              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
-                activePage === "stats"
-                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
-                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
-              }`}
+        {/* FEEDBACK TOAST FLOTTANT */}
+        <AnimatePresence>
+          {feedback && (
+            <motion.div
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              className="fixed top-20 right-4 sm:right-6 z-50"
             >
-              <span className="material-symbols-outlined text-[17px]">bar_chart</span>
-              <span>Vue d&apos;ensemble</span>
-            </button>
-
-            <button
-              onClick={() => setActivePage("neon")}
-              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
-                activePage === "neon"
-                  ? "border-sky-600 text-sky-800 font-bold bg-sky-50/50"
-                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[17px] text-sky-600">database</span>
-              <span>Infrastructure Neon</span>
-              <span className="px-1.5 py-0.2 rounded-md bg-sky-50 text-sky-700 text-[10px] font-semibold tabular-nums border border-sky-200">
-                1 Go • 100 CU-h
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActivePage("doctors")}
-              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
-                activePage === "doctors"
-                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
-                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[17px]">medical_services</span>
-              <span>Cabinets Médicaux</span>
-              <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold tabular-nums">
-                {data.doctorsWithAssistants.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActivePage("users")}
-              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
-                activePage === "users"
-                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
-                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[17px]">group</span>
-              <span>Gestion des Personnes</span>
-              <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold tabular-nums">
-                {data.allUsers?.length || data.stats.totalUsers}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActivePage("database")}
-              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
-                activePage === "database"
-                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
-                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[17px]">table_rows</span>
-              <span>Explorateur BDD</span>
-            </button>
-
-            <button
-              onClick={() => setActivePage("requests")}
-              className={`flex items-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-3 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition cursor-pointer rounded-t-lg ${
-                activePage === "requests"
-                  ? "border-slate-900 text-slate-900 font-bold bg-slate-50/50"
-                  : "border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50/30"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[17px]">inbox</span>
-              <span>Demandes d&apos;inscription</span>
-              {data.stats.pendingCount > 0 ? (
-                <span className="px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold tabular-nums animate-pulse">
-                  {data.stats.pendingCount}
-                </span>
-              ) : (
-                <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold tabular-nums">
-                  {data.allRequests.length}
-                </span>
-              )}
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* FEEDBACK TOAST */}
-      <AnimatePresence>
-        {feedback && (
-          <motion.div
-            initial={{ opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            className="fixed top-20 right-4 sm:right-6 z-50"
-          >
-            <div
-              className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl border shadow-xl text-xs font-bold ${
-                feedback.type === "success"
-                  ? "bg-white border-emerald-200 text-emerald-800"
-                  : "bg-white border-red-200 text-red-700"
-              }`}
-            >
-              <span
-                className={`material-symbols-outlined text-base ${
-                  feedback.type === "success" ? "text-emerald-500" : "text-red-500"
+              <div
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl border shadow-xl text-xs font-bold ${
+                  feedback.type === "success"
+                    ? "bg-white border-emerald-200 text-emerald-800"
+                    : "bg-white border-red-200 text-red-700"
                 }`}
               >
-                {feedback.type === "success" ? "check_circle" : "error"}
-              </span>
-              <span>{feedback.message}</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* CONTENU PRINCIPAL */}
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6">
-        {/* ============================================================
-            PAGE 1 : STATISTIQUES GLOBALES DE LA PLATEFORME
-           ============================================================ */}
-        {activePage === "stats" && (
-          <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                  Statistiques Globales de MonCabinet
-                </h1>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Vue consolidée en temps réel de tous les cabinets, patients, consultations et revenus.
-                </p>
-              </div>
-              <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 shadow-xs">
                 <span
-                  className={`w-2 h-2 rounded-full ${
-                    data.stats.resendConfigured ? "bg-emerald-500" : "bg-amber-500"
+                  className={`material-symbols-outlined text-base ${
+                    feedback.type === "success" ? "text-emerald-500" : "text-red-500"
                   }`}
-                />
-                <span>
-                  Passerelle Email Resend :{" "}
-                  <strong className="text-slate-900">
-                    {data.stats.resendConfigured ? "Connectée" : "Non configurée"}
-                  </strong>
+                >
+                  {feedback.type === "success" ? "check_circle" : "error"}
                 </span>
+                <span>{feedback.message}</span>
               </div>
-            </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            {/* BANDEAU KPI PRINCIPAL UNIFIÉ */}
-            <div className="bg-slate-200/80 rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden grid grid-cols-2 lg:grid-cols-4 gap-px">
-              <div className="bg-white p-5">
-                <p className="text-xs font-medium text-slate-500">Cabinets & médecins</p>
-                <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
-                  {data.stats.totalClinics}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {data.stats.totalDoctors} méd. • {data.stats.totalAssistants} assist.
-                </p>
-              </div>
-
-              <div className="bg-white p-5">
-                <p className="text-xs font-medium text-slate-500">Dossiers patients</p>
-                <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
-                  {data.stats.totalPatients}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {data.stats.totalAppointments} RDV actifs
-                </p>
-              </div>
-
-              <div className="bg-white p-5">
-                <p className="text-xs font-medium text-slate-500">Consultations</p>
-                <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
-                  {data.stats.totalVisits}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  +{data.stats.visitsToday} aujourd'hui • {data.stats.visitsThisMonth} ce mois
-                </p>
-              </div>
-
-              <div className="bg-white p-5">
-                <p className="text-xs font-medium text-slate-500">Volume financier</p>
-                <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
-                  {formatMoney(data.stats.totalRevenue)}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {data.stats.collectionRate}% encaissé ({formatMoney(data.stats.paidRevenue)})
-                </p>
-              </div>
-            </div>
-
-            {/* PIPELINE DES DEMANDES D'INSCRIPTION */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-slate-200/80 border border-slate-200/90 rounded-xl overflow-hidden shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-              <div className="bg-white p-4 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-medium text-slate-500 truncate">En attente (OTP)</p>
-                  <p className="text-xl font-semibold text-amber-600 tabular-nums mt-0.5">
-                    {data.stats.pendingCount}
-                  </p>
-                </div>
-                <span className="material-symbols-outlined text-lg text-amber-500 shrink-0">hourglass_top</span>
-              </div>
-
-              <div className="bg-white p-4 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-medium text-slate-500 truncate">Demandes validées</p>
-                  <p className="text-xl font-semibold text-emerald-600 tabular-nums mt-0.5">
-                    {data.stats.approvedRequestsCount}
-                  </p>
-                </div>
-                <span className="material-symbols-outlined text-lg text-emerald-500 shrink-0">verified</span>
-              </div>
-
-              <div className="bg-white p-4 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-medium text-slate-500 truncate">Rejetées</p>
-                  <p className="text-xl font-semibold text-red-600 tabular-nums mt-0.5">
-                    {data.stats.rejectedRequestsCount}
-                  </p>
-                </div>
-                <span className="material-symbols-outlined text-lg text-red-500 shrink-0">cancel</span>
-              </div>
-
-              <div className="bg-white p-4 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-medium text-slate-500 truncate">Expirées</p>
-                  <p className="text-xl font-semibold text-slate-600 tabular-nums mt-0.5">
-                    {data.stats.expiredRequestsCount}
-                  </p>
-                </div>
-                <span className="material-symbols-outlined text-lg text-slate-400 shrink-0">timer_off</span>
-              </div>
-            </div>
-
-            {/* ANALYTIQUE VISUELLE : ACTIVITÉ 6 MOIS + RÉPARTITION VILLES & SPÉCIALITÉS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {/* Graphique Activité Mensuelle */}
-              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col justify-between">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-3.5 border-b border-slate-100">
-                  <div>
-                    <h2 className="font-semibold text-slate-900 text-sm">
-                      Activité des 6 derniers mois
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Consultations enregistrées et nouveaux cabinets inscrits
-                    </p>
+        {/* CONTENU PROPRE PAR PAGE */}
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1400px] w-full mx-auto">
+          {/* ============================================================
+              PAGE 1 : VUE D'ENSEMBLE (STATS GLOBALES)
+             ============================================================ */}
+          {activePage === "stats" && (
+            <div className="space-y-6">
+              {/* CARTES KPI HAUT DE PAGE */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                  <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                    <span>Cabinets Actifs</span>
+                    <span className="material-symbols-outlined text-slate-400 text-[18px]">medical_services</span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-xs bg-sky-600" />
-                      Consultations
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-xs bg-slate-900" />
-                      Cabinets
-                    </span>
+                  <p className="text-2xl font-black text-slate-900 mt-2 tabular-nums">
+                    {data.stats.totalClinics}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {data.stats.totalDoctors} praticiens • {data.stats.totalAssistants} assistantes
+                  </p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                  <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                    <span>Dossiers Patients</span>
+                    <span className="material-symbols-outlined text-sky-500 text-[18px]">folder_shared</span>
+                  </div>
+                  <p className="text-2xl font-black text-slate-900 mt-2 tabular-nums">
+                    {data.stats.totalPatients}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">Patients répertoriés</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                  <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                    <span>Consultations Globales</span>
+                    <span className="material-symbols-outlined text-purple-500 text-[18px]">assignment_turned_in</span>
+                  </div>
+                  <p className="text-2xl font-black text-slate-900 mt-2 tabular-nums">
+                    {data.stats.totalVisits}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {data.stats.finishedVisits} terminées • {data.stats.visitsToday} aujourd&apos;hui
+                  </p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                  <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                    <span>Chiffre d&apos;Affaires Consolidé</span>
+                    <span className="material-symbols-outlined text-emerald-500 text-[18px]">payments</span>
+                  </div>
+                  <p className="text-2xl font-black text-emerald-700 mt-2 tabular-nums">
+                    {formatMoney(data.stats.totalRevenue)}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Recouvrement : {data.stats.collectionRate}% encaissé
+                  </p>
+                </div>
+              </div>
+
+              {/* GRAPHIQUE D'ACTIVITÉ MENSUELLE */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div>
+                      <h2 className="text-sm font-bold text-slate-900">Activité des consultations (6 derniers mois)</h2>
+                      <p className="text-xs text-slate-500">Volume mensuel consolidé de toutes les consultations</p>
+                    </div>
+                  </div>
+
+                  <div className="h-56 flex items-end gap-3 pt-4">
+                    {data.stats.monthlyActivity.map((m) => (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                        <span className="text-[11px] font-bold text-slate-700 tabular-nums">{m.visits}</span>
+                        <div
+                          style={{ height: `${Math.round((m.visits / maxMonthlyVisits) * 80)}%` }}
+                          className="w-full rounded-t-lg bg-slate-900 hover:bg-sky-600 transition min-h-[4px]"
+                        />
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase">{m.month}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-6 gap-2 sm:gap-3 items-end h-48 pt-2">
-                  {data.stats.monthlyActivity.map((m) => {
-                    const heightPct = Math.max(8, Math.round((m.visits / maxMonthlyVisits) * 100));
-                    return (
-                      <div key={m.label} className="flex flex-col items-center gap-2 h-full justify-end">
-                        <div className="flex flex-col items-center gap-1 w-full">
-                          <span className="text-xs font-semibold text-slate-700 tabular-nums">
-                            {m.visits}
-                          </span>
-                          <div className="w-full max-w-[40px] bg-slate-100 rounded-lg h-28 flex items-end p-0.5 overflow-hidden">
-                            <div
-                              style={{ height: `${m.visits === 0 ? 5 : heightPct}%` }}
-                              className="w-full rounded-md bg-sky-600 transition-all duration-500"
-                            />
-                          </div>
+                {/* RÉPARTITION PAR VILLE */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+                  <div className="pb-3 border-b border-slate-100">
+                    <h2 className="text-sm font-bold text-slate-900">Répartition par ville</h2>
+                    <p className="text-xs text-slate-500">Implantation géographique des cabinets</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {data.stats.citiesBreakdown.slice(0, 5).map((c) => (
+                      <div key={c.city} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-slate-700">{c.city}</span>
+                          <span className="text-slate-900 tabular-nums">{c.count} cabinet{c.count > 1 ? "s" : ""}</span>
                         </div>
-                        <div className="text-center">
-                          <p className="text-xs font-medium text-slate-700">{m.label}</p>
-                          <p className="text-[11px] text-slate-400 tabular-nums">
-                            +{m.clinics} cab.
-                          </p>
+                        <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            style={{ width: `${Math.round((c.count / maxCityCount) * 100)}%` }}
+                            className="h-full rounded-full bg-slate-900"
+                          />
                         </div>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Répartition Villes & Spécialités */}
-              <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] space-y-5">
-                <div>
-                  <h2 className="font-semibold text-slate-900 text-sm">
-                    Répartition par ville
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5 mb-4">Couverture géographique</p>
+          {/* ============================================================
+              PAGE 2 : CABINETS MÉDICAUX & ABONNEMENTS
+             ============================================================ */}
+          {activePage === "doctors" && (
+            <div className="space-y-6">
+              {/* BANNIÈRE DEMANDES DE CHANGEMENT DE FORMULE EN ATTENTE */}
+              {pendingPlanChanges.length > 0 && (
+                <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-50/90 via-orange-50/80 to-amber-50/90 border border-amber-200 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold">
+                      <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {pendingPlanChanges.length} demande{pendingPlanChanges.length > 1 ? "s" : ""} de changement de formule reçue{pendingPlanChanges.length > 1 ? "s" : ""}
+                      </h3>
+                      <p className="text-xs text-slate-600">
+                        Validez les demandes d&apos;évolution soumises par les praticiens après confirmation de leur règlement.
+                      </p>
+                    </div>
+                  </div>
 
-                  {data.stats.citiesBreakdown.length === 0 ? (
-                    <p className="text-xs text-slate-400">Aucun cabinet inscrit.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {data.stats.citiesBreakdown.slice(0, 5).map((item) => (
-                        <div key={item.city} className="space-y-1.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium text-slate-700 truncate">{item.city}</span>
-                            <span className="text-slate-900 font-semibold tabular-nums shrink-0 ml-2">
-                              {item.count} cabinet{item.count > 1 ? "s" : ""}
-                            </span>
+                  <div className="space-y-2">
+                    {pendingPlanChanges.map((item) => {
+                      const p = item.clinic.pendingPlanChange as any;
+                      return (
+                        <div
+                          key={item.clinic.id}
+                          className="p-3.5 rounded-xl bg-white border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+                        >
+                          <div>
+                            <span className="text-xs font-bold text-slate-900">{item.clinic.name}</span>
+                            <span className="text-xs text-slate-500 ml-1">({item.doctor?.name || "Dr."})</span>
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              Actuel : <strong className="capitalize">{item.clinic.plan}</strong> &rarr; Demandé :{" "}
+                              <strong className="text-emerald-700 capitalize">
+                                {p.requestedPlan} ({p.requestedCycle === "yearly" ? "Annuel" : p.requestedCycle === "quarterly" ? "Trimestriel" : "Mensuel"} - {p.requestedPrice} DH)
+                              </strong>
+                            </p>
                           </div>
-                          <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              style={{ width: `${Math.round((item.count / maxCityCount) * 100)}%` }}
-                              className="h-full rounded-full bg-slate-900"
-                            />
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              disabled={actionLoading === `approve-plan-${item.clinic.id}`}
+                              onClick={() => handleApprovePlanChange(item.clinic.id)}
+                              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                            >
+                              {actionLoading === `approve-plan-${item.clinic.id}` ? "Validation..." : "Accepter & Mettre à jour"}
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={actionLoading === `reject-plan-${item.clinic.id}`}
+                              onClick={() => handleRejectPlanChange(item.clinic.id)}
+                              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold transition cursor-pointer"
+                            >
+                              Refuser
+                            </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-4 border-t border-slate-100">
-                  <h3 className="font-semibold text-slate-900 text-sm mb-3">Spécialités médicales</h3>
-                  {data.stats.specialtiesBreakdown.length === 0 ? (
-                    <p className="text-xs text-slate-400">Aucune spécialité enregistrée.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {data.stats.specialtiesBreakdown.map((sp) => (
-                        <span
-                          key={sp.specialty}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200/80 text-slate-700 text-xs font-medium"
-                        >
-                          <span>{sp.specialty}</span>
-                          <span className="text-slate-400 font-semibold tabular-nums">
-                            {sp.count}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* CLASSEMENT D'ACTIVITÉ PAR CABINET */}
-            <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold text-slate-900 text-sm">
-                    Performance par cabinet médical
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Comparatif des volumes patients, consultations et chiffre d&apos;affaires par praticien
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActivePage("doctors")}
-                  className="text-xs font-medium text-sky-700 hover:text-sky-800 flex items-center gap-1 cursor-pointer self-start sm:self-center shrink-0"
-                >
-                  <span>Gérer les médecins</span>
-                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                </button>
-              </div>
-
-              {data.doctorsWithAssistants.length === 0 ? (
-                <div className="p-10 text-center text-slate-400 text-sm">
-                  Aucun cabinet enregistré pour le moment.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px] text-left text-xs">
-                    <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-                      <tr>
-                        <th className="px-5 py-3">Cabinet & Ville</th>
-                        <th className="px-5 py-3">Médecin & Assistante</th>
-                        <th className="px-5 py-3 text-center">Patients</th>
-                        <th className="px-5 py-3 text-center">Consultations</th>
-                        <th className="px-5 py-3 text-center">RDV</th>
-                        <th className="px-5 py-3 text-right">Volume CA</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {data.doctorsWithAssistants.map((item) => (
-                        <tr key={item.clinic.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-5 py-3.5">
-                            <p className="font-semibold text-slate-900 text-sm">{item.clinic.name}</p>
-                            <p className="text-xs text-slate-500">
-                              {item.clinic.city} • {item.clinic.specialty}
-                            </p>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <p className="font-medium text-slate-800">
-                              {item.doctor?.name || "Médecin non lié"}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              Assistante :{" "}
-                              <span className="text-slate-700 font-medium">
-                                {item.assistants.length > 0
-                                  ? item.assistants.map((a) => a.name).join(", ")
-                                  : "Aucune"}
-                              </span>
-                            </p>
-                          </td>
-                          <td className="px-5 py-3.5 text-center font-semibold text-slate-900 tabular-nums">
-                            {item.metrics.patientsCount}
-                          </td>
-                          <td className="px-5 py-3.5 text-center font-semibold text-sky-700 tabular-nums">
-                            {item.metrics.visitsCount}
-                          </td>
-                          <td className="px-5 py-3.5 text-center font-medium text-slate-600 tabular-nums">
-                            {item.metrics.appointmentsCount}
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-semibold text-emerald-700 tabular-nums whitespace-nowrap">
-                            {formatMoney(item.metrics.revenue)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
-        )}
 
-        {/* ============================================================
-            PAGE 1.5 : SANTÉ & PERFORMANCES DE LA BASE DE DONNÉES NEON
-           ============================================================ */}
-        {activePage === "neon" && (
-          <AdminNeonHealth
-            stats={data.stats}
-            onRunVacuum={handleRunVacuum}
-            actionLoading={actionLoading}
-          />
-        )}
-
-        {/* ============================================================
-            PAGE 2 : MÉDECINS & LEURS ASSISTANTES (+ SUPPRESSION)
-           ============================================================ */}
-        {activePage === "doctors" && (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
-                  Médecins & Assistantes
-                </h1>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Chaque médecin affiché avec son cabinet, son assistante rattachée et ses actions de gestion.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreateClinicPrefill(null);
-                    setCreateClinicModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition shadow-xs cursor-pointer shrink-0"
-                >
-                  <span className="material-symbols-outlined text-[17px]">add_circle</span>
-                  <span>Nouveau Cabinet</span>
-                </button>
-
-                <div className="relative w-full sm:w-72">
-                  <span className="material-symbols-outlined text-[18px] text-slate-400 absolute left-3 top-1/2 -translate-y-1/2">
+              {/* RECHERCHE & FILTRE CABINETS */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="relative flex-1 w-full sm:max-w-md">
+                  <span className="material-symbols-outlined text-[18px] text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2">
                     search
                   </span>
                   <input
                     type="text"
                     value={doctorSearch}
                     onChange={(e) => setDoctorSearch(e.target.value)}
-                    placeholder="Rechercher médecin, assistante..."
-                    className="w-full pl-9 pr-3.5 py-2 rounded-lg bg-white border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                    placeholder="Rechercher cabinet, médecin, ville, spécialité..."
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 transition"
                   />
                 </div>
-              </div>
-            </div>
 
-            {filteredDoctors.length === 0 ? (
-              <div className="bg-white rounded-xl border border-slate-200/90 p-12 text-center shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-                <span className="material-symbols-outlined text-3xl text-slate-300 mb-2 block">medical_services</span>
-                <h3 className="font-semibold text-slate-800 text-sm">Aucun médecin trouvé</h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  {doctorSearch
-                    ? "Aucun résultat ne correspond à votre recherche."
-                    : "Les médecins inscrits et validés apparaîtront ici avec leur assistante."}
-                </p>
+                <div className="text-xs text-slate-500 font-semibold">
+                  Total : <span className="text-slate-900 tabular-nums">{filteredDoctors.length}</span> cabinet{filteredDoctors.length > 1 ? "s" : ""}
+                </div>
               </div>
-            ) : (
+
+              {/* LISTE DES CABINETS */}
               <div className="space-y-4">
                 {filteredDoctors.map((item) => (
                   <div
                     key={item.clinic.id}
-                    className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden"
+                    className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden"
                   >
-                    {/* En-tête du Cabinet */}
-                    <div className="px-5 py-3.5 bg-slate-50/80 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="min-w-0">
+                    {/* Header du cabinet */}
+                    <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="font-semibold text-slate-900 text-sm sm:text-base">
-                            {item.clinic.name}
-                          </h2>
-                          <span className="px-2 py-0.5 rounded bg-white border border-slate-200 text-[11px] font-medium text-slate-600">
+                          <h2 className="text-base font-bold text-slate-900">{item.clinic.name}</h2>
+                          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold">
                             {item.clinic.specialty}
                           </span>
                           <span className="text-xs text-slate-500">• {item.clinic.city}</span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
-                          Créé le {formatDate(item.clinic.createdAt)} •{" "}
-                          <span className="font-medium text-slate-700">{item.metrics.patientsCount}</span>{" "}
-                          patient{item.metrics.patientsCount > 1 ? "s" : ""} •{" "}
-                          <span className="font-medium text-slate-700">{item.metrics.visitsCount}</span>{" "}
-                          consultation{item.metrics.visitsCount > 1 ? "s" : ""} •{" "}
-                          <span className="font-semibold text-slate-900">
-                            {formatMoney(item.metrics.revenue)}
-                          </span>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Praticien : <strong className="text-slate-800">{item.doctor?.name || "Non assigné"}</strong> ({item.doctor?.email || "Pas d'email"}) • Assistante :{" "}
+                          <strong className="text-slate-800">
+                            {item.assistants.length > 0 ? item.assistants.map((a) => a.name).join(", ") : "Aucune"}
+                          </strong>
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
+                        {item.clinic.slug && (
+                          <a
+                            href={`https://${item.clinic.slug}.toncabinet.me`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+                            <span>Accès Cabinet</span>
+                          </a>
+                        )}
+
                         <button
+                          type="button"
                           onClick={() => {
                             const fullClinic = data.allClinics?.find((c) => c.id === item.clinic.id);
                             setEditingClinic({
@@ -917,13 +1008,14 @@ export default function AdminDashboardClient({
                               status: (fullClinic?.status as any) || "active",
                             });
                           }}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-medium transition cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
                         >
-                          <span className="material-symbols-outlined text-[15px] text-slate-500">edit</span>
+                          <span className="material-symbols-outlined text-[15px]">edit</span>
                           <span>Modifier</span>
                         </button>
 
                         <button
+                          type="button"
                           onClick={() =>
                             setDeleteTarget({
                               clinicId: item.clinic.id,
@@ -934,7 +1026,7 @@ export default function AdminDashboardClient({
                               visitsCount: item.metrics.visitsCount,
                             })
                           }
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 text-xs font-medium transition cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-semibold transition cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[15px]">delete</span>
                           <span>Supprimer</span>
@@ -942,714 +1034,464 @@ export default function AdminDashboardClient({
                       </div>
                     </div>
 
-                    {/* BARRE D'ABONNEMENT & VALIDITÉ DU CABINET */}
-                    <div className="px-5 py-2.5 bg-slate-100/60 border-b border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    {/* Barre d'Abonnement, Formule & Actions Rapides */}
+                    <div className="px-5 py-3 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-bold text-[11px] ${
-                          item.clinic.plan === 'standard'
-                            ? 'bg-sky-50 text-sky-800 border border-sky-200'
-                            : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                        }`}>
+                        {/* Badge Formule */}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-bold text-[11px] ${
+                            item.clinic.plan === "standard"
+                              ? "bg-slate-100 text-slate-800 border border-slate-300"
+                              : "bg-emerald-50 text-emerald-800 border border-emerald-300"
+                          }`}
+                        >
                           <span className="material-symbols-outlined text-[13px]">
-                            {item.clinic.plan === 'standard' ? 'history' : 'verified'}
+                            {item.clinic.plan === "standard" ? "history" : "verified"}
                           </span>
-                          <span>{item.clinic.plan === 'standard' ? 'Plan STANDARD (30j)' : 'Plan PRO (À vie)'}</span>
+                          <span>{item.clinic.plan === "standard" ? "Plan STANDARD (30j)" : "Plan PRO (À vie)"}</span>
                         </span>
 
                         <span className="text-slate-600 font-medium">
-                          {item.clinic.billingCycle === 'yearly' ? 'Annuel' : item.clinic.billingCycle === 'quarterly' ? 'Trimestriel' : 'Mensuel'} • <strong>{item.clinic.planPrice || (item.clinic.plan === 'standard' ? 200 : 250)} DH</strong>
+                          {item.clinic.billingCycle === "yearly" ? "Annuel" : item.clinic.billingCycle === "quarterly" ? "Trimestriel" : "Mensuel"} •{" "}
+                          <strong>{item.clinic.planPrice || (item.clinic.plan === "standard" ? 200 : 250)} DH</strong>
                         </span>
 
-                        {/* Statut Essai 7 jours ou Abonnement Payé */}
+                        {/* Statut Abonnement */}
                         {item.clinic.subscriptionStatus === "trial" ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-bold text-[11px] bg-purple-50 text-purple-800 border border-purple-200">
                             <span className="material-symbols-outlined text-[13px]">timer</span>
                             <span>
                               {(item.clinic.daysRemaining || 0) > 0
-                                ? `Essai 7 jours : Reste ${item.clinic.daysRemaining} jour${(item.clinic.daysRemaining || 0) > 1 ? 's' : ''}`
-                                : 'Essai 7 jours terminé (En attente règlement)'}
+                                ? `Essai 7 jours : Reste ${item.clinic.daysRemaining} j`
+                                : "Essai 7 jours terminé"}
                             </span>
                           </span>
                         ) : item.clinic.daysRemaining !== null ? (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold text-[11px] ${
-                            item.clinic.daysRemaining > 15
-                              ? 'bg-emerald-100/70 text-emerald-800'
-                              : item.clinic.daysRemaining > 0
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            <span className="material-symbols-outlined text-[13px]">
-                              {item.clinic.daysRemaining > 0 ? 'check_circle' : 'warning'}
-                            </span>
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-semibold text-[11px] ${
+                              item.clinic.daysRemaining > 15
+                                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                : item.clinic.daysRemaining > 0
+                                ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                : "bg-rose-50 text-rose-800 border border-rose-200"
+                            }`}
+                          >
                             <span>
                               {item.clinic.daysRemaining > 0
-                                ? `Payé & Actif : Reste ${item.clinic.daysRemaining} jour${item.clinic.daysRemaining > 1 ? 's' : ''}`
-                                : 'Abonnement expiré'}
+                                ? `Actif : ${item.clinic.daysRemaining} j restants`
+                                : "Abonnement expiré"}
                             </span>
-                            {item.clinic.subscriptionExpiresAt && (
-                              <span className="opacity-75 font-normal">
-                                (jusqu'au {new Date(item.clinic.subscriptionExpiresAt).toLocaleDateString('fr-FR')})
-                              </span>
-                            )}
                           </span>
                         ) : null}
                       </div>
 
-                      {/* Boutons rapides de prolongation ou validation paiement */}
-                      <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+                      {/* Actions rapides Formule / Prolongation */}
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
                         {item.clinic.subscriptionStatus === "trial" && (
                           <button
                             type="button"
                             disabled={actionLoading === `renew-${item.clinic.id}`}
                             onClick={() => handleRenewSubscription(item.clinic.id, "validate_trial")}
-                            className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
-                            title="Le médecin a effectué son premier règlement : activer l'abonnement payé"
+                            className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition cursor-pointer"
                           >
                             Valider le 1er paiement
                           </button>
                         )}
-                        <span className="text-[11px] text-slate-500 font-medium mr-1">Prolonger :</span>
+
+                        <button
+                          type="button"
+                          disabled={actionLoading === `renew-${item.clinic.id}`}
+                          onClick={() =>
+                            handleRenewSubscription(
+                              item.clinic.id,
+                              "change_plan",
+                              item.clinic.plan === "standard" ? "pro" : "standard"
+                            )
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-[11px] transition cursor-pointer"
+                          title="Basculer instantanément de Standard à Pro ou inversement"
+                        >
+                          Passer en {item.clinic.plan === "standard" ? "PRO" : "STANDARD"}
+                        </button>
+
                         <button
                           type="button"
                           disabled={actionLoading === `renew-${item.clinic.id}`}
                           onClick={() => handleRenewSubscription(item.clinic.id, "1month")}
-                          className="px-2 py-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
-                          title="Ajouter 30 jours à l'abonnement"
+                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-[11px] transition cursor-pointer"
                         >
                           +1 Mois
                         </button>
-                        <button
-                          type="button"
-                          disabled={actionLoading === `renew-${item.clinic.id}`}
-                          onClick={() => handleRenewSubscription(item.clinic.id, "3months")}
-                          className="px-2 py-1 rounded bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
-                          title="Ajouter 90 jours à l'abonnement"
-                        >
-                          +3 Mois
-                        </button>
+
                         <button
                           type="button"
                           disabled={actionLoading === `renew-${item.clinic.id}`}
                           onClick={() => handleRenewSubscription(item.clinic.id, "1year")}
-                          className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50"
-                          title="Ajouter 365 jours à l'abonnement"
+                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-[11px] transition cursor-pointer"
                         >
                           +1 An
                         </button>
-                        <button
-                          type="button"
-                          disabled={actionLoading === `renew-${item.clinic.id}`}
-                          onClick={() => handleRenewSubscription(item.clinic.id, "change_plan", item.clinic.plan === "standard" ? "pro" : "standard")}
-                          className="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-semibold transition cursor-pointer disabled:opacity-50 ml-1"
-                          title="Basculer entre Plan Standard et Plan Pro"
-                        >
-                          Passer en {item.clinic.plan === "standard" ? "PRO" : "STANDARD"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Corps : Médecin | Assistante(s) séparés par une fine bordure */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80">
-                      {/* Colonne Médecin */}
-                      <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <span className="text-[11px] font-medium text-sky-700 block mb-0.5">
-                            Médecin titulaire
-                          </span>
-                          <h3 className="font-semibold text-slate-900 text-sm truncate">
-                            {item.doctor?.name || "Compte médecin manquant"}
-                          </h3>
-                          <p className="text-xs text-slate-500 truncate">
-                            {item.doctor?.email || "—"}
-                            {item.doctor?.phone ? ` • ${item.doctor.phone}` : ""}
-                          </p>
-                        </div>
-
-                        {item.doctor && (
-                          <button
-                            onClick={() => {
-                              setPasswordModalUser({
-                                id: item.doctor!.id,
-                                name: item.doctor!.name,
-                                email: item.doctor!.email,
-                                roleLabel: "Médecin",
-                              });
-                              setNewPassword("");
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 text-xs font-medium transition cursor-pointer shrink-0"
-                          >
-                            <span className="material-symbols-outlined text-[15px] text-slate-500">key</span>
-                            <span>Mot de passe</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Colonne Assistante(s) */}
-                      <div className="p-4 sm:p-5 space-y-2.5">
-                        <span className="text-[11px] font-medium text-slate-500 block">
-                          Assistante médicale ({item.assistants.length})
-                        </span>
-
-                        {item.assistants.length === 0 ? (
-                          <p className="text-xs text-slate-400">Aucune assistante associée.</p>
-                        ) : (
-                          <div className="space-y-2.5">
-                            {item.assistants.map((assistant) => (
-                              <div
-                                key={assistant.id}
-                                className="flex items-center justify-between gap-3"
-                              >
-                                <div className="min-w-0">
-                                  <p className="font-semibold text-slate-900 text-sm truncate">
-                                    {assistant.name}
-                                  </p>
-                                  <p className="text-xs text-slate-500 truncate">
-                                    {assistant.email}
-                                  </p>
-                                </div>
-
-                                <button
-                                  onClick={() => {
-                                    setPasswordModalUser({
-                                      id: assistant.id,
-                                      name: assistant.name,
-                                      email: assistant.email,
-                                      roleLabel: "Assistante",
-                                    });
-                                    setNewPassword("");
-                                  }}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 text-xs font-medium transition cursor-pointer shrink-0"
-                                >
-                                  <span className="material-symbols-outlined text-[15px] text-slate-500">key</span>
-                                  <span>Mot de passe</span>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* ============================================================
-            PAGE 2.5 : GESTION GLOBALE DES PERSONNES (UTILISATEURS)
-           ============================================================ */}
-        {activePage === "users" && (
-          <AdminUsersManagement
-            users={(data.allUsers || []) as any}
-            clinics={(data.allClinics || []) as any}
-            doctorsWithAssistants={data.doctorsWithAssistants}
-            onRefresh={() => refreshData(true)}
-            onPasswordModal={(user) => {
-              setPasswordModalUser(user);
-              setNewPassword("");
-            }}
-            showFeedback={showFeedback}
-          />
-        )}
-
-        {/* ============================================================
-            PAGE 2.6 : EXPLORATEUR DIRECT BASE DE DONNÉES
-           ============================================================ */}
-        {activePage === "database" && (
-          <AdminDatabaseExplorer
-            onRefresh={() => refreshData(true)}
-            showFeedback={showFeedback}
-          />
-        )}
-
-        {/* ============================================================
-            PAGE 3 : DEMANDES DE CRÉATION (OTP EN DIRECT + HISTORIQUE)
-           ============================================================ */}
-        {activePage === "requests" && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
-                Demandes de création de cabinet
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Codes d&apos;activation OTP en direct (valables 5 minutes) et historique complet des inscriptions.
-              </p>
             </div>
+          )}
 
-            {/* SECTION 1 : DEMANDES EN ATTENTE (OTP EN DIRECT) */}
-            <section className="space-y-3.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span>Demandes en attente ({data.pendingRequests.length})</span>
-                </h2>
-                <span className="text-xs text-slate-400">
-                  Actualisation automatique toutes les 5 s
-                </span>
-              </div>
-
-              {data.pendingRequests.length === 0 ? (
-                <div className="bg-white rounded-xl border border-slate-200/90 p-10 text-center shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-                  <span className="material-symbols-outlined text-3xl text-emerald-500 mb-2 block">mark_email_read</span>
-                  <p className="font-semibold text-slate-800 text-sm">
-                    Aucune demande en attente pour le moment
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                    Dès qu&apos;un médecin s&apos;inscrit sur /register, sa demande et son code OTP à 6 chiffres apparaîtront ici automatiquement.
-                  </p>
+          {/* ============================================================
+              PAGE 3 : DEMANDES D'INSCRIPTION & ONBOARDING
+             ============================================================ */}
+          {activePage === "requests" && (
+            <div className="space-y-6">
+              {/* DEMANDES EN ATTENTE (CARTE OTP) */}
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 mb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Demandes en attente d&apos;activation ({data.pendingRequests.length})
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Vérifiez les informations, confirmez le code ou validez directement en un clic.
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {data.pendingRequests.map((req) => {
-                    const remaining = getTimeRemainingText(req.expiresAt);
-                    const isExpired = remaining === "Expiré";
 
-                    return (
+                {data.pendingRequests.length === 0 ? (
+                  <div className="bg-white p-10 rounded-2xl border border-slate-200/90 text-center shadow-2xs">
+                    <span className="material-symbols-outlined text-3xl text-slate-300 mb-2 block">inbox</span>
+                    <h3 className="text-sm font-bold text-slate-800">Aucune demande en attente</h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Toutes les inscriptions ont été traitées. Les nouvelles demandes apparaîtront ici automatiquement.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {data.pendingRequests.map((req) => (
                       <div
                         key={req.id}
-                        className="bg-white rounded-xl border border-amber-300/90 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] space-y-4"
+                        className="bg-white rounded-2xl border-2 border-amber-300 p-5 space-y-4 shadow-sm relative"
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                Nouvelle inscription • 24h
-                              </span>
-                              <span className="text-[11px] text-slate-400">
-                                Reçue le {formatDate(req.createdAt)}
-                              </span>
-                            </div>
-                            <h3 className="font-bold text-slate-900 text-base leading-tight">
-                              {req.clinicName}
-                            </h3>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              {req.clinicCity} • {req.specialty}
-                            </p>
-                          </div>
-
-                          <div className="px-3 py-1.5 rounded-lg bg-sky-50 border border-sky-100 text-sky-800 text-xs font-semibold flex items-center gap-1.5 self-start">
-                            <span className="material-symbols-outlined text-[16px] text-sky-600">lock_clock</span>
-                            <span>En attente de mot de passe</span>
-                          </div>
-                        </div>
-
-                        {/* Détails Médecin + Assistante */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                          <div className="rounded-lg bg-slate-50/80 border border-slate-200/80 p-3">
-                            <p className="text-[11px] font-medium text-sky-700 mb-1">
-                              Médecin
-                            </p>
-                            <p className="font-semibold text-slate-900">{req.doctorName}</p>
-                            <p className="text-slate-600 truncate">{req.doctorEmail}</p>
-                            <p className="text-slate-500 mt-0.5">{req.doctorPhone}</p>
-                          </div>
-
-                          <div className="rounded-lg bg-slate-50/80 border border-slate-200/80 p-3">
-                            <p className="text-[11px] font-medium text-slate-600 mb-1">
-                              Assistante
-                            </p>
-                            <p className="font-semibold text-slate-900">
-                              {req.assistantName || "Non renseignée"}
-                            </p>
-                            <p className="text-slate-600 truncate">
-                              {req.assistantEmail || "—"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Formule Choisie */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded font-bold text-[11px] ${
-                              (req as any).selectedPlan === 'standard'
-                                ? 'bg-sky-50 text-sky-800 border border-sky-200'
-                                : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                            }`}>
-                              <span className="material-symbols-outlined text-[13px]">
-                                {(req as any).selectedPlan === 'standard' ? 'history' : 'star'}
-                              </span>
-                              <span>{(req as any).selectedPlan === 'standard' ? 'STANDARD (30j)' : 'PRO (À vie)'}</span>
+                        <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                          <div>
+                            <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">
+                              Demande #{req.id} • {req.selectedPlan === "standard" ? "Plan Standard" : "Plan Pro"}
                             </span>
-                            <span className="text-slate-700 font-semibold">
-                              {(req as any).selectedCycle === 'yearly' ? '1 An' : (req as any).selectedCycle === 'quarterly' ? '3 Mois' : '1 Mois'}
-                            </span>
+                            <h3 className="text-sm font-bold text-slate-900 mt-0.5">{req.clinicName}</h3>
                           </div>
-                          <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                            {(req as any).selectedPrice || ((req as any).selectedPlan === 'standard' ? 200 : 250)} DH
-                          </span>
+
+                          <div className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 text-xs font-bold font-mono">
+                            {getTimeRemainingText(req.expiresAt)}
+                          </div>
                         </div>
 
-                        {/* Actions : Créer le compte avec pré-remplissage / Rejeter */}
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+                        <div className="text-xs space-y-1.5 text-slate-600">
+                          <p>Médecin : <strong className="text-slate-900">{req.doctorName}</strong> ({req.doctorEmail})</p>
+                          <p>Téléphone : <strong className="text-slate-900">{req.doctorPhone}</strong></p>
+                          <p>Spécialité : {req.specialty} • {req.clinicCity}</p>
+                          {req.assistantEmail && (
+                            <p>Assistante : <strong className="text-slate-900">{req.assistantName || "Secrétaire"}</strong> ({req.assistantEmail})</p>
+                          )}
+                          <p>Formule choisie : <strong className="capitalize">{req.selectedPlan || "Pro"}</strong> ({req.selectedCycle || "mensuel"} - {req.selectedPrice || 250} DH)</p>
+                        </div>
+
+                        {/* Code OTP en évidence */}
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Code de validation :</span>
+                          <span className="text-lg font-black font-mono tracking-widest text-slate-900">{req.otpCode}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
                           <button
                             type="button"
-                            onClick={() => {
-                              setCreateClinicPrefill({
-                                requestId: req.id,
-                                clinicName: req.clinicName,
-                                slug: slugifyClinic(req.clinicName),
-                                clinicCity: req.clinicCity,
-                                clinicAddress: req.clinicAddress,
-                                doctorName: req.doctorName,
-                                doctorEmail: req.doctorEmail,
-                                doctorPhone: req.doctorPhone,
-                                specialty: req.specialty,
-                                assistantName: req.assistantName,
-                                assistantEmail: req.assistantEmail,
-                              });
-                              setCreateClinicModalOpen(true);
-                            }}
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                            disabled={actionLoading === `approve-${req.id}`}
+                            onClick={() => handleApprove(req.id)}
+                            className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-xs cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[16px]">how_to_reg</span>
-                            <span>Créer le compte (Formulaire pré-rempli)</span>
+                            {actionLoading === `approve-${req.id}` ? "Activation..." : "Valider & Créer le Cabinet"}
                           </button>
 
                           <button
-                            onClick={() => handleReject(req.id)}
+                            type="button"
                             disabled={actionLoading === `reject-${req.id}`}
-                            className="inline-flex items-center justify-center gap-1 py-2 px-3.5 rounded-lg bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-medium transition cursor-pointer disabled:opacity-60"
+                            onClick={() => handleReject(req.id)}
+                            className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold transition cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[15px]">close</span>
-                            <span>Rejeter</span>
+                            Rejeter
                           </button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            {/* SECTION 2 : HISTORIQUE COMPLET DES DEMANDES */}
-            <section className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold text-slate-900 text-sm">
-                    Historique des demandes ({filteredRequestsHistory.length})
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Journal de toutes les tentatives et validations de création de cabinet
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium">
-                    {(
-                      [
-                        { key: "all", label: "Toutes" },
-                        { key: "approved", label: "Validées" },
-                        { key: "rejected", label: "Rejetées" },
-                        { key: "expired", label: "Expirées" },
-                      ] as const
-                    ).map((f) => (
-                      <button
-                        key={f.key}
-                        onClick={() => setRequestStatusFilter(f.key)}
-                        className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                          requestStatusFilter === f.key
-                            ? "bg-white text-slate-900 shadow-2xs"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                      >
-                        {f.label}
-                      </button>
                     ))}
                   </div>
-
-                  <input
-                    type="text"
-                    value={requestSearch}
-                    onChange={(e) => setRequestSearch(e.target.value)}
-                    placeholder="Filtrer..."
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 w-full sm:w-44"
-                  />
-                </div>
+                )}
               </div>
 
-              {filteredRequestsHistory.length === 0 ? (
-                <div className="p-10 text-center text-slate-400 text-xs">
-                  Aucune demande dans cette catégorie.
+              {/* HISTORIQUE COMPLET DES DEMANDES */}
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900">Archive des demandes d&apos;inscription</h2>
+                    <p className="text-xs text-slate-500">Toutes les demandes passées validées, rejetées ou expirées.</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={requestSearch}
+                      onChange={(e) => setRequestSearch(e.target.value)}
+                      placeholder="Filtrer l'historique..."
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900"
+                    />
+
+                    <select
+                      value={requestStatusFilter}
+                      onChange={(e: any) => setRequestStatusFilter(e.target.value)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-900 bg-white"
+                    >
+                      <option value="all">Tous les statuts</option>
+                      <option value="approved">Validées</option>
+                      <option value="rejected">Rejetées</option>
+                      <option value="expired">Expirées</option>
+                    </select>
+                  </div>
                 </div>
-              ) : (
+
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[680px] text-left text-xs">
-                    <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold border-b border-slate-100">
                       <tr>
-                        <th className="px-5 py-3">Cabinet & Ville</th>
+                        <th className="px-5 py-3">ID</th>
+                        <th className="px-5 py-3">Cabinet / Ville</th>
                         <th className="px-5 py-3">Médecin</th>
-                        <th className="px-5 py-3">Assistante</th>
                         <th className="px-5 py-3">Formule</th>
-                        <th className="px-5 py-3">Date</th>
                         <th className="px-5 py-3">Statut</th>
-                        <th className="px-5 py-3 text-right">Action</th>
+                        <th className="px-5 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredRequestsHistory.map((req) => {
-                        const badge =
-                          req.status === "approved" || req.status === "verified"
-                            ? { text: "Validée", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" }
-                            : req.status === "pending"
-                            ? { text: "En attente", cls: "bg-amber-50 text-amber-700 border-amber-200" }
-                            : req.status === "rejected"
-                            ? { text: "Rejetée", cls: "bg-red-50 text-red-700 border-red-200" }
-                            : { text: "Expirée", cls: "bg-slate-100 text-slate-600 border-slate-200" };
-
-                        const planLabel = (req as any).selectedPlan === "standard" ? "STANDARD" : "PRO";
-                        const cycleLabel = (req as any).selectedCycle === "yearly" ? "1 An" : (req as any).selectedCycle === "quarterly" ? "3 Mois" : "1 Mois";
-
-                        return (
-                          <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="px-5 py-3.5">
-                              <p className="font-semibold text-slate-900 text-sm">{req.clinicName}</p>
-                              <p className="text-xs text-slate-500">
-                                {req.clinicCity} • {req.specialty}
-                              </p>
-                            </td>
-                            <td className="px-5 py-3.5">
-                              <p className="font-medium text-slate-800">{req.doctorName}</p>
-                              <p className="text-xs text-slate-500">{req.doctorEmail}</p>
-                            </td>
-                            <td className="px-5 py-3.5">
-                              <p className="font-medium text-slate-800">
-                                {req.assistantName || "—"}
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                {req.assistantEmail || "—"}
-                              </p>
-                            </td>
-                            <td className="px-5 py-3.5">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
-                                (req as any).selectedPlan === 'standard'
-                                  ? 'bg-sky-50 text-sky-800 border border-sky-200'
-                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                              }`}>
-                                {planLabel} • {cycleLabel}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3.5 text-slate-500 tabular-nums whitespace-nowrap">
-                              {formatDate(req.createdAt)}
-                            </td>
-                            <td className="px-5 py-3.5">
-                              <span
-                                className={`inline-flex px-2 py-0.5 rounded-md border text-[11px] font-medium ${badge.cls}`}
-                              >
-                                {badge.text}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3.5 text-right">
-                              <button
-                                onClick={() => handleDeleteRequest(req.id)}
-                                disabled={actionLoading === `del-req-${req.id}`}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-                                title="Supprimer cette demande de l'historique"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">delete</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {filteredRequestsHistory.map((r) => (
+                        <tr key={r.id} className="hover:bg-slate-50/70 transition">
+                          <td className="px-5 py-3 font-mono font-bold text-slate-500">#{r.id}</td>
+                          <td className="px-5 py-3">
+                            <span className="font-bold text-slate-900 block">{r.clinicName}</span>
+                            <span className="text-[11px] text-slate-400">{r.clinicCity} • {r.specialty}</span>
+                          </td>
+                          <td className="px-5 py-3">
+                            <span className="font-semibold text-slate-800 block">{r.doctorName}</span>
+                            <span className="text-[11px] text-slate-400">{r.doctorEmail}</span>
+                          </td>
+                          <td className="px-5 py-3">
+                            <span className="capitalize font-bold text-slate-800">{r.selectedPlan || "Pro"}</span>
+                            <span className="text-[11px] text-slate-400 block">{r.selectedCycle || "mensuel"}</span>
+                          </td>
+                          <td className="px-5 py-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${
+                                r.status === "verified" || r.status === "approved"
+                                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                  : r.status === "rejected"
+                                  ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRequest(r.id)}
+                              className="text-slate-400 hover:text-rose-600 transition"
+                              title="Supprimer définitivement de l'historique"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">delete</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
-              )}
-            </section>
-          </div>
-        )}
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================
+              PAGE 4 : GESTION DES PERSONNES (USERS MANAGEMENT)
+             ============================================================ */}
+          {activePage === "users" && (
+            <AdminUsersManagement
+              users={data.allUsers || []}
+              clinics={data.allClinics || []}
+              onUserPasswordChange={(user) => {
+                setPasswordModalUser({
+                  id: user.id,
+                  name: user.name,
+                  email: user.email,
+                  roleLabel: user.role === "doctor" ? "Médecin" : user.role === "assistant" ? "Assistante" : "Admin",
+                });
+                setNewPassword("");
+              }}
+              onRefresh={() => refreshData(true)}
+              showFeedback={showFeedback}
+            />
+          )}
+
+          {/* ============================================================
+              PAGE 5 : SUPPORT & WHATSAPP CONFIGURATION
+             ============================================================ */}
+          {activePage === "platform" && (
+            <AdminPlatformSupport
+              initialSettings={data.platformSettings}
+              onSaved={() => refreshData(true)}
+              showFeedback={showFeedback}
+            />
+          )}
+
+          {/* ============================================================
+              PAGE 6 : INFRASTRUCTURE NEON (TÉLÉMÉTRIE)
+             ============================================================ */}
+          {activePage === "neon" && (
+            <AdminNeonHealth
+              stats={data.stats}
+              onRunVacuum={handleRunVacuum}
+              actionLoading={actionLoading}
+            />
+          )}
+
+          {/* ============================================================
+              PAGE 7 : EXPLORATEUR DE BASE DE DONNÉES
+             ============================================================ */}
+          {activePage === "database" && (
+            <AdminDatabaseExplorer />
+          )}
+        </div>
       </main>
 
       {/* ============================================================
-          MODALE 1 : CONFIRMATION DE SUPPRESSION DÉFINITIVE D'UN CABINET
+          MODALES DE GESTION (ÉDITION, CRÉATION, PASSWORD, SUPPRESSION)
          ============================================================ */}
-      <AnimatePresence>
-        {deleteTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setDeleteTarget(null)}
-              className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px]"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: 8 }}
-              className="relative z-10 w-full max-w-md bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xl space-y-4"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red-50 border border-red-200 text-red-600 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-xl">warning</span>
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">
-                    Supprimer ce cabinet définitivement ?
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Vous êtes sur le point de supprimer <strong>{deleteTarget.clinicName}</strong>{" "}
-                    ({deleteTarget.doctorName}). Cette action est <strong>irréversible</strong>.
-                  </p>
-                </div>
-              </div>
 
-              <div className="rounded-lg bg-red-50/70 border border-red-200/80 p-3.5 text-xs text-red-800 space-y-1.5">
-                <p className="font-semibold">Seront définitivement supprimés :</p>
-                <ul className="list-disc pl-4 space-y-0.5 text-red-700">
-                  <li>Le compte Médecin ({deleteTarget.doctorName})</li>
-                  <li>
-                    {deleteTarget.assistantsCount} compte{deleteTarget.assistantsCount > 1 ? "s" : ""}{" "}
-                    Assistante rattaché{deleteTarget.assistantsCount > 1 ? "s" : ""}
-                  </li>
-                  <li>
-                    {deleteTarget.patientsCount} dossier{deleteTarget.patientsCount > 1 ? "s" : ""}{" "}
-                    patient{deleteTarget.patientsCount > 1 ? "s" : ""} et{" "}
-                    {deleteTarget.visitsCount} consultation{deleteTarget.visitsCount > 1 ? "s" : ""}
-                  </li>
-                </ul>
-              </div>
-
-              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(null)}
-                  className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium transition cursor-pointer"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmDeleteClinic}
-                  disabled={actionLoading === `delete-clinic-${deleteTarget.clinicId}`}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition cursor-pointer disabled:opacity-60"
-                >
-                  <span className="material-symbols-outlined text-[16px]">delete_forever</span>
-                  <span>
-                    {actionLoading === `delete-clinic-${deleteTarget.clinicId}`
-                      ? "Suppression..."
-                      : "Supprimer définitivement"}
-                  </span>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ============================================================
-          MODALE 2 : CHANGER LE MOT DE PASSE D'UN MÉDECIN / ASSISTANTE
-         ============================================================ */}
-      <AnimatePresence>
-        {passwordModalUser && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setPasswordModalUser(null)}
-              className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px]"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: 8 }}
-              className="relative z-10 w-full max-w-md bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xl"
-            >
-              <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
-                <div>
-                  <h3 className="font-semibold text-slate-900 text-base">
-                    Modifier le mot de passe
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {passwordModalUser.name} • {passwordModalUser.roleLabel}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setPasswordModalUser(null)}
-                  className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-lg">close</span>
-                </button>
-              </div>
-
-              <form onSubmit={handleUpdatePassword} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                    Identifiant (Email)
-                  </label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={passwordModalUser.email}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                    Nouveau mot de passe (min. 6 caractères)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    minLength={6}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Ex: Cabinet2026!"
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-                  />
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2">
-                  <button
-                    type="button"
-                    disabled={newPassword.trim().length < 6}
-                    onClick={copyCredentials}
-                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-medium transition cursor-pointer disabled:opacity-40"
-                  >
-                    <span className="material-symbols-outlined text-[15px]">
-                      {copiedNotice ? "check" : "content_copy"}
-                    </span>
-                    <span>{copiedNotice ? "Copié !" : "Copier WhatsApp"}</span>
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={actionLoading === "update-password"}
-                    className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer disabled:opacity-60"
-                  >
-                    {actionLoading === "update-password" ? "Enregistrement..." : "Enregistrer"}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-      {/* MODALE ÉDITION DU CABINET */}
+      {/* Modale Édition Cabinet */}
       {editingClinic && (
         <AdminClinicEditModal
           clinic={editingClinic}
           onClose={() => setEditingClinic(null)}
-          onSaved={() => refreshData(true)}
-          showFeedback={showFeedback}
+          onSuccess={() => {
+            setEditingClinic(null);
+            showFeedback("success", "Cabinet mis à jour avec succès.");
+            refreshData(true);
+          }}
         />
       )}
 
-      {/* MODALE CRÉATION D'UN NOUVEAU CABINET */}
-      <AdminCreateClinicModal
-        isOpen={createClinicModalOpen}
-        onClose={() => {
-          setCreateClinicModalOpen(false);
-          setCreateClinicPrefill(null);
-        }}
-        onSuccess={() => refreshData(true)}
-        showFeedback={showFeedback}
-        initialData={createClinicPrefill}
-      />
+      {/* Modale Création Cabinet Direct */}
+      {createClinicModalOpen && (
+        <AdminCreateClinicModal
+          prefill={createClinicPrefill}
+          onClose={() => setCreateClinicModalOpen(false)}
+          onSuccess={() => {
+            setCreateClinicModalOpen(false);
+            showFeedback("success", "Cabinet et praticiens créés avec succès !");
+            refreshData(true);
+          }}
+        />
+      )}
+
+      {/* Modale Réinitialisation Mot de passe */}
+      {passwordModalUser && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900">
+                Modifier le mot de passe : {passwordModalUser.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPasswordModalUser(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nouveau mot de passe (min. 6 caractères)
+                </label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Ex: SecurPass2026!"
+                  required
+                  minLength={6}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={actionLoading === "update-password"}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+                >
+                  {actionLoading === "update-password" ? "Enregistrement..." : "Appliquer le mot de passe"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={copyCredentials}
+                  className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition"
+                  title="Copier les identifiants pour WhatsApp"
+                >
+                  {copiedNotice ? "Copié !" : "Copier"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modale Confirmation Suppression Définitive */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+              <span className="material-symbols-outlined text-[24px]">warning</span>
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Supprimer définitivement {deleteTarget.clinicName} ?
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Cette action supprimera irréversiblement le cabinet, le compte du médecin ({deleteTarget.doctorName}), l&apos;assistante, ainsi que l&apos;ensemble des {deleteTarget.patientsCount} patients et {deleteTarget.visitsCount} consultations associées.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer"
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                disabled={actionLoading?.startsWith("delete-clinic")}
+                onClick={handleConfirmDeleteClinic}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+              >
+                {actionLoading?.startsWith("delete-clinic") ? "Suppression..." : "Confirmer la suppression"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

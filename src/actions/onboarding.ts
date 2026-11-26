@@ -53,7 +53,7 @@ export async function registerClinic(data: {
     const cycle = data.selectedCycle === "yearly" ? "yearly" : data.selectedCycle === "quarterly" ? "quarterly" : "monthly";
     const price = data.selectedPrice || (plan === "standard" ? (cycle === "yearly" ? 1900 : cycle === "quarterly" ? 550 : 200) : (cycle === "yearly" ? 2500 : cycle === "quarterly" ? 700 : 250));
 
-    // Vérifier si l'email de l'assistante existe déjà
+    // 1. Vérifier si l'email de l'assistante existe déjà dans les utilisateurs actifs
     const existingAssistant = await db
       .select({ id: users.id })
       .from(users)
@@ -61,10 +61,26 @@ export async function registerClinic(data: {
       .limit(1);
 
     if (existingAssistant.length > 0) {
-      return { error: "Cet email d'assistante est déjà attribué à un autre compte." };
+      return { error: "Cet email d'assistante est déjà attribué à un compte actif." };
     }
 
-    // 1. Vérifier si l'email du médecin existe déjà dans les utilisateurs actifs
+    // 2. Vérifier si l'email de l'assistante est déjà dans une demande en attente
+    const pendingAssistant = await db
+      .select({ id: onboardingRequests.id })
+      .from(onboardingRequests)
+      .where(
+        and(
+          eq(onboardingRequests.assistantEmail, cleanAssistantEmail),
+          eq(onboardingRequests.status, "pending")
+        )
+      )
+      .limit(1);
+
+    if (pendingAssistant.length > 0) {
+      return { error: "Une demande d'inscription avec cet email d'assistante est déjà en cours de validation." };
+    }
+
+    // 3. Vérifier si l'email du médecin existe déjà dans les utilisateurs actifs
     const existingUser = await db
       .select({ id: users.id })
       .from(users)
@@ -73,6 +89,22 @@ export async function registerClinic(data: {
 
     if (existingUser.length > 0) {
       return { error: "Un compte praticien existe déjà avec cet email." };
+    }
+
+    // 4. Vérifier si l'email du médecin est déjà dans une demande en attente
+    const pendingDoctor = await db
+      .select({ id: onboardingRequests.id })
+      .from(onboardingRequests)
+      .where(
+        and(
+          eq(onboardingRequests.doctorEmail, cleanDoctorEmail),
+          eq(onboardingRequests.status, "pending")
+        )
+      )
+      .limit(1);
+
+    if (pendingDoctor.length > 0) {
+      return { error: "Une demande d'inscription avec cet email praticien est déjà en cours de validation." };
     }
 
     // 2. Code interne & validité 30 jours

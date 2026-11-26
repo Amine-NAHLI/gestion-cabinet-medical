@@ -537,3 +537,135 @@ export async function sendNeonTelemetryReportEmail(
     return { success: false, error: err.message || "Erreur d'envoi d'email" };
   }
 }
+
+export interface PlanChangeNotificationParams {
+  clinicName: string;
+  doctorName: string;
+  doctorEmail: string;
+  doctorPhone: string;
+  currentPlan: string;
+  currentCycle: string;
+  requestedPlan: string;
+  requestedCycle: string;
+  requestedPrice: number;
+}
+
+export async function sendPlanChangeRequestNotification(params: PlanChangeNotificationParams) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const receiverEmail = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || "nahli-ami@upf.ac.ma";
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
+  const baseUrl = process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")
+    ? process.env.NEXTAUTH_URL
+    : process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : (process.env.NEXTAUTH_URL || "http://localhost:3000");
+
+  if (!apiKey) {
+    console.warn("[EMAIL WARN] Clé RESEND_API_KEY absente. Demande de modification de plan enregistrée et visible sur /admin.");
+    return { success: false, warning: "Clé RESEND_API_KEY manquante." };
+  }
+
+  const cycleLabels: Record<string, string> = {
+    monthly: "Mensuel (1 mois)",
+    quarterly: "Trimestriel (3 mois)",
+    yearly: "Annuel (1 an - 2 mois offerts)",
+  };
+
+  const planLabels: Record<string, string> = {
+    standard: "Standard (30 jours)",
+    pro: "Pro (Historique illimité à vie)",
+  };
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 24px; color: #334155; }
+        .container { max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .header { background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); padding: 30px 28px; text-align: center; color: white; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 800; }
+        .header p { margin: 6px 0 0; font-size: 13px; color: #a7f3d0; }
+        .content { padding: 30px 28px; }
+        .badge { display: inline-block; background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 5px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 16px; }
+        .highlight-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 16px 0; }
+        .info-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .info-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+        .info-table tr:last-child td { border-bottom: none; }
+        .info-table td.label { font-weight: 600; color: #64748b; width: 40%; }
+        .info-table td.val { font-weight: 700; color: #0f172a; }
+        .btn-container { text-align: center; margin-top: 24px; }
+        .btn { display: inline-block; background: #059669; color: #ffffff !important; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-weight: 700; font-size: 13px; }
+        .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>MonCabinet • Gestion des Abonnements</h1>
+          <p>Demande de modification de formule par un praticien</p>
+        </div>
+        <div class="content">
+          <span class="badge">Demande de Changement de Formule</span>
+          <p style="margin: 0 0 14px; font-size: 13px; color: #334155; line-height: 1.5;">
+            Le <strong>Dr. ${params.doctorName}</strong> (${params.clinicName}) souhaite modifier sa formule d'abonnement.
+          </p>
+          <div class="highlight-card">
+            <table class="info-table">
+              <tr>
+                <td class="label">Cabinet Médical</td>
+                <td class="val">${params.clinicName}</td>
+              </tr>
+              <tr>
+                <td class="label">Médecin Praticien</td>
+                <td class="val">${params.doctorName} (${params.doctorEmail})</td>
+              </tr>
+              <tr>
+                <td class="label">Téléphone / WhatsApp</td>
+                <td class="val">${params.doctorPhone || "Non renseigné"}</td>
+              </tr>
+              <tr>
+                <td class="label">Formule Actuelle</td>
+                <td class="val">${planLabels[params.currentPlan] || params.currentPlan} • ${cycleLabels[params.currentCycle] || params.currentCycle}</td>
+              </tr>
+              <tr>
+                <td class="label">Nouvelle Formule Demandée</td>
+                <td class="val" style="color: #059669;">${planLabels[params.requestedPlan] || params.requestedPlan} • ${cycleLabels[params.requestedCycle] || params.requestedCycle}</td>
+              </tr>
+              <tr>
+                <td class="label">Tarif Correspondant</td>
+                <td class="val" style="font-size: 15px; color: #059669;">${params.requestedPrice} DH</td>
+              </tr>
+            </table>
+          </div>
+          <div class="btn-container">
+            <a href="${baseUrl}/admin" class="btn" target="_blank">Valider la modification dans la console Admin</a>
+          </div>
+        </div>
+        <div class="footer">
+          MonCabinet SaaS • Notification automatique d'administration
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: receiverEmail,
+      subject: `Demande de changement d'abonnement : Dr. ${params.doctorName} (${params.clinicName})`,
+      html: emailHtml,
+    });
+    if (error) {
+      console.error("[EMAIL PLAN CHANGE ERROR]", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("[EMAIL PLAN CHANGE EXCEPTION]", err);
+    return { success: false, error: err.message };
+  }
+}
