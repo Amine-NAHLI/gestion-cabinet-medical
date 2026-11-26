@@ -107,16 +107,16 @@ export default function PatientHistoryButton({
         type="button"
         onClick={handleOpen}
         title="Consulter l'historique médical antérieur du patient"
-        className={`inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition font-medium shadow-2xs cursor-pointer active:bg-slate-100 ${
+        className={`inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 transition font-medium shadow-2xs cursor-pointer active:bg-slate-100 whitespace-nowrap shrink-0 ${
           variant === "compact"
             ? "px-3 py-1.5 text-xs"
             : "px-4 py-2.5 text-sm"
         } ${className}`}
       >
-        <span className="material-symbols-outlined text-[18px] text-slate-500">
+        <span className="material-symbols-outlined text-[18px] text-slate-500 shrink-0">
           folder_shared
         </span>
-        <span>Voir ancien dossier</span>
+        <span className="whitespace-nowrap">Voir ancien dossier</span>
       </button>
 
       <AnimatePresence>
@@ -345,11 +345,11 @@ export default function PatientHistoryButton({
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-3.5 border-t border-slate-200/80 bg-slate-50 flex items-center justify-between gap-3">
+              <div className="px-6 py-3.5 border-t border-slate-200/80 bg-slate-50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs"
+                  className="px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs text-center"
                 >
                   Fermer
                 </button>
@@ -358,7 +358,7 @@ export default function PatientHistoryButton({
                   <button
                     type="button"
                     onClick={handleGoToConsultation}
-                    className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer whitespace-nowrap"
                   >
                     <span>Faire entrer & Ouvrir la consultation</span>
                     <span className="material-symbols-outlined text-[16px]">arrow_forward</span>

@@ -333,18 +333,18 @@ export default function RealtimeSync({ role }: { role: string }) {
         </button>
       </div>
 
-      {/* Notification flottante en temps réel */}
+      {/* Notification flottante en temps réel (positionnée en bas à droite pour ne jamais masquer les KPI ou la barre supérieure) */}
       <AnimatePresence>
         {notification && (
           <motion.div
             key={notification.id}
-            initial={{ opacity: 0, y: -16, scale: 0.96 }}
+            initial={{ opacity: 0, y: 24, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.96 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className={`fixed top-20 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] max-w-sm bg-white/95 backdrop-blur-xl rounded-2xl border ${
+            exit={{ opacity: 0, y: 16, scale: 0.95 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className={`fixed bottom-6 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-96 max-w-[calc(100vw-2rem)] bg-white/95 backdrop-blur-xl rounded-2xl border ${
               toneStyles[notification.tone].border
-            } shadow-xl shadow-slate-900/10 p-4`}
+            } shadow-2xl shadow-slate-900/15 p-4`}
           >
             <div className="flex items-start gap-3">
               <div

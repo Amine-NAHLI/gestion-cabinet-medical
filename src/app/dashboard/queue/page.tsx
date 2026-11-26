@@ -100,10 +100,10 @@ export default async function QueuePage() {
                             En salle
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                        <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
                           <span>{visit.patient.age} ans</span>
                           <span>•</span>
-                          <span>Tél. {visit.patient.phone}</span>
+                          <span className="whitespace-nowrap tabular-nums">Tél. {visit.patient.phone}</span>
                         </p>
                       </div>
                     </div>
@@ -117,7 +117,7 @@ export default async function QueuePage() {
                       )}
                       <Link
                         href={`/dashboard/consultation/${visit.id}`}
-                        className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition cursor-pointer"
+                        className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition cursor-pointer whitespace-nowrap"
                       >
                         <span>Ouvrir la consultation</span>
                         <span className="material-symbols-outlined text-base">arrow_forward</span>
@@ -228,7 +228,7 @@ export default async function QueuePage() {
                           {visit.patient.phone && (
                             <>
                               <span>•</span>
-                              <span className="tabular-nums">{visit.patient.phone}</span>
+                              <span className="tabular-nums whitespace-nowrap">{visit.patient.phone}</span>
                             </>
                           )}
                         </div>

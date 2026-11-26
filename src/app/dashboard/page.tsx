@@ -168,7 +168,7 @@ export default async function DashboardIndex() {
                         {v.patient.lastName} {v.patient.firstName}
                       </p>
                       <p className="text-xs text-slate-500 tabular-nums">
-                        {formatTime(v.createdAt)} • {v.patient.age} ans • {v.patient.phone}
+                        {formatTime(v.createdAt)} • {v.patient.age} ans • <span className="whitespace-nowrap">{v.patient.phone}</span>
                       </p>
                     </div>
 
@@ -254,61 +254,82 @@ export default async function DashboardIndex() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Prochain Patient prêt en consultation */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-slate-200/80 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-900">Patient prêt à recevoir</h2>
             {readyPatient && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 En salle
               </span>
             )}
           </div>
 
           {readyPatient ? (
-            <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center font-semibold text-base shrink-0">
-                  {readyPatient.patient.firstName[0]}
-                  {readyPatient.patient.lastName[0]}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    {readyPatient.patient.lastName} {readyPatient.patient.firstName}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {readyPatient.patient.age} ans • Tél. {readyPatient.patient.phone}
-                    {readyPatient.patient.mutuelle ? ` • ${readyPatient.patient.mutuelle}` : ""}
-                  </p>
+            <div className="p-5 sm:p-6 space-y-4">
+              {/* Ligne Identité du patient (pleine largeur, ne se comprime jamais) */}
+              <div className="flex items-center justify-between gap-4 min-w-0">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm sm:text-base shrink-0 shadow-xs">
+                    {readyPatient.patient.firstName[0]}
+                    {readyPatient.patient.lastName[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
+                      {readyPatient.patient.lastName} {readyPatient.patient.firstName}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 mt-0.5">
+                      <span className="font-medium text-slate-700 whitespace-nowrap">
+                        {readyPatient.patient.age} ans
+                      </span>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1 font-medium text-slate-700 whitespace-nowrap tabular-nums">
+                        <span className="material-symbols-outlined text-[14px] text-slate-400">call</span>
+                        {readyPatient.patient.phone}
+                      </span>
+                      {readyPatient.patient.mutuelle && (
+                        <>
+                          <span>•</span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px] whitespace-nowrap">
+                            {readyPatient.patient.mutuelle}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-                {allVisits.some(
-                  (v) =>
-                    v.patient.id === readyPatient.patient.id &&
-                    v.id !== readyPatient.id &&
-                    v.status === "finished"
-                ) && (
-                  <PatientHistoryButton
-                    patientId={readyPatient.patient.id}
-                    visitIdToOpen={readyPatient.id}
+              {/* Barre d'actions responsive avec respiration propre et aucun débordement */}
+              <div className="pt-3.5 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  {allVisits.some(
+                    (v) =>
+                      v.patient.id === readyPatient.patient.id &&
+                      v.id !== readyPatient.id &&
+                      v.status === "finished"
+                  ) && (
+                    <PatientHistoryButton
+                      patientId={readyPatient.patient.id}
+                      visitIdToOpen={readyPatient.id}
+                      patientName={`${readyPatient.patient.lastName} ${readyPatient.patient.firstName}`}
+                      variant="compact"
+                    />
+                  )}
+
+                  <CancelVisitButton
+                    variant="button"
+                    visitId={readyPatient.id}
                     patientName={`${readyPatient.patient.lastName} ${readyPatient.patient.firstName}`}
                   />
-                )}
+                </div>
 
                 <Link
                   href={`/dashboard/consultation/${readyPatient.id}`}
-                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition shrink-0"
+                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition shadow-2xs hover:shadow-xs shrink-0 whitespace-nowrap"
                 >
                   <span>Ouvrir la consultation</span>
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </Link>
-
-                <CancelVisitButton
-                  variant="button"
-                  visitId={readyPatient.id}
-                  patientName={`${readyPatient.patient.lastName} ${readyPatient.patient.firstName}`}
-                />
               </div>
             </div>
           ) : (

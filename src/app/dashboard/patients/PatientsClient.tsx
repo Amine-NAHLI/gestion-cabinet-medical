@@ -234,7 +234,7 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 mt-1">
                         <span>{patient.age} ans</span>
                         <span>•</span>
-                        <span className="tabular-nums">{patient.phone}</span>
+                        <span className="tabular-nums whitespace-nowrap">{patient.phone}</span>
                         {patient.mutuelle && (
                           <>
                             <span>•</span>
