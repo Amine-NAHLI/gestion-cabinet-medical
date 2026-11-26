@@ -1115,7 +1115,7 @@ export async function sendManualNeonReport() {
 // 9. Renouvellement ou prolongation de l'abonnement d'un cabinet
 export async function adminRenewSubscription(
   clinicId: number,
-  duration: "1month" | "3months" | "1year" | "change_plan",
+  duration: "1month" | "3months" | "1year" | "validate_trial" | "add_trial_days" | "change_plan",
   newPlan?: "standard" | "pro"
 ) {
   await verifySuperAdmin();
@@ -1131,7 +1131,22 @@ export async function adminRenewSubscription(
       ? (cycle === "yearly" ? 1900 : cycle === "quarterly" ? 550 : 200)
       : (cycle === "yearly" ? 2500 : cycle === "quarterly" ? 700 : 250);
     updateValues.planPrice = price;
+  } else if (duration === "add_trial_days") {
+    // Prolonger la période d'essai de 7 jours supplémentaires
+    const currentExpiry = clinic.subscriptionExpiresAt ? new Date(clinic.subscriptionExpiresAt).getTime() : 0;
+    const baseTime = currentExpiry > Date.now() ? currentExpiry : Date.now();
+    const newExpiry = new Date(baseTime + 7 * 24 * 60 * 60 * 1000);
+    updateValues.subscriptionExpiresAt = newExpiry;
+    updateValues.subscriptionStatus = "trial";
+  } else if (duration === "validate_trial") {
+    // Valider le premier paiement : convertit l'essai en abonnement payé actif
+    const cycle = clinic.billingCycle || "monthly";
+    const days = cycle === "yearly" ? 365 : cycle === "quarterly" ? 90 : 30;
+    const newExpiry = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    updateValues.subscriptionExpiresAt = newExpiry;
+    updateValues.subscriptionStatus = "active";
   } else {
+    // Prolongation standard (+1m, +3m, +1y)
     const days = duration === "1year" ? 365 : duration === "3months" ? 90 : 30;
     const currentExpiry = clinic.subscriptionExpiresAt ? new Date(clinic.subscriptionExpiresAt).getTime() : 0;
     const baseTime = currentExpiry > Date.now() ? currentExpiry : Date.now();
@@ -1142,9 +1157,6 @@ export async function adminRenewSubscription(
 
   await db.update(clinics).set(updateValues).where(eq(clinics.id, clinicId));
 
-  // Synchro des utilisateurs de ce cabinet
-  await db.update(users).set(updateValues).where(eq(users.clinicId, clinicId));
-
   revalidatePath("/admin");
   revalidatePath("/dashboard/settings");
 
@@ -1152,6 +1164,10 @@ export async function adminRenewSubscription(
     success: true,
     message: duration === "change_plan"
       ? `Plan modifié en ${newPlan?.toUpperCase()} avec succès.`
+      : duration === "validate_trial"
+      ? "Premier paiement validé avec succès ! L'abonnement payé est désormais actif."
+      : duration === "add_trial_days"
+      ? "Période d'essai prolongée de +7 jours avec succès."
       : `Abonnement prolongé avec succès (+${duration === "1year" ? "1 An" : duration === "3months" ? "3 Mois" : "1 Mois"}).`,
   };
 }

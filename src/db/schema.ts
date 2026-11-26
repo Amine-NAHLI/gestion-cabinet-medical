@@ -36,11 +36,6 @@ export const users = pgTable("users", {
   isOnboarded: boolean("is_onboarded").default(false).notNull(), // A complété le parcours d'accueil
   notificationPreferences: json("notification_preferences"), // Préférences alertes & notifications
   status: text("status").notNull().default("active"), // 'active', 'suspended'
-  plan: text("plan").default("pro").notNull(), // 'standard' | 'pro'
-  billingCycle: text("billing_cycle").default("monthly").notNull(), // 'monthly' | 'quarterly' | 'yearly'
-  planPrice: integer("plan_price").default(250).notNull(), // Montant en DH
-  subscriptionExpiresAt: timestamp("subscription_expires_at"), // Échéance de l'abonnement
-  subscriptionStatus: text("subscription_status").default("active").notNull(), // 'active', 'trial', 'expired'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

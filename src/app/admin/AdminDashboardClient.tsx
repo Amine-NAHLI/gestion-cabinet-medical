@@ -131,7 +131,7 @@ export default function AdminDashboardClient({
 
   const handleRenewSubscription = async (
     clinicId: number,
-    duration: "1month" | "3months" | "1year" | "change_plan",
+    duration: "1month" | "3months" | "1year" | "validate_trial" | "add_trial_days" | "change_plan",
     newPlan?: "standard" | "pro"
   ) => {
     setActionLoading(`renew-${clinicId}`);
@@ -951,7 +951,7 @@ export default function AdminDashboardClient({
                             : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
                         }`}>
                           <span className="material-symbols-outlined text-[13px]">
-                            {item.clinic.plan === 'standard' ? 'history' : 'star'}
+                            {item.clinic.plan === 'standard' ? 'history' : 'verified'}
                           </span>
                           <span>{item.clinic.plan === 'standard' ? 'Plan STANDARD (30j)' : 'Plan PRO (À vie)'}</span>
                         </span>
@@ -960,8 +960,17 @@ export default function AdminDashboardClient({
                           {item.clinic.billingCycle === 'yearly' ? 'Annuel' : item.clinic.billingCycle === 'quarterly' ? 'Trimestriel' : 'Mensuel'} • <strong>{item.clinic.planPrice || (item.clinic.plan === 'standard' ? 200 : 250)} DH</strong>
                         </span>
 
-                        {/* Compte à rebours / Jours restants */}
-                        {item.clinic.daysRemaining !== null ? (
+                        {/* Statut Essai 7 jours ou Abonnement Payé */}
+                        {item.clinic.subscriptionStatus === "trial" ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-bold text-[11px] bg-purple-50 text-purple-800 border border-purple-200">
+                            <span className="material-symbols-outlined text-[13px]">timer</span>
+                            <span>
+                              {(item.clinic.daysRemaining || 0) > 0
+                                ? `Essai 7 jours : Reste ${item.clinic.daysRemaining} jour${(item.clinic.daysRemaining || 0) > 1 ? 's' : ''}`
+                                : 'Essai 7 jours terminé (En attente règlement)'}
+                            </span>
+                          </span>
+                        ) : item.clinic.daysRemaining !== null ? (
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold text-[11px] ${
                             item.clinic.daysRemaining > 15
                               ? 'bg-emerald-100/70 text-emerald-800'
@@ -970,11 +979,11 @@ export default function AdminDashboardClient({
                               : 'bg-rose-100 text-rose-800'
                           }`}>
                             <span className="material-symbols-outlined text-[13px]">
-                              {item.clinic.daysRemaining > 0 ? 'timer' : 'warning'}
+                              {item.clinic.daysRemaining > 0 ? 'check_circle' : 'warning'}
                             </span>
                             <span>
                               {item.clinic.daysRemaining > 0
-                                ? `Reste ${item.clinic.daysRemaining} jour${item.clinic.daysRemaining > 1 ? 's' : ''}`
+                                ? `Payé & Actif : Reste ${item.clinic.daysRemaining} jour${item.clinic.daysRemaining > 1 ? 's' : ''}`
                                 : 'Abonnement expiré'}
                             </span>
                             {item.clinic.subscriptionExpiresAt && (
@@ -986,8 +995,19 @@ export default function AdminDashboardClient({
                         ) : null}
                       </div>
 
-                      {/* Boutons rapides de prolongation */}
+                      {/* Boutons rapides de prolongation ou validation paiement */}
                       <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+                        {item.clinic.subscriptionStatus === "trial" && (
+                          <button
+                            type="button"
+                            disabled={actionLoading === `renew-${item.clinic.id}`}
+                            onClick={() => handleRenewSubscription(item.clinic.id, "validate_trial")}
+                            className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
+                            title="Le médecin a effectué son premier règlement : activer l'abonnement payé"
+                          >
+                            Valider le 1er paiement
+                          </button>
+                        )}
                         <span className="text-[11px] text-slate-500 font-medium mr-1">Prolonger :</span>
                         <button
                           type="button"

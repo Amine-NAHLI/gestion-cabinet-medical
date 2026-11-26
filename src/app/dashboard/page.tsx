@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { visits, patients, appointments } from "@/db/schema";
+import { visits, patients, appointments, clinics } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getTenantClinicId } from "@/lib/tenant";
 import Link from "next/link";
@@ -22,7 +22,7 @@ export default async function DashboardIndex() {
   const role = (session?.user as any)?.role;
   const clinicId = await getTenantClinicId();
 
-  const [allVisits, allAppointments] = await Promise.all([
+  const [allVisits, allAppointments, clinicData] = await Promise.all([
     db
       .select({
         id: visits.id,
@@ -37,7 +37,14 @@ export default async function DashboardIndex() {
       .where(eq(visits.clinicId, clinicId))
       .orderBy(desc(visits.createdAt)),
     db.select().from(appointments).where(eq(appointments.clinicId, clinicId)),
+    db.select().from(clinics).where(eq(clinics.id, clinicId)).limit(1),
   ]);
+
+  const currentClinic = clinicData[0];
+  const isTrial = currentClinic?.subscriptionStatus === "trial";
+  const trialDaysRemaining = currentClinic?.subscriptionExpiresAt
+    ? Math.max(0, Math.ceil((new Date(currentClinic.subscriptionExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 7;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -70,6 +77,30 @@ export default async function DashboardIndex() {
   if (role === "assistant") {
     return (
       <div className="space-y-6">
+        {/* BANDEAU PÉRIODE D'ESSAI 7 JOURS */}
+        {isTrial && (
+          <div className="p-4 rounded-xl bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <span className="material-symbols-outlined text-[18px]">timer</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-purple-950">
+                    Période d'essai gratuite : Il reste {trialDaysRemaining} jour{trialDaysRemaining > 1 ? 's' : ''} de test
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold uppercase">
+                    Cabinet en évaluation
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Toutes les fonctionnalités sont actives pour votre secrétariat.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -202,6 +233,47 @@ export default async function DashboardIndex() {
   // ========================================================
   return (
     <div className="space-y-6">
+      {/* BANDEAU PÉRIODE D'ESSAI 7 JOURS */}
+      {isTrial && (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <span className="material-symbols-outlined text-[18px]">timer</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-purple-950">
+                  Période d'essai gratuite : Il vous reste {trialDaysRemaining} jour{trialDaysRemaining > 1 ? 's' : ''} de test
+                </span>
+                <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold uppercase">
+                  Formule {currentClinic?.plan === 'standard' ? 'Standard' : 'Pro'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Vous testez actuellement toutes les fonctionnalités en cabinet. Aucun règlement n'est exigé avant la fin de votre essai.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <Link
+              href="/dashboard/settings"
+              className="px-3 py-1.5 rounded-lg bg-white border border-purple-200 hover:bg-purple-50 text-purple-900 text-xs font-semibold transition"
+            >
+              Voir mon abonnement
+            </Link>
+            <a
+              href="https://wa.me/212600000000?text=Bonjour,%20je%20souhaite%20valider%20mon%20abonnement%20MonCabinet"
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-2xs"
+            >
+              Support WhatsApp
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

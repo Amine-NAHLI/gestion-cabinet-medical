@@ -495,37 +495,37 @@ function RegisterFlow() {
             {/* Garanties et réassurance sous les cartes */}
             <div className="pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-slate-600">
               <div className="p-4 rounded-xl bg-white border border-slate-200/80 flex items-start gap-3">
-                <span className="material-symbols-outlined text-slate-700 text-lg shrink-0 mt-0.5">
-                  credit_card_off
+                <span className="material-symbols-outlined text-emerald-600 text-xl shrink-0 mt-0.5">
+                  verified
                 </span>
                 <div>
-                  <h4 className="font-bold text-slate-900">Zéro paiement immédiat</h4>
+                  <h4 className="font-bold text-slate-900">1 semaine de test offerte</h4>
                   <p className="text-slate-500 mt-0.5 leading-relaxed">
-                    Aucune carte bancaire requise. Le règlement s'effectue après activation de votre compte.
+                    Testez l'application en conditions réelles pendant 7 jours complets avant d'effectuer votre premier règlement.
                   </p>
                 </div>
               </div>
 
               <div className="p-4 rounded-xl bg-white border border-slate-200/80 flex items-start gap-3">
-                <span className="material-symbols-outlined text-slate-700 text-lg shrink-0 mt-0.5">
-                  schedule
+                <span className="material-symbols-outlined text-sky-700 text-xl shrink-0 mt-0.5">
+                  support_agent
                 </span>
                 <div>
-                  <h4 className="font-bold text-slate-900">Mise en ligne sous 24h</h4>
+                  <h4 className="font-bold text-slate-900">Paiement avec l'équipe support</h4>
                   <p className="text-slate-500 mt-0.5 leading-relaxed">
-                    Notre équipe prépare votre espace médical et vous transmet vos accès sécurisés.
+                    Aucun paiement en ligne ni carte bancaire. Le règlement se fait directement avec notre équipe support (virement, chèque ou espèces).
                   </p>
                 </div>
               </div>
 
               <div className="p-4 rounded-xl bg-white border border-slate-200/80 flex items-start gap-3">
-                <span className="material-symbols-outlined text-slate-700 text-lg shrink-0 mt-0.5">
-                  lock
+                <span className="material-symbols-outlined text-slate-700 text-xl shrink-0 mt-0.5">
+                  rocket_launch
                 </span>
                 <div>
-                  <h4 className="font-bold text-slate-900">Données souveraines</h4>
+                  <h4 className="font-bold text-slate-900">Mise en service sous 24h</h4>
                   <p className="text-slate-500 mt-0.5 leading-relaxed">
-                    Vos dossiers patients restent strictement protégés, confidentiels et exportables en permanence.
+                    Notre équipe prépare votre espace médical, configure votre cabinet et vous accompagne pour démarrer immédiatement.
                   </p>
                 </div>
               </div>
@@ -611,9 +611,9 @@ function RegisterFlow() {
 
                 {/* Info timing */}
                 <div className="p-4 rounded-xl bg-sky-50/70 border border-sky-100 text-xs text-sky-900 flex items-center gap-3 text-left">
-                  <span className="material-symbols-outlined text-xl text-sky-600 shrink-0">schedule</span>
+                  <span className="material-symbols-outlined text-xl text-sky-600 shrink-0">verified</span>
                   <p className="leading-relaxed">
-                    <strong>Délai moyen de validation :</strong> Moins de 24h. Vous recevrez un email de confirmation contenant votre lien de connexion sécurisé dès que votre espace est actif.
+                    <strong>7 jours d'essai gratuit offerts :</strong> Dès validation sous 24h ouvrées, vous recevez vos accès sécurisés et profitez d'une semaine complète de test avant tout règlement avec notre équipe support.
                   </p>
                 </div>
 
@@ -882,7 +882,7 @@ function RegisterFlow() {
                       )}
                     </button>
                     <p className="text-center text-[11px] text-slate-400 mt-3">
-                      En validant, vous recevrez la confirmation d'activation et vos accès sous 24h ouvrées. Aucun débit préalable.
+                      En validant, vous recevrez vos accès sous 24h ouvrées avec 7 jours d'essai gratuit offert. Le premier règlement s'effectue directement avec l'équipe support à la fin de votre test.
                     </p>
                   </div>
                 </form>

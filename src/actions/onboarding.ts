@@ -306,14 +306,16 @@ export async function activateClinicFromRequest(
     candidateSlug = `${baseSlug}-${counter}`;
   }
 
-  // Déterminer le plan, cycle et date d'échéance selon la demande
+  // Déterminer le plan et le cycle choisis
   const plan = request.selectedPlan === "standard" ? "standard" : "pro";
   const cycle = request.selectedCycle === "yearly" ? "yearly" : request.selectedCycle === "quarterly" ? "quarterly" : "monthly";
   const price = request.selectedPrice || (plan === "standard" ? (cycle === "yearly" ? 1900 : cycle === "quarterly" ? 550 : 200) : (cycle === "yearly" ? 2500 : cycle === "quarterly" ? 700 : 250));
-  const daysToAdd = cycle === "yearly" ? 365 : cycle === "quarterly" ? 90 : 30;
-  const subscriptionExpiresAt = new Date(Date.now() + daysToAdd * 24 * 60 * 60 * 1000);
 
-  // 1. Créer le cabinet avec sous-domaine & abonnement
+  // 1 semaine de test offerte (7 jours d'essai gratuit) avant le premier règlement
+  const trialDays = 7;
+  const subscriptionExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+
+  // 1. Créer le cabinet avec sous-domaine & abonnement en période d'essai 7 jours
   const [newClinic] = await db
     .insert(clinics)
     .values({
@@ -327,7 +329,7 @@ export async function activateClinicFromRequest(
       billingCycle: cycle,
       planPrice: price,
       subscriptionExpiresAt,
-      subscriptionStatus: "active",
+      subscriptionStatus: "trial",
       isCommunityMember: false,
     })
     .returning({ id: clinics.id });
@@ -341,11 +343,6 @@ export async function activateClinicFromRequest(
     role: "doctor",
     phone: request.doctorPhone,
     status: "active",
-    plan,
-    billingCycle: cycle,
-    planPrice: price,
-    subscriptionExpiresAt,
-    subscriptionStatus: "active",
     isOnboarded: false,
   });
 

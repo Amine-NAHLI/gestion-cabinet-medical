@@ -1375,6 +1375,43 @@ export default function SettingsClient({
          ============================================================ */}
       {activeTab === "subscription" && (
         <div className="space-y-6">
+          {/* BANDEAU PÉRIODE D'ESSAI 7 JOURS */}
+          {initialSettings.subscription?.subscriptionStatus === "trial" && (
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <span className="material-symbols-outlined text-[22px]">timer</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[11px] font-bold uppercase tracking-wider">
+                      Semaine de test offerte
+                    </span>
+                    <span className="text-xs font-bold text-purple-900">
+                      Reste {initialSettings.subscription?.daysRemaining ?? 7} jour{(initialSettings.subscription?.daysRemaining ?? 7) > 1 ? 's' : ''} d'essai
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 mt-1">
+                    Vous testez actuellement MonCabinet en conditions réelles
+                  </h3>
+                  <p className="text-xs text-slate-600 mt-0.5 max-w-xl leading-relaxed">
+                    Toutes les fonctionnalités de votre formule {initialSettings.subscription?.plan === 'standard' ? 'Standard' : 'Pro'} sont débloquées. Le premier règlement s'effectue directement auprès de l'équipe support à la fin de vos 7 jours de test.
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href="https://wa.me/212600000000?text=Bonjour,%20je%20souhaite%20valider%20le%20premier%20paiement%20de%20mon%20cabinet%20MonCabinet"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs shrink-0 whitespace-nowrap cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">chat</span>
+                <span>Contacter le support pour valider</span>
+              </a>
+            </div>
+          )}
+
           {/* Grille des indicateurs d'abonnement */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 1. Formule */}
@@ -1389,7 +1426,7 @@ export default function SettingsClient({
                     : 'bg-emerald-50 text-emerald-800 border border-emerald-300'
                 }`}>
                   <span className="material-symbols-outlined text-[15px]">
-                    {initialSettings.subscription?.plan === 'standard' ? 'history' : 'star'}
+                    {initialSettings.subscription?.plan === 'standard' ? 'history' : 'verified'}
                   </span>
                   <span>{initialSettings.subscription?.plan === 'standard' ? 'STANDARD' : 'PLAN PRO'}</span>
                 </span>
@@ -1404,22 +1441,28 @@ export default function SettingsClient({
             {/* 2. Compte à rebours */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                Validité restante
+                {initialSettings.subscription?.subscriptionStatus === "trial" ? "Essai gratuit restant" : "Validité restante"}
               </span>
               <div className="flex items-baseline gap-1.5 mt-1">
                 <span className={`text-2xl font-black tabular-nums ${
-                  (initialSettings.subscription?.daysRemaining || 0) > 15
+                  initialSettings.subscription?.subscriptionStatus === "trial"
+                    ? 'text-purple-700'
+                    : (initialSettings.subscription?.daysRemaining || 0) > 15
                     ? 'text-emerald-700'
                     : (initialSettings.subscription?.daysRemaining || 0) > 0
                     ? 'text-amber-600'
                     : 'text-rose-600'
                 }`}>
-                  {initialSettings.subscription?.daysRemaining ?? 30}
+                  {initialSettings.subscription?.daysRemaining ?? 7}
                 </span>
                 <span className="text-xs font-bold text-slate-500">jours</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {(initialSettings.subscription?.daysRemaining || 0) > 0 ? "Abonnement actif" : "Échéance dépassée"}
+              <p className="text-xs text-slate-500 mt-1 font-medium">
+                {initialSettings.subscription?.subscriptionStatus === "trial"
+                  ? "Période de test 7 jours"
+                  : (initialSettings.subscription?.daysRemaining || 0) > 0
+                  ? "Abonnement actif"
+                  : "Échéance dépassée"}
               </p>
             </div>
 
