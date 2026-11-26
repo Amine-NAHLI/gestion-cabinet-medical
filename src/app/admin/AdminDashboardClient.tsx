@@ -827,13 +827,13 @@ export default function AdminDashboardClient({
 
                   <div className="h-56 flex items-end gap-3 pt-4">
                     {data.stats.monthlyActivity.map((m) => (
-                      <div key={m.month} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                      <div key={m.label} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
                         <span className="text-[11px] font-bold text-slate-700 tabular-nums">{m.visits}</span>
                         <div
                           style={{ height: `${Math.round((m.visits / maxMonthlyVisits) * 80)}%` }}
                           className="w-full rounded-t-lg bg-slate-900 hover:bg-sky-600 transition min-h-[4px]"
                         />
-                        <span className="text-[10px] font-semibold text-slate-400 uppercase">{m.month}</span>
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase">{m.label}</span>
                       </div>
                     ))}
                   </div>
@@ -1323,16 +1323,14 @@ export default function AdminDashboardClient({
             <AdminUsersManagement
               users={data.allUsers || []}
               clinics={data.allClinics || []}
-              onUserPasswordChange={(user) => {
-                setPasswordModalUser({
-                  id: user.id,
-                  name: user.name,
-                  email: user.email,
-                  roleLabel: user.role === "doctor" ? "Médecin" : user.role === "assistant" ? "Assistante" : "Admin",
-                });
+              doctorsWithAssistants={data.doctorsWithAssistants as any}
+              onPasswordModal={(user: { id: number; name: string; email: string; roleLabel: string }) => {
+                setPasswordModalUser(user);
                 setNewPassword("");
               }}
-              onRefresh={() => refreshData(true)}
+              onRefresh={async () => {
+                await refreshData(true);
+              }}
               showFeedback={showFeedback}
             />
           )}
@@ -1363,7 +1361,12 @@ export default function AdminDashboardClient({
               PAGE 7 : EXPLORATEUR DE BASE DE DONNÉES
              ============================================================ */}
           {activePage === "database" && (
-            <AdminDatabaseExplorer />
+            <AdminDatabaseExplorer
+              onRefresh={async () => {
+                await refreshData(true);
+              }}
+              showFeedback={showFeedback}
+            />
           )}
         </div>
       </main>
@@ -1377,24 +1380,27 @@ export default function AdminDashboardClient({
         <AdminClinicEditModal
           clinic={editingClinic}
           onClose={() => setEditingClinic(null)}
-          onSuccess={() => {
+          onSaved={async () => {
             setEditingClinic(null);
             showFeedback("success", "Cabinet mis à jour avec succès.");
-            refreshData(true);
+            await refreshData(true);
           }}
+          showFeedback={showFeedback}
         />
       )}
 
       {/* Modale Création Cabinet Direct */}
       {createClinicModalOpen && (
         <AdminCreateClinicModal
-          prefill={createClinicPrefill}
+          isOpen={createClinicModalOpen}
+          initialData={createClinicPrefill}
           onClose={() => setCreateClinicModalOpen(false)}
-          onSuccess={() => {
+          onSuccess={async () => {
             setCreateClinicModalOpen(false);
             showFeedback("success", "Cabinet et praticiens créés avec succès !");
-            refreshData(true);
+            await refreshData(true);
           }}
+          showFeedback={showFeedback}
         />
       )}
 
