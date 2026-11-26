@@ -2,11 +2,12 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
 import { visits, patients } from "@/db/schema";
-import { eq, sql, asc, and } from "drizzle-orm";
+import { eq, sql, asc, and, inArray } from "drizzle-orm";
 import { getTenantClinicId } from "@/lib/tenant";
 import AddPatientModal from "@/components/AddPatientModal";
 import SendToDoctorButton from "@/components/SendToDoctorButton";
 import CancelVisitButton from "@/components/CancelVisitButton";
+import PatientHistoryButton from "@/components/PatientHistoryButton";
 import Link from "next/link";
 import { MotionDiv } from "@/components/MotionWrapper";
 
@@ -37,6 +38,23 @@ export default async function QueuePage() {
 
   const waitingList = visitArray.filter(v => v.status === 'waiting');
   const readyList = visitArray.filter(v => v.status === 'ready');
+
+  // Détecter les patients ayant déjà un historique médical antérieur dans ce cabinet
+  const patientIds = Array.from(new Set(visitArray.map(v => v.patient.id)));
+  const pastVisitsCounts = patientIds.length > 0
+    ? await db
+        .select({ patientId: visits.patientId })
+        .from(visits)
+        .where(
+          and(
+            eq(visits.clinicId, clinicId),
+            inArray(visits.patientId, patientIds),
+            eq(visits.status, "finished")
+          )
+        )
+    : [];
+
+  const patientsWithHistory = new Set(pastVisitsCounts.map(v => v.patientId));
 
   return (
     <div className="space-y-6">
@@ -89,13 +107,22 @@ export default async function QueuePage() {
                         </p>
                       </div>
                     </div>
-                    <Link
-                      href={`/dashboard/consultation/${visit.id}`}
-                      className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition cursor-pointer"
-                    >
-                      <span>Ouvrir la consultation</span>
-                      <span className="material-symbols-outlined text-base">arrow_forward</span>
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                      {patientsWithHistory.has(visit.patient.id) && (
+                        <PatientHistoryButton
+                          patientId={visit.patient.id}
+                          visitIdToOpen={visit.id}
+                          patientName={`${visit.patient.lastName} ${visit.patient.firstName}`}
+                        />
+                      )}
+                      <Link
+                        href={`/dashboard/consultation/${visit.id}`}
+                        className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition cursor-pointer"
+                      >
+                        <span>Ouvrir la consultation</span>
+                        <span className="material-symbols-outlined text-base">arrow_forward</span>
+                      </Link>
+                    </div>
                   </div>
                 );
               })}
@@ -211,9 +238,19 @@ export default async function QueuePage() {
                           <CancelVisitButton visitId={visit.id} />
                         </>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-medium">
-                          En attente
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {patientsWithHistory.has(visit.patient.id) && (
+                            <PatientHistoryButton
+                              variant="compact"
+                              patientId={visit.patient.id}
+                              visitIdToOpen={visit.id}
+                              patientName={`${visit.patient.lastName} ${visit.patient.firstName}`}
+                            />
+                          )}
+                          <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-medium">
+                            En attente
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>

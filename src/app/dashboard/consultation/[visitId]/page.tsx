@@ -33,6 +33,19 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
   const visit = visitArray[0];
   const patientId = visit.patients.id;
 
+  // Si la consultation n'est pas encore marquée active ('consulting'), on l'active en BDD
+  if (
+    visit.visits.status !== "consulting" &&
+    visit.visits.status !== "finished" &&
+    visit.visits.status !== "cancelled"
+  ) {
+    await db
+      .update(visits)
+      .set({ status: "consulting" })
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)));
+    visit.visits.status = "consulting";
+  }
+
   // Charger en parallèle : ordonnance courante, historique complet des visites passées, RDV et paramètres cabinet
   const [prescriptionArray, previousVisitsRaw, patientAppointmentsRaw, settings] = await Promise.all([
     db.select().from(prescriptions).where(eq(prescriptions.visitId, visitId)),

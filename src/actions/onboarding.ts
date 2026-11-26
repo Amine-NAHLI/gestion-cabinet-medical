@@ -16,13 +16,13 @@ export async function registerClinic(data: {
   clinicName: string;
   clinicCity: string;
   clinicAddress?: string;
-  assistantName?: string;
-  assistantEmail?: string;
+  assistantName: string;
+  assistantEmail: string;
 }) {
   try {
     const cleanDoctorEmail = data.doctorEmail.trim().toLowerCase();
-    const cleanAssistantEmail = data.assistantEmail?.trim().toLowerCase() || "";
-    const cleanAssistantName = data.assistantName?.trim() || "";
+    const cleanAssistantEmail = data.assistantEmail.trim().toLowerCase();
+    const cleanAssistantName = data.assistantName.trim();
 
     if (!data.doctorName.trim() || !cleanDoctorEmail) {
       return { error: "Veuillez renseigner le nom et l'email du médecin." };
@@ -32,29 +32,28 @@ export async function registerClinic(data: {
       return { error: "Veuillez renseigner le nom du cabinet et sa ville." };
     }
 
-    // Si une assistante est renseignée, vérifier la cohérence
-    if (cleanAssistantEmail || cleanAssistantName) {
-      if (!cleanAssistantName || !cleanAssistantEmail) {
-        return {
-          error: "Si vous ajoutez une assistante, veuillez renseigner son nom et son email.",
-        };
-      }
-      if (cleanAssistantEmail === cleanDoctorEmail) {
-        return {
-          error: "L'adresse email de l'assistante doit être différente de celle du médecin.",
-        };
-      }
+    // Validation obligatoire du compte Assistante
+    if (!cleanAssistantName || !cleanAssistantEmail) {
+      return {
+        error: "Les informations de l'assistante médicale (nom et email) sont obligatoires.",
+      };
+    }
 
-      // Vérifier si l'email de l'assistante existe déjà
-      const existingAssistant = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, cleanAssistantEmail))
-        .limit(1);
+    if (cleanAssistantEmail === cleanDoctorEmail) {
+      return {
+        error: "L'adresse email de l'assistante doit être différente de celle du médecin.",
+      };
+    }
 
-      if (existingAssistant.length > 0) {
-        return { error: "Cet email d'assistante est déjà attribué à un autre compte." };
-      }
+    // Vérifier si l'email de l'assistante existe déjà
+    const existingAssistant = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, cleanAssistantEmail))
+      .limit(1);
+
+    if (existingAssistant.length > 0) {
+      return { error: "Cet email d'assistante est déjà attribué à un autre compte." };
     }
 
     // 1. Vérifier si l'email du médecin existe déjà dans les utilisateurs actifs

@@ -22,6 +22,8 @@ import bcrypt from "bcryptjs";
 import { activateClinicFromRequest } from "./onboarding";
 import { slugifyClinic } from "@/lib/slug";
 import { revalidatePath } from "next/cache";
+import { getNeonClusterMetrics } from "@/lib/neonTelemetry";
+import { sendNeonTelemetryReportEmail } from "@/lib/email";
 
 async function verifySuperAdmin() {
   const session = await getServerSession(authOptions);
@@ -570,29 +572,27 @@ export async function adminCreateClinicAndUsers(input: AdminCreateClinicInput) {
     return { error: `Un utilisateur avec l'email médecin ${cleanDoctorEmail} existe déjà.` };
   }
 
-  // Vérifier l'assistante si fournie
-  const cleanAssistantName = input.assistantName?.trim() || null;
-  const cleanAssistantEmail = input.assistantEmail?.trim().toLowerCase() || null;
-  const cleanAssistantPassword = input.assistantPassword?.trim() || null;
+  // Vérifier l'assistante (obligatoire)
+  const cleanAssistantName = input.assistantName?.trim() || "";
+  const cleanAssistantEmail = input.assistantEmail?.trim().toLowerCase() || "";
+  const cleanAssistantPassword = input.assistantPassword?.trim() || "";
 
-  if (cleanAssistantEmail || cleanAssistantName || cleanAssistantPassword) {
-    if (!cleanAssistantName || !cleanAssistantEmail || !cleanAssistantPassword) {
-      return { error: "Veuillez renseigner le nom, l'email et le mot de passe de l'assistante." };
-    }
-    if (cleanAssistantPassword.length < 6) {
-      return { error: "Le mot de passe de l'assistante doit contenir au moins 6 caractères." };
-    }
-    if (cleanAssistantEmail === cleanDoctorEmail) {
-      return { error: "L'email de l'assistante doit être différent de celui du médecin." };
-    }
-    const [existingAssistant] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, cleanAssistantEmail))
-      .limit(1);
-    if (existingAssistant) {
-      return { error: `Un utilisateur avec l'email assistante ${cleanAssistantEmail} existe déjà.` };
-    }
+  if (!cleanAssistantName || !cleanAssistantEmail || !cleanAssistantPassword) {
+    return { error: "Le nom, l'email et le mot de passe de l'assistante sont obligatoires." };
+  }
+  if (cleanAssistantPassword.length < 6) {
+    return { error: "Le mot de passe de l'assistante doit contenir au moins 6 caractères." };
+  }
+  if (cleanAssistantEmail === cleanDoctorEmail) {
+    return { error: "L'email de l'assistante doit être différent de celui du médecin." };
+  }
+  const [existingAssistant] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, cleanAssistantEmail))
+    .limit(1);
+  if (existingAssistant) {
+    return { error: `Un utilisateur avec l'email assistante ${cleanAssistantEmail} existe déjà.` };
   }
 
   // Génération et validation du sous-domaine (slug)
@@ -645,18 +645,16 @@ export async function adminCreateClinicAndUsers(input: AdminCreateClinicInput) {
     isOnboarded: false,
   });
 
-  // 3. Créer l'utilisateur Assistante si renseignée
-  if (cleanAssistantEmail && assistantHash) {
-    await db.insert(users).values({
-      clinicId: newClinic.id,
-      name: cleanAssistantName || "Assistante",
-      email: cleanAssistantEmail,
-      password: assistantHash,
-      role: "assistant",
-      status: "active",
-      isOnboarded: false,
-    });
-  }
+  // 3. Créer l'utilisateur Assistante (obligatoire)
+  await db.insert(users).values({
+    clinicId: newClinic.id,
+    name: cleanAssistantName,
+    email: cleanAssistantEmail,
+    password: assistantHash!,
+    role: "assistant",
+    status: "active",
+    isOnboarded: false,
+  });
 
   // 4. Initialiser les paramètres du cabinet
   await db.insert(clinicSettings).values({
@@ -1079,5 +1077,28 @@ export async function adminDeleteTableRecord(tableName: string, recordId: number
     };
   } catch (err: any) {
     return { error: `Erreur lors de la suppression : ${err?.message || "inconnue"}` };
+  }
+}
+
+// 8. Envoi manuel du rapport de télémétrie Neon par email
+export async function sendManualNeonReport() {
+  await verifySuperAdmin();
+
+  try {
+    const metrics = await getNeonClusterMetrics();
+    const isCritical = metrics.storage.percentUsed >= 80 || metrics.compute.percentUsed >= 80;
+    const res = await sendNeonTelemetryReportEmail(metrics, isCritical);
+
+    if (!res.success) {
+      return { success: false, error: res.warning || res.error || "Échec d'envoi de l'email" };
+    }
+
+    return {
+      success: true,
+      message: `Rapport Neon envoyé avec succès par email ! (Stockage : ${metrics.storage.usedMB} Mo, Calcul : ${metrics.compute.usedHours} CU-h)`,
+    };
+  } catch (err: any) {
+    console.error("[MANUAL NEON REPORT ERROR]", err);
+    return { success: false, error: err.message || "Erreur lors de l'envoi du rapport." };
   }
 }

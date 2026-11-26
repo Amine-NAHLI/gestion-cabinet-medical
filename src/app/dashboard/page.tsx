@@ -8,6 +8,7 @@ import { getTenantClinicId } from "@/lib/tenant";
 import Link from "next/link";
 import AddPatientModal from "@/components/AddPatientModal";
 import AddAppointmentModal from "@/components/AddAppointmentModal";
+import PatientHistoryButton from "@/components/PatientHistoryButton";
 
 export const dynamic = "force-dynamic";
 
@@ -280,13 +281,28 @@ export default async function DashboardIndex() {
                 </div>
               </div>
 
-              <Link
-                href={`/dashboard/consultation/${readyPatient.id}`}
-                className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition shrink-0"
-              >
-                <span>Ouvrir la consultation</span>
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-              </Link>
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                {allVisits.some(
+                  (v) =>
+                    v.patient.id === readyPatient.patient.id &&
+                    v.id !== readyPatient.id &&
+                    v.status === "finished"
+                ) && (
+                  <PatientHistoryButton
+                    patientId={readyPatient.patient.id}
+                    visitIdToOpen={readyPatient.id}
+                    patientName={`${readyPatient.patient.lastName} ${readyPatient.patient.firstName}`}
+                  />
+                )}
+
+                <Link
+                  href={`/dashboard/consultation/${readyPatient.id}`}
+                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition shrink-0"
+                >
+                  <span>Ouvrir la consultation</span>
+                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="py-12 px-6 text-center">

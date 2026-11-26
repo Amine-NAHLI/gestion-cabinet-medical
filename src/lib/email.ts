@@ -289,3 +289,235 @@ export async function sendAdminOtpNotification(params: SendOtpNotificationParams
     return { success: false, error: err.message || "Erreur d'envoi d'email" };
   }
 }
+
+export interface NeonTelemetryMetrics {
+  storage: {
+    usedMB: string;
+    totalMB: number;
+    remainingMB: string;
+    percentUsed: number;
+    tablesBreakdown?: {
+      table: string;
+      rowCount: number;
+      totalSize: string;
+      bytes: number;
+    }[];
+  };
+  compute: {
+    maxHours: number;
+    usedHours: string;
+    remainingHours: string;
+    percentUsed: number;
+  };
+  performance: {
+    cacheHitRatio: string;
+    activeConnections: number;
+    pingMs: number;
+    uptime?: string;
+    pgVersion?: string;
+  };
+  timestamp?: string;
+}
+
+export async function sendNeonTelemetryReportEmail(
+  metrics: NeonTelemetryMetrics,
+  isAlert: boolean = false
+) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const receiverEmail = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || "nahli-ami@upf.ac.ma";
+  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
+  const baseUrl =
+    process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")
+      ? process.env.NEXTAUTH_URL
+      : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXTAUTH_URL || "http://localhost:3000";
+
+  if (!apiKey) {
+    console.warn("[EMAIL WARN] Clé RESEND_API_KEY absente. Rapport Neon non envoyé par email.");
+    return { success: false, warning: "RESEND_API_KEY manquante" };
+  }
+
+  const isCritical = isAlert || metrics.storage.percentUsed >= 80 || metrics.compute.percentUsed >= 80;
+
+  const storageColor =
+    metrics.storage.percentUsed >= 80 ? "#ef4444" : metrics.storage.percentUsed >= 60 ? "#f59e0b" : "#10b981";
+  const computeColor =
+    metrics.compute.percentUsed >= 80 ? "#ef4444" : metrics.compute.percentUsed >= 60 ? "#f59e0b" : "#0284c7";
+
+  const dateFormatted = new Date().toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const timeFormatted = new Date().toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const subject = isCritical
+    ? `⚠️ [ALERTE CRITIQUE] Saturation Neon à ${Math.max(
+        metrics.storage.percentUsed,
+        metrics.compute.percentUsed
+      )}% • MonCabinet`
+    : `📊 [MonCabinet] Rapport Quotidien Infrastructure Neon (${timeFormatted})`;
+
+  const topTables = (metrics.storage.tablesBreakdown || []).slice(0, 5);
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #070e1a; margin: 0; padding: 24px; color: #1e293b; }
+        .container { max-width: 620px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25); }
+        .header { background: ${isCritical ? "linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)" : "linear-gradient(135deg, #070e1c 0%, #0d2847 100%)"}; padding: 32px 28px; text-align: center; color: white; }
+        .header h1 { margin: 0; font-size: 23px; font-weight: 800; letter-spacing: -0.5px; }
+        .header p { margin: 6px 0 0; font-size: 13px; color: ${isCritical ? "#fecaca" : "#94a3b8"}; }
+        .content { padding: 30px 26px; }
+        .status-badge { display: inline-block; background-color: ${isCritical ? "#fef2f2" : "#ecfdf5"}; color: ${isCritical ? "#b91c1c" : "#047857"}; border: 1px solid ${isCritical ? "#fecaca" : "#a7f3d0"}; padding: 6px 14px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 20px; letter-spacing: 0.5px; }
+        .kpi-grid { display: table; width: 100%; margin-bottom: 20px; }
+        .kpi-col { display: table-cell; width: 50%; padding: 6px; box-sizing: border-box; }
+        .kpi-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; }
+        .kpi-label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .kpi-val { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+        .progress-bg { background: #e2e8f0; height: 8px; border-radius: 9999px; overflow: hidden; }
+        .progress-bar { height: 100%; border-radius: 9999px; }
+        .section-title { font-size: 13px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 10px; }
+        .info-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .info-table td, .info-table th { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: left; }
+        .info-table th { font-weight: 700; color: #64748b; font-size: 11px; text-transform: uppercase; background: #f8fafc; }
+        .info-table td.val { font-weight: 700; color: #0f172a; text-align: right; }
+        .btn-container { text-align: center; margin-top: 28px; }
+        .btn { display: inline-block; background: #0284c7; color: #ffffff !important; text-decoration: none; padding: 13px 30px; border-radius: 12px; font-weight: 700; font-size: 13px; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.25); }
+        .footer { background: #f8fafc; padding: 16px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>${isCritical ? "⚠️ ALERTE SATURATION NEON" : "MonCabinet • Télémétrie Neon"}</h1>
+          <p>${isCritical ? "Seuil critique atteint ou dépassé (>= 80%)" : "Rapport automatique d'infrastructure & base de données"}</p>
+        </div>
+        <div class="content">
+          <span class="status-badge">
+            ${isCritical ? "🔴 Seuil d'Alerte Atteint (Action requise)" : "🟢 Santé Cluster : Excellente (Nominale)"}
+          </span>
+          <p style="margin: 0 0 18px; font-size: 13px; color: #475569;">
+            Rapport généré le <strong>${dateFormatted} à ${timeFormatted}</strong>. Voici l'état de consommation de votre cluster PostgreSQL Serverless Neon :
+          </p>
+
+          <!-- GRILLE KPI STOCKAGE & COMPUTE -->
+          <div class="kpi-grid">
+            <div class="kpi-col">
+              <div class="kpi-card">
+                <div class="kpi-label">Stockage BDD (1 Go max)</div>
+                <div class="kpi-val" style="color: ${storageColor};">${metrics.storage.usedMB} <span style="font-size: 13px; font-weight: 500; color: #64748b;">Mo</span></div>
+                <div class="progress-bg">
+                  <div class="progress-bar" style="width: ${Math.max(3, metrics.storage.percentUsed)}%; background-color: ${storageColor};"></div>
+                </div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 6px;">
+                  <strong>${metrics.storage.percentUsed}%</strong> utilisé (${metrics.storage.remainingMB} Mo libres)
+                </div>
+              </div>
+            </div>
+
+            <div class="kpi-col">
+              <div class="kpi-card">
+                <div class="kpi-label">Calcul CU-h (100h max)</div>
+                <div class="kpi-val" style="color: ${computeColor};">${metrics.compute.usedHours} <span style="font-size: 13px; font-weight: 500; color: #64748b;">CU-h</span></div>
+                <div class="progress-bg">
+                  <div class="progress-bar" style="width: ${Math.max(3, metrics.compute.percentUsed)}%; background-color: ${computeColor};"></div>
+                </div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 6px;">
+                  <strong>${metrics.compute.percentUsed}%</strong> consommé (${metrics.compute.remainingHours} CU-h restantes)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PERFORMANCES ET SANTÉ -->
+          <div class="section-title">Performances & Disponibilité</div>
+          <table class="info-table" style="margin-bottom: 18px;">
+            <tr>
+              <td>Cache Hit Ratio (Mémoire)</td>
+              <td class="val">${metrics.performance.cacheHitRatio}%</td>
+            </tr>
+            <tr>
+              <td>Latence Ping (Aller-retour)</td>
+              <td class="val">${metrics.performance.pingMs} ms</td>
+            </tr>
+            <tr>
+              <td>Connexions actives</td>
+              <td class="val">${metrics.performance.activeConnections} active(s)</td>
+            </tr>
+            <tr>
+              <td>Moteur & Version</td>
+              <td class="val">${metrics.performance.pgVersion || "PostgreSQL 16 (Neon Serverless)"}</td>
+            </tr>
+            ${metrics.performance.uptime ? `
+            <tr>
+              <td>Disponibilité Instance</td>
+              <td class="val">${metrics.performance.uptime}</td>
+            </tr>
+            ` : ""}
+          </table>
+
+          <!-- TOP 5 TABLES -->
+          ${topTables.length > 0 ? `
+          <div class="section-title">Top 5 des tables les plus volumineuses</div>
+          <table class="info-table">
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th style="text-align: right;">Lignes</th>
+                <th style="text-align: right;">Taille Totale</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${topTables.map(t => `
+                <tr>
+                  <td style="font-family: monospace; font-size: 12px; color: #0369a1; font-weight: 600;">${t.table}</td>
+                  <td style="text-align: right; color: #64748b;">${t.rowCount.toLocaleString('fr-FR')}</td>
+                  <td class="val">${t.totalSize}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+          ` : ""}
+
+          <div class="btn-container">
+            <a href="${baseUrl}/admin" class="btn" target="_blank">Ouvrir le Tableau de bord Admin</a>
+          </div>
+        </div>
+        <div class="footer">
+          MonCabinet Infrastructure Monitor • Surveillance automatisée Neon PostgreSQL
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: receiverEmail,
+      subject,
+      html: emailHtml,
+    });
+
+    if (error) {
+      console.error("[RESEND NEON TELEMETRY ERROR]", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[RESEND NEON TELEMETRY SUCCESS] Rapport envoyé à ${receiverEmail}. ID: ${data?.id}`);
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("[RESEND NEON TELEMETRY EXCEPTION]", err);
+    return { success: false, error: err.message || "Erreur d'envoi d'email" };
+  }
+}

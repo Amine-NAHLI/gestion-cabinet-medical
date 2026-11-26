@@ -55,16 +55,12 @@ export default function AdminCreateClinicModal({
     assistantPassword: "", // Laisser vide pour saisie admin
   });
 
-  const [hasAssistant, setHasAssistant] = useState(
-    Boolean(initialData?.assistantEmail || initialData?.assistantName)
-  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Synchronisation dynamique dès que la modale s'ouvre ou que initialData change
   useEffect(() => {
     if (isOpen) {
-      const hasAssis = Boolean(initialData?.assistantEmail || initialData?.assistantName);
       setFormData({
         requestId: initialData?.requestId,
         clinicName: initialData?.clinicName || "",
@@ -80,7 +76,6 @@ export default function AdminCreateClinicModal({
         assistantEmail: initialData?.assistantEmail || "",
         assistantPassword: "", // Vide pour saisie par l'admin
       });
-      setHasAssistant(hasAssis);
       setError(null);
     }
   }, [isOpen, initialData]);
@@ -123,15 +118,18 @@ export default function AdminCreateClinicModal({
       return;
     }
 
-    if (hasAssistant) {
-      if (!formData.assistantName?.trim() || !formData.assistantEmail?.trim() || !formData.assistantPassword?.trim()) {
-        setError("Veuillez renseigner le nom, l'email et le mot de passe de l'assistante.");
-        return;
-      }
-      if (formData.assistantEmail.trim().toLowerCase() === formData.doctorEmail.trim().toLowerCase()) {
-        setError("L'email de l'assistante doit être différent de celui du médecin.");
-        return;
-      }
+    // Assistante obligatoire
+    if (!formData.assistantName?.trim() || !formData.assistantEmail?.trim() || !formData.assistantPassword?.trim()) {
+      setError("Le nom, l'email et le mot de passe de l'assistante sont obligatoires.");
+      return;
+    }
+    if (formData.assistantPassword.trim().length < 6) {
+      setError("Le mot de passe de l'assistante doit comporter au moins 6 caractères.");
+      return;
+    }
+    if (formData.assistantEmail.trim().toLowerCase() === formData.doctorEmail.trim().toLowerCase()) {
+      setError("L'email de l'assistante doit être différent de celui du médecin.");
+      return;
     }
 
     setIsSubmitting(true);
@@ -147,9 +145,9 @@ export default function AdminCreateClinicModal({
         doctorPassword: formData.doctorPassword.trim(),
         doctorPhone: formData.doctorPhone?.trim() || null,
         specialty: formData.specialty.trim(),
-        assistantName: hasAssistant ? formData.assistantName?.trim() || null : null,
-        assistantEmail: hasAssistant ? formData.assistantEmail?.trim().toLowerCase() || null : null,
-        assistantPassword: hasAssistant ? formData.assistantPassword?.trim() || null : null,
+        assistantName: formData.assistantName.trim(),
+        assistantEmail: formData.assistantEmail.trim().toLowerCase(),
+        assistantPassword: formData.assistantPassword.trim(),
       };
 
       const res = await adminCreateClinicAndUsers(payload);
@@ -367,85 +365,67 @@ export default function AdminCreateClinicModal({
               </div>
             </div>
 
-            {/* SECTION 3: ASSISTANTE */}
+            {/* SECTION 3: ASSISTANTE (OBLIGATOIRE) */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-600 text-base">support_agent</span>
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    3. Secrétariat & Accueil
-                  </h4>
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={hasAssistant}
-                    onChange={(e) => {
-                      setHasAssistant(e.target.checked);
-                      if (e.target.checked && !formData.assistantPassword) {
-                        setFormData((prev) => ({ ...prev, assistantPassword: generateRandomPassword() }));
-                      }
-                    }}
-                    className="w-4 h-4 rounded text-sky-600 border-slate-300 focus:ring-0 cursor-pointer"
-                  />
-                  <span className="text-xs font-medium text-slate-700">Ajouter une assistante</span>
-                </label>
+              <div className="flex items-center gap-2 pb-1.5 border-b border-slate-100">
+                <span className="material-symbols-outlined text-emerald-600 text-base">support_agent</span>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  3. Secrétariat & Accueil (Compte Assistante *)
+                </h4>
               </div>
 
-              {hasAssistant && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Nom de l'assistante *
-                    </label>
-                    <input
-                      type="text"
-                      required={hasAssistant}
-                      placeholder="Ex: Fatima Zahra"
-                      value={formData.assistantName || ""}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, assistantName: e.target.value }))}
-                      className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Email de connexion assistante *
-                    </label>
-                    <input
-                      type="email"
-                      required={hasAssistant}
-                      placeholder="secretariat@gmail.com"
-                      value={formData.assistantEmail || ""}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, assistantEmail: e.target.value }))}
-                      className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-medium text-slate-700">
-                        Mot de passe assistante *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleGenerateAssistantPassword}
-                        className="text-[11px] text-sky-600 hover:text-sky-800 font-medium flex items-center gap-1 cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-xs">autorenew</span>
-                        Générer un mot de passe
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      required={hasAssistant}
-                      value={formData.assistantPassword || ""}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, assistantPassword: e.target.value }))}
-                      className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white font-mono"
-                    />
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Nom de l'assistante *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Fatima Zahra"
+                    value={formData.assistantName || ""}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, assistantName: e.target.value }))}
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white"
+                  />
                 </div>
-              )}
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Email de connexion assistante *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="secretariat@gmail.com"
+                    value={formData.assistantEmail || ""}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, assistantEmail: e.target.value }))}
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-medium text-slate-700">
+                      Mot de passe assistante *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAssistantPassword}
+                      className="text-[11px] text-sky-600 hover:text-sky-800 font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-xs">autorenew</span>
+                      Générer un mot de passe
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={formData.assistantPassword || ""}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, assistantPassword: e.target.value }))}
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white font-mono"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Footer Buttons */}

@@ -172,20 +172,12 @@ export default function DashboardTour({
       // ignore
     }
 
-    // Première fois de ce compte : verrouiller immédiatement en BDD et en localStorage pour ne plus JAMAIS se répéter
-    try {
-      localStorage.setItem(storageKey, "true");
-    } catch {
-      // ignore
-    }
-    markTourAsSeen();
-
     const timer = setTimeout(() => {
       setIsOpen(true);
       if (onEnsureSidebarOpen && !sidebarOpen) {
         onEnsureSidebarOpen();
       }
-    }, 800);
+    }, 600);
 
     return () => clearTimeout(timer);
   }, [hasSeenTour, storageKey, onEnsureSidebarOpen, sidebarOpen]);

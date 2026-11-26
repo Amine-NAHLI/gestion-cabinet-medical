@@ -11,6 +11,15 @@ import AssistantOnboardingModal from "@/components/AssistantOnboardingModal";
 import DashboardTour from "@/components/DashboardTour";
 import { getUnreadChatCount } from "@/actions/community";
 import { getActiveNotifications, markNotificationsAsRead } from "@/actions/notifications";
+import { getActiveConsultation } from "@/actions/consultation";
+
+export interface ActiveConsultationInfo {
+  visitId: number;
+  patientName: string;
+  patientAge: number;
+  patientPhone?: string;
+  sinceTime?: string;
+}
 
 interface DashboardShellProps {
   role: string;
@@ -19,6 +28,7 @@ interface DashboardShellProps {
   primaryColor?: string;
   isCommunityMember?: boolean;
   unreadChatCount?: number;
+  activeConsultation?: ActiveConsultationInfo | null;
   todayStr: string;
   user?: {
     name?: string | null;
@@ -37,6 +47,7 @@ export default function DashboardShell({
   primaryColor = "#0f172a",
   isCommunityMember,
   unreadChatCount = 0,
+  activeConsultation = null,
   todayStr,
   user,
   children,
@@ -52,6 +63,39 @@ export default function DashboardShell({
   );
 
   const isDoctor = role === "doctor";
+
+  // Consultation en cours pour le médecin (persistant jusqu'à encaissement)
+  const [currentConsultation, setCurrentConsultation] = useState<ActiveConsultationInfo | null>(
+    activeConsultation || null
+  );
+
+  useEffect(() => {
+    if (activeConsultation !== undefined) {
+      setCurrentConsultation(activeConsultation);
+    }
+  }, [activeConsultation]);
+
+  useEffect(() => {
+    if (!isDoctor) return;
+    const fetchActive = async () => {
+      try {
+        const active = await getActiveConsultation();
+        setCurrentConsultation(active);
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchActive();
+    const interval = setInterval(fetchActive, 4000);
+    const handleActiveUpdate = () => fetchActive();
+    window.addEventListener("refresh_active_consultation", handleActiveUpdate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("refresh_active_consultation", handleActiveUpdate);
+    };
+  }, [isDoctor, pathname]);
 
   // Notifications en direct par catégorie (Communauté, Messagerie, Interphone, Salle d'attente)
   const [notifCounts, setNotifCounts] = useState({
@@ -281,6 +325,54 @@ export default function DashboardShell({
 
   const renderNavLinks = (expanded: boolean) => (
     <nav className="flex-1 px-2.5 py-3 space-y-4 overflow-y-auto">
+      {/* Consultation active permanente pour le praticien */}
+      {isDoctor && currentConsultation && (
+        <div className="space-y-1">
+          {expanded ? (
+            <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-300 shadow-2xs transition-all">
+              <div className="flex items-center justify-between gap-1 mb-1.5">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  En consultation
+                </span>
+                {currentConsultation.sinceTime && (
+                  <span className="text-[10px] text-emerald-700 font-semibold tabular-nums">
+                    {currentConsultation.sinceTime}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs font-bold text-slate-900 truncate">
+                {currentConsultation.patientName}
+              </p>
+              <p className="text-[11px] text-slate-500 mb-2.5">
+                {currentConsultation.patientAge} ans
+              </p>
+              <Link
+                href={`/dashboard/consultation/${currentConsultation.visitId}`}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+              >
+                <span>Reprendre</span>
+                <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+              </Link>
+            </div>
+          ) : (
+            <Link
+              href={`/dashboard/consultation/${currentConsultation.visitId}`}
+              title={`Consultation en cours : ${currentConsultation.patientName}`}
+              className="group relative flex items-center justify-center py-2.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
+            >
+              <span className="material-symbols-outlined text-[20px] text-emerald-700 animate-pulse">
+                stethoscope
+              </span>
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-ping" />
+            </Link>
+          )}
+        </div>
+      )}
+
       {renderGroup(primaryItems, expanded, "Cabinet")}
       <div className="border-t border-slate-100 pt-2">
         {renderGroup(secondaryItems, expanded, "Gestion")}
@@ -479,6 +571,33 @@ export default function DashboardShell({
               {todayStr}
             </span>
           </div>
+
+          {/* Pillule active "Consultation en cours" pour le praticien */}
+          {isDoctor && currentConsultation && (
+            <Link
+              href={`/dashboard/consultation/${currentConsultation.visitId}`}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition shrink-0 shadow-2xs group ${
+                pathname === `/dashboard/consultation/${currentConsultation.visitId}`
+                  ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
+                  : "bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300"
+              }`}
+              title={`Consultation en cours avec ${currentConsultation.patientName}`}
+            >
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="hidden sm:inline font-semibold">En consultation :</span>
+              <span className="font-semibold truncate max-w-[130px] sm:max-w-[200px]">
+                {currentConsultation.patientName}
+              </span>
+              <span className="text-[11px] font-bold underline underline-offset-2 shrink-0 hidden md:inline ml-0.5">
+                {pathname === `/dashboard/consultation/${currentConsultation.visitId}`
+                  ? "Fiche ouverte"
+                  : "Reprendre →"}
+              </span>
+            </Link>
+          )}
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Bouton Interphone Cabinet avec Badge de notification directe */}

@@ -1,9 +1,9 @@
 "use server";
 
 import { db } from "@/db";
-import { patients, visits } from "@/db/schema";
+import { patients, visits, prescriptions } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { ilike, or, eq, desc, and } from "drizzle-orm";
+import { ilike, or, eq, desc, and, inArray, ne } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { getTenantClinicId } from "@/lib/tenant";
@@ -262,5 +262,95 @@ export async function cancelVisit(visitId: number) {
   } catch (error) {
     console.error("Erreur annulation visite:", error);
     return { success: false, error: "Erreur lors de l'annulation de la visite." };
+  }
+}
+
+export async function getPatientMedicalHistory(patientId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
+  const clinicId = await getTenantClinicId();
+
+  try {
+    const [patient] = await db
+      .select()
+      .from(patients)
+      .where(and(eq(patients.id, patientId), eq(patients.clinicId, clinicId)))
+      .limit(1);
+
+    if (!patient) {
+      return { success: false, error: "Patient introuvable" };
+    }
+
+    const pastVisits = await db
+      .select()
+      .from(visits)
+      .where(
+        and(
+          eq(visits.patientId, patientId),
+          eq(visits.clinicId, clinicId),
+          ne(visits.status, "cancelled")
+        )
+      )
+      .orderBy(desc(visits.createdAt));
+
+    const visitIds = pastVisits.map((v) => v.id);
+    const prescriptionsList =
+      visitIds.length > 0
+        ? await db
+            .select()
+            .from(prescriptions)
+            .where(inArray(prescriptions.visitId, visitIds))
+        : [];
+
+    const prescriptionsMap = new Map<number, { name: string; instructions: string }[]>();
+    for (const pr of prescriptionsList) {
+      prescriptionsMap.set(
+        pr.visitId,
+        Array.isArray(pr.medicines) ? (pr.medicines as { name: string; instructions: string }[]) : []
+      );
+    }
+
+    const serializedVisits = pastVisits.map((v) => ({
+      id: v.id,
+      date: v.createdAt.toISOString(),
+      status: v.status,
+      disease: v.disease,
+      diagnosis: v.diagnosis,
+      notes: v.notes,
+      bloodPressure: v.bloodPressure,
+      heartRate: v.heartRate,
+      temperature: v.temperature ? String(v.temperature) : null,
+      weight: v.weight ? String(v.weight) : null,
+      height: v.height ? String(v.height) : null,
+      amountToPay: v.amountToPay ? String(v.amountToPay) : null,
+      paymentStatus: v.paymentStatus,
+      paymentMethod: v.paymentMethod,
+      medicines: prescriptionsMap.get(v.id) || [],
+    }));
+
+    return {
+      success: true,
+      patient: {
+        id: patient.id,
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        age: patient.age,
+        phone: patient.phone,
+        gender: patient.gender,
+        mutuelle: patient.mutuelle,
+        cin: patient.cin,
+        bloodGroup: patient.bloodGroup,
+        allergies: patient.allergies,
+        antecedents: patient.antecedents,
+        address: patient.address,
+        createdAt: patient.createdAt.toISOString(),
+      },
+      visits: serializedVisits,
+      totalVisitsCount: serializedVisits.length,
+    };
+  } catch (error) {
+    console.error("Erreur récupération historique patient:", error);
+    return { success: false, error: "Erreur lors du chargement de l'historique." };
   }
 }

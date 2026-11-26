@@ -81,8 +81,8 @@
 
 /* Style typographie signature calligraphique italique */
 .font-signature {
-  font-family: 'Great Vibes', 'Alex Brush', 'Allura', 'Dancing Script', 'Satisfy', 'Segoe Script', 'Brush Script MT', 'Snell Roundhand', cursive, sans-serif;
+  font-family: 'Alex Brush', 'Dancing Script', 'Great Vibes', 'Allura', 'Satisfy', 'Segoe Script', 'Brush Script MT', cursive, sans-serif;
   font-style: italic;
-  font-weight: 500;
-  letter-spacing: 0.03em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }

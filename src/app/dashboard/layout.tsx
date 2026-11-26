@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/authOptions";
 import { redirect } from "next/navigation";
 import { getClinicSettings } from "@/actions/settings";
 import { getUnreadChatCount } from "@/actions/community";
+import { getActiveConsultation } from "@/actions/consultation";
 import { db } from "@/db";
 import { users, clinics } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -66,6 +67,7 @@ export default async function DashboardLayout({
 
   const settings = await getClinicSettings();
   const unreadChatCount = role === "doctor" ? await getUnreadChatCount() : 0;
+  const activeConsultation = role === "doctor" ? await getActiveConsultation() : null;
 
   const todayStr = new Date().toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -82,6 +84,7 @@ export default async function DashboardLayout({
       primaryColor={clinic?.primaryColor || "#0f172a"}
       isCommunityMember={clinic?.isCommunityMember || false}
       unreadChatCount={unreadChatCount}
+      activeConsultation={activeConsultation}
       todayStr={todayStr}
       user={{
         name: currentUser?.name || userSession?.name,

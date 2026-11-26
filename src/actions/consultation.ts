@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { visits, prescriptions, customMedications, patients } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
@@ -160,5 +160,78 @@ export async function finishConsultation(
   } catch (error) {
     console.error("Erreur clôture consultation:", error);
     return { success: false, error: "Erreur lors de la clôture de la consultation." };
+  }
+}
+
+export async function markConsultationActive(visitId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false };
+
+  const clinicId = await getTenantClinicId();
+
+  try {
+    await db
+      .update(visits)
+      .set({ status: "consulting" })
+      .where(
+        and(
+          eq(visits.id, visitId),
+          eq(visits.clinicId, clinicId),
+          ne(visits.status, "finished"),
+          ne(visits.status, "cancelled")
+        )
+      );
+
+    revalidatePath("/dashboard", "layout");
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur activation consultation:", error);
+    return { success: false };
+  }
+}
+
+export async function getActiveConsultation() {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user as any)?.role !== "doctor") return null;
+
+  const clinicId = await getTenantClinicId();
+
+  try {
+    const activeVisits = await db
+      .select({
+        id: visits.id,
+        createdAt: visits.createdAt,
+        patientFirstName: patients.firstName,
+        patientLastName: patients.lastName,
+        patientAge: patients.age,
+        patientPhone: patients.phone,
+      })
+      .from(visits)
+      .innerJoin(patients, eq(visits.patientId, patients.id))
+      .where(
+        and(
+          eq(visits.clinicId, clinicId),
+          eq(visits.status, "consulting")
+        )
+      )
+      .orderBy(desc(visits.createdAt))
+      .limit(1);
+
+    if (activeVisits.length === 0) return null;
+
+    const active = activeVisits[0];
+    return {
+      visitId: active.id,
+      patientName: `${active.patientLastName} ${active.patientFirstName}`,
+      patientAge: active.patientAge,
+      patientPhone: active.patientPhone,
+      sinceTime: new Date(active.createdAt).toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+  } catch (error) {
+    console.error("Erreur récupération consultation active:", error);
+    return null;
   }
 }

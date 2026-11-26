@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { sendManualNeonReport } from "@/actions/admin";
 
 interface AdminNeonHealthProps {
   stats: any;
@@ -13,6 +15,41 @@ export default function AdminNeonHealth({
   onRunVacuum,
   actionLoading,
 }: AdminNeonHealthProps) {
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailFeedback, setEmailFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  const handleSendReport = async () => {
+    setEmailSending(true);
+    setEmailFeedback(null);
+    try {
+      const res = await sendManualNeonReport();
+      if (res && res.success) {
+        setEmailFeedback({
+          type: "success",
+          text: res.message || "Rapport envoyé avec succès !",
+        });
+      } else {
+        setEmailFeedback({
+          type: "error",
+          text: res?.error || "Erreur lors de l'envoi du rapport.",
+        });
+      }
+    } catch (err: any) {
+      setEmailFeedback({
+        type: "error",
+        text: err.message || "Erreur de connexion.",
+      });
+    } finally {
+      setEmailSending(false);
+      setTimeout(() => {
+        setEmailFeedback(null);
+      }, 7000);
+    }
+  };
+
   const storage = stats.storage || {};
   const compute = stats.compute || {};
   const performance = stats.performance || {};
@@ -36,7 +73,24 @@ export default function AdminNeonHealth({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+          <button
+            type="button"
+            onClick={handleSendReport}
+            disabled={emailSending}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50"
+            title="Recevoir immédiatement les statistiques Neon par email"
+          >
+            <span
+              className={`material-symbols-outlined text-[16px] text-sky-600 ${
+                emailSending ? "animate-spin" : ""
+              }`}
+            >
+              {emailSending ? "progress_activity" : "mail"}
+            </span>
+            <span>{emailSending ? "Envoi en cours..." : "M'envoyer le rapport par email"}</span>
+          </button>
+
           <button
             type="button"
             onClick={onRunVacuum}
@@ -57,6 +111,44 @@ export default function AdminNeonHealth({
             </span>
           </button>
         </div>
+      </div>
+
+      {/* FEEDBACK EMAIL EN DIRECT */}
+      {emailFeedback && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-3.5 rounded-xl border text-xs flex items-center gap-2.5 font-medium shadow-2xs ${
+            emailFeedback.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+              : "bg-rose-50 border-rose-200 text-rose-900"
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">
+            {emailFeedback.type === "success" ? "check_circle" : "error"}
+          </span>
+          <span>{emailFeedback.text}</span>
+        </motion.div>
+      )}
+
+      {/* BANDEAU RECAP CRON & ALERTING */}
+      <div className="p-3.5 rounded-xl bg-slate-900 text-white text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <span className="material-symbols-outlined text-sky-400 text-[20px]">
+            schedule
+          </span>
+          <div>
+            <p className="font-semibold text-white">
+              Surveillance automatique activée
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Rapport journalier expédié chaque nuit à 00h00 • Alerte d&apos;urgence immédiate si saturation &ge; 80% (Stockage &gt; 819 Mo ou Calcul &gt; 80 CU-h)
+            </p>
+          </div>
+        </div>
+        <span className="text-[11px] font-mono text-emerald-400 bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700/80 self-start sm:self-auto shrink-0">
+          nahli-ami@upf.ac.ma
+        </span>
       </div>
 
       {/* 2. SPÉCIFICATIONS CLOUD & ARCHITECTURE SYSTÈME */}

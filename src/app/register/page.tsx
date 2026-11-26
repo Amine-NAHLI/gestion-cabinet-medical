@@ -11,7 +11,6 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [hasAssistant, setHasAssistant] = useState(false);
 
   const [formData, setFormData] = useState({
     doctorName: "",
@@ -44,16 +43,14 @@ export default function RegisterPage() {
       return;
     }
 
-    if (hasAssistant) {
-      if (!formData.assistantName.trim() || !formData.assistantEmail.trim()) {
-        setError("Veuillez renseigner le nom et l'email du compte Assistante.");
-        return;
-      }
+    if (!formData.assistantName.trim() || !formData.assistantEmail.trim()) {
+      setError("Les informations de l'assistante médicale (nom et email) sont obligatoires.");
+      return;
+    }
 
-      if (formData.doctorEmail.trim().toLowerCase() === formData.assistantEmail.trim().toLowerCase()) {
-        setError("L'email de l'assistante doit être différent de celui du médecin.");
-        return;
-      }
+    if (formData.doctorEmail.trim().toLowerCase() === formData.assistantEmail.trim().toLowerCase()) {
+      setError("L'email de l'assistante doit être différent de celui du médecin.");
+      return;
     }
 
     setIsLoading(true);
@@ -67,8 +64,8 @@ export default function RegisterPage() {
         clinicName: formData.clinicName,
         clinicCity: formData.clinicCity,
         clinicAddress: formData.clinicAddress,
-        assistantName: hasAssistant ? formData.assistantName : undefined,
-        assistantEmail: hasAssistant ? formData.assistantEmail : undefined,
+        assistantName: formData.assistantName,
+        assistantEmail: formData.assistantEmail,
       };
 
       const res: any = await registerClinic(payload);
@@ -151,12 +148,10 @@ export default function RegisterPage() {
                   <span className="text-slate-500 block">Téléphone :</span>
                   <span className="font-semibold text-slate-900">{formData.doctorPhone || "—"}</span>
                 </div>
-                {hasAssistant && formData.assistantName && (
-                  <div className="sm:col-span-2">
-                    <span className="text-slate-500 block">Assistante médicale :</span>
-                    <span className="font-semibold text-slate-900">{formData.assistantName} ({formData.assistantEmail})</span>
-                  </div>
-                )}
+                <div className="sm:col-span-2">
+                  <span className="text-slate-500 block">Assistante médicale :</span>
+                  <span className="font-semibold text-slate-900">{formData.assistantName} ({formData.assistantEmail})</span>
+                </div>
               </div>
             </div>
 
@@ -330,59 +325,46 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* SECTION 3: ASSISTANTE (OPTIONNELLE) */}
+              {/* SECTION 3: ASSISTANTE (OBLIGATOIRE) */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-emerald-600 text-base">support_agent</span>
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      3. Assistante Médicale / Secrétariat
-                    </h3>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={hasAssistant}
-                      onChange={(e) => setHasAssistant(e.target.checked)}
-                      className="w-4 h-4 rounded text-sky-600 border-slate-300 focus:ring-0 cursor-pointer"
-                    />
-                    <span className="text-xs font-medium text-slate-700">J'ai une assistante</span>
-                  </label>
+                <div className="flex items-center gap-2 pb-1.5 border-b border-slate-100">
+                  <span className="material-symbols-outlined text-emerald-600 text-base">support_agent</span>
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    3. Assistante Médicale / Secrétariat *
+                  </h3>
                 </div>
 
-                {hasAssistant && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80 animate-in fade-in duration-200">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Nom de l'assistante *
-                      </label>
-                      <input
-                        type="text"
-                        name="assistantName"
-                        required={hasAssistant}
-                        placeholder="Ex: Fatima Zahra"
-                        value={formData.assistantName}
-                        onChange={handleChange}
-                        className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Email de l'assistante *
-                      </label>
-                      <input
-                        type="email"
-                        name="assistantEmail"
-                        required={hasAssistant}
-                        placeholder="secretariat@gmail.com"
-                        value={formData.assistantEmail}
-                        onChange={handleChange}
-                        className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white"
-                      />
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Nom et Prénom de l'assistante *
+                    </label>
+                    <input
+                      type="text"
+                      name="assistantName"
+                      required
+                      placeholder="Ex: Fatima Zahra"
+                      value={formData.assistantName}
+                      onChange={handleChange}
+                      className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white"
+                    />
                   </div>
-                )}
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Email de connexion de l'assistante *
+                    </label>
+                    <input
+                      type="email"
+                      name="assistantEmail"
+                      required
+                      placeholder="secretariat@gmail.com"
+                      value={formData.assistantEmail}
+                      onChange={handleChange}
+                      className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:border-sky-500 bg-white"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Bouton de validation */}
