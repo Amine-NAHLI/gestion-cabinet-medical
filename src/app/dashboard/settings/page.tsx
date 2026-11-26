@@ -47,6 +47,7 @@ export default async function SettingsPage() {
           subscription: (settings as any).subscription || null,
           supportWhatsapp: platform.supportWhatsapp,
           supportWhatsappMessage: platform.supportWhatsappMessage,
+          supportEmail: platform.supportEmail,
         }}
       />
     </div>
