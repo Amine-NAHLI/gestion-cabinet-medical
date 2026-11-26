@@ -141,6 +141,16 @@ export async function markInternalMessagesAsRead() {
   return { success: true };
 }
 
+export async function clearInternalMessages() {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
+  const clinicId = await getTenantClinicId();
+  await db.delete(clinicMessages).where(eq(clinicMessages.clinicId, clinicId));
+
+  return { success: true };
+}
+
 export async function saveQuickMessages(messages: string[]) {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: "Non autorisé" };

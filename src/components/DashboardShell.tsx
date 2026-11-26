@@ -639,6 +639,8 @@ export default function DashboardShell({
         onClose={() => setChatOpen(false)}
         primaryColor={primaryColor}
         onUnreadChange={setChatUnread}
+        role={role}
+        clinicName={clinicName}
       />
 
       {/* Modal d'accueil première connexion assistante */}
