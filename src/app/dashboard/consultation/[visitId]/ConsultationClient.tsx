@@ -122,7 +122,7 @@ export default function ConsultationClient({
   const router = useRouter();
   const hasHistory = pastVisits.length > 0;
 
-  const [activeTab, setActiveTab] = useState<"history" | "dossier" | "ordonnance" | "documents" | "cloture">("dossier");
+  const [activeTab, setActiveTab] = useState<"history" | "dossier" | "ordonnance" | "cloture">("dossier");
   const [historySearch, setHistorySearch] = useState("");
   const [expandedVisits, setExpandedVisits] = useState<Record<number, boolean>>(() => {
     const initial: Record<number, boolean> = {};
@@ -138,6 +138,7 @@ export default function ConsultationClient({
   const [documents, setDocuments] = useState<ClinicalDocument[]>(
     Array.isArray(initialData.documents) ? (initialData.documents as ClinicalDocument[]) : []
   );
+  const [showDocModal, setShowDocModal] = useState(false);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [newDocTitle, setNewDocTitle] = useState("");
   const [newDocType, setNewDocType] = useState("biologie");
@@ -309,7 +310,7 @@ export default function ConsultationClient({
       await savePrescription(visitId, validMeds);
       if (mode === "print") {
         showToast("Préparation de l'impression...");
-        triggerPrint("prescription", () => setActiveTab("documents"));
+        triggerPrint("prescription", () => setActiveTab("cloture"));
       } else if (mode === "pdf") {
         downloadFilledPrescriptionPdf({
           patient,
@@ -318,13 +319,13 @@ export default function ConsultationClient({
           settings,
         });
         showToast("Ordonnance PDF téléchargée");
-        setActiveTab("documents");
+        setActiveTab("cloture");
       } else {
         showToast("Ordonnance enregistrée");
-        setActiveTab("documents");
+        setActiveTab("cloture");
       }
     } else {
-      setActiveTab("documents");
+      setActiveTab("cloture");
     }
   }
 
@@ -445,7 +446,7 @@ export default function ConsultationClient({
   });
 
   const tabs: {
-    id: "dossier" | "ordonnance" | "documents" | "cloture" | "history";
+    id: "dossier" | "ordonnance" | "cloture" | "history";
     step: string;
     label: string;
     icon: string;
@@ -455,18 +456,11 @@ export default function ConsultationClient({
     {
       id: "ordonnance",
       step: "2",
-      label: "Prescription",
+      label: "Prescription / Ordonnance",
       icon: "prescriptions",
       badge: medicines.filter((m) => m.name.trim()).length || undefined,
     },
-    {
-      id: "documents",
-      step: "3",
-      label: "Documents & Bilans",
-      icon: "attach_file",
-      badge: documents.length || undefined,
-    },
-    { id: "cloture", step: "4", label: "Honoraires & Clôture", icon: "payments" },
+    { id: "cloture", step: "3", label: "Honoraires & Clôture", icon: "payments" },
     ...(hasHistory
       ? [{ id: "history" as const, step: "Dossier", label: "Historique patient", icon: "history_edu", badge: pastVisits.length }]
       : []),
@@ -584,28 +578,18 @@ export default function ConsultationClient({
 
         {/* Action Controls & LE BOUTON D'ACTION PRINCIPAL (Visible sans scroller !) */}
         <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
-          {/* Bouton d'accès rapide Pièces jointes & Bilans */}
+          {/* Bouton d'ouverture directe du dossier bilans & documents */}
           <button
             type="button"
-            onClick={() => setActiveTab(activeTab === "documents" ? "dossier" : "documents")}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
-              activeTab === "documents"
-                ? "bg-violet-700 border-violet-700 text-white shadow-xs"
-                : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800"
-            }`}
-            title="Dossier, bilans & pièces jointes du patient"
+            onClick={() => setShowDocModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200/90 shadow-2xs"
+            title="Déposer ou consulter les bilans, analyses, radios et motifs"
           >
-            <span className="material-symbols-outlined text-[16px]">attach_file</span>
+            <span className="material-symbols-outlined text-[16px] text-violet-700">attach_file</span>
             <span className="hidden sm:inline">Bilans & Pièces</span>
-            {documents.length > 0 && (
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  activeTab === "documents" ? "bg-white text-violet-800" : "bg-violet-100 text-violet-800"
-                }`}
-              >
-                {documents.length}
-              </span>
-            )}
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-violet-700 text-white">
+              {documents.length}
+            </span>
           </button>
 
           {activeTab === "dossier" && (
@@ -624,17 +608,6 @@ export default function ConsultationClient({
             <button
               type="button"
               onClick={() => handleSavePrescription("none")}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 whitespace-nowrap"
-            >
-              <span>Valider & Bilans</span>
-              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-            </button>
-          )}
-
-          {activeTab === "documents" && (
-            <button
-              type="button"
-              onClick={() => setActiveTab("cloture")}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 whitespace-nowrap"
             >
               <span>Passer à la clôture</span>
@@ -860,6 +833,50 @@ export default function ConsultationClient({
                   </span>
                 </div>
               </div>
+
+              {/* Repères Bilans & Documents numérisés pour ce patient */}
+              <div className="p-3 rounded-xl bg-violet-50/50 border border-violet-200/80 text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-violet-900 uppercase tracking-wider flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px] text-violet-700">attach_file</span>
+                    <span>Bilans, Radios & Pièces Jointes ({documents.length})</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowDocModal(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-700 hover:text-violet-950 transition cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">add_circle</span>
+                    <span>Ajouter / Déposer</span>
+                  </button>
+                </div>
+
+                {documents.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {documents.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          if (d.fileUrl) setActiveDocPreview(d);
+                          else setShowDocModal(true);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-violet-200 hover:border-violet-400 text-slate-800 text-[11px] font-semibold transition cursor-pointer shadow-2xs"
+                        title={d.notes ? `Observation : ${d.notes}` : d.title}
+                      >
+                        <span className="material-symbols-outlined text-[13px] text-violet-700">
+                          {d.fileUrl ? "visibility" : "description"}
+                        </span>
+                        <span className="truncate max-w-[130px]">{d.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 italic">
+                    Aucun document rattaché. Cliquez sur « Ajouter » pour déposer un bilan ou une observation.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1079,259 +1096,7 @@ export default function ConsultationClient({
       )}
 
       {/* ============================================================
-          ONGLET 3 : DOSSIER, BILANS & PIÈCES JOINTES
-         ============================================================ */}
-      {activeTab === "documents" && (
-        <div className="p-4 sm:p-6 space-y-6">
-          {/* En-tête explicatif */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-violet-700">attach_file</span>
-                <span>Dossier, Bilans & Pièces Jointes du Patient</span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Déposez des bilans (radios, analyses, scanners, PDF) ou notez un motif / observation pour enrichir l'archive.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-lg bg-violet-50 text-violet-800 text-xs font-bold border border-violet-200">
-                {documents.length} pièce{documents.length > 1 ? "s" : ""} jointe{documents.length > 1 ? "s" : ""}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Formulaire d'ajout de document ou de motif (5 colonnes) */}
-            <form
-              onSubmit={handleAddDocument}
-              className="lg:col-span-5 p-4 sm:p-5 rounded-2xl border border-slate-200/90 bg-slate-50/60 shadow-2xs space-y-4"
-            >
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-violet-700">add_circle</span>
-                <span>Ajouter un document ou une observation</span>
-              </h3>
-
-              {/* Catégorie */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">
-                  Type de document / examen
-                </label>
-                <select
-                  value={newDocType}
-                  onChange={(e) => setNewDocType(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-medium bg-white rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
-                >
-                  <option value="biologie">Bilan Biologique / Analyses sanguines</option>
-                  <option value="imagerie">Imagerie Médicale (Radio, Scanner, Écho)</option>
-                  <option value="compte_rendu">Compte-rendu médical / Spécialiste</option>
-                  <option value="ordonnance_externe">Ordonnance antérieure / Externe</option>
-                  <option value="note">Observation clinique / Note interne</option>
-                  <option value="autre">Autre document</option>
-                </select>
-              </div>
-
-              {/* Titre */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">
-                  Intitulé du document / motif
-                </label>
-                <input
-                  type="text"
-                  value={newDocTitle}
-                  onChange={(e) => setNewDocTitle(e.target.value)}
-                  placeholder="Ex: NFS + Bilan rénal, Radio Thorax, Avis cardio..."
-                  className="w-full px-3 py-2 text-xs font-medium bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs"
-                />
-              </div>
-
-              {/* Fichier joint (optionnel) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">
-                  Fichier numérique <span className="text-slate-400 font-normal">(Optionnel : image ou PDF)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="clinical-doc-file-input"
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  {newDocFile ? (
-                    <div className="p-3 rounded-xl border border-violet-200 bg-violet-50/50 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="material-symbols-outlined text-[18px] text-violet-700 shrink-0">
-                          {newDocFile.fileType.startsWith("image/") ? "image" : "picture_as_pdf"}
-                        </span>
-                        <span className="text-xs font-bold text-slate-900 truncate">
-                          {newDocFile.fileName}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewDocFile(null);
-                          const el = document.getElementById("clinical-doc-file-input") as HTMLInputElement | null;
-                          if (el) el.value = "";
-                        }}
-                        className="text-slate-400 hover:text-rose-600 p-1"
-                        title="Retirer le fichier"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <label
-                      htmlFor="clinical-doc-file-input"
-                      className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 hover:border-violet-400 rounded-xl bg-white hover:bg-slate-50 transition cursor-pointer text-center"
-                    >
-                      <span className="material-symbols-outlined text-[24px] text-slate-400 mb-1">
-                        cloud_upload
-                      </span>
-                      <span className="text-xs font-semibold text-slate-700">
-                        Cliquez pour sélectionner une photo ou un PDF
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">
-                        JPG, PNG, WEBP ou document PDF
-                      </span>
-                    </label>
-                  )}
-                </div>
-              </div>
-
-              {/* Observation / Motif textuel */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">
-                  Observation clinique ou motif détaillé
-                </label>
-                <textarea
-                  rows={3}
-                  value={newDocNotes}
-                  onChange={(e) => setNewDocNotes(e.target.value)}
-                  placeholder="Ex: Glycémie à jeun 0.98 g/L, pas de foyer infectieux pulmonaire, recontrôler dans 3 mois..."
-                  className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs resize-y leading-relaxed"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isUploadingDoc}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined text-[16px]">save</span>
-                <span>{isUploadingDoc ? "Enregistrement en cours..." : "Enregistrer dans le dossier patient"}</span>
-              </button>
-            </form>
-
-            {/* Liste des documents attachés à cette consultation (7 colonnes) */}
-            <div className="lg:col-span-7 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] text-slate-500">folder_shared</span>
-                  <span>Documents de la visite courante ({documents.length})</span>
-                </h3>
-              </div>
-
-              {documents.length === 0 ? (
-                <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
-                    <span className="material-symbols-outlined text-[20px]">note_add</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-800">Aucun document joint pour le moment</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5 max-w-sm mx-auto">
-                    Utilisez le formulaire ci-contre pour joindre les bilans, scanners ou observations de cette consultation.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {documents.map((doc) => {
-                    const isImg =
-                      doc.fileType?.startsWith("image/") ||
-                      doc.fileUrl?.startsWith("data:image/") ||
-                      /\.(jpg|jpeg|png|webp)$/i.test(doc.fileName || "");
-
-                    return (
-                      <div
-                        key={doc.id}
-                        className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2.5 flex flex-col justify-between"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-800 text-[10px] font-bold">
-                              {DOCUMENT_TYPE_LABELS[doc.type] || doc.type}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteDocument(doc.id)}
-                              className="text-slate-400 hover:text-rose-600 p-0.5 rounded transition"
-                              title="Supprimer ce document"
-                            >
-                              <span className="material-symbols-outlined text-[15px]">delete</span>
-                            </button>
-                          </div>
-
-                          <h4 className="font-bold text-slate-900 text-xs truncate" title={doc.title}>
-                            {doc.title}
-                          </h4>
-
-                          {doc.notes && (
-                            <p className="text-[11px] text-slate-600 line-clamp-3 italic leading-relaxed">
-                              "{doc.notes}"
-                            </p>
-                          )}
-                        </div>
-
-                        {doc.fileUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => setActiveDocPreview(doc)}
-                            className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[15px] text-violet-700">
-                              {isImg ? "visibility" : "open_in_new"}
-                            </span>
-                            <span>Visualiser le document</span>
-                          </button>
-                        ) : (
-                          <div className="text-[10px] text-slate-400 italic pt-1">
-                            Observation textuelle enregistrée
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Pied de section Documents avec transition vers Clôture */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("ordonnance")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 text-xs font-semibold transition"
-                >
-                  <span className="material-symbols-outlined text-[15px]">arrow_back</span>
-                  <span>Retour à l'ordonnance</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("cloture")}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
-                >
-                  <span>Passer à la clôture et honoraires</span>
-                  <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================
-          ONGLET 4 : HONORAIRES & CLÔTURE DE CONSULTATION
+          ONGLET 3 : HONORAIRES & CLÔTURE DE CONSULTATION
          ============================================================ */}
       {activeTab === "cloture" && (
         <form
@@ -1650,6 +1415,252 @@ export default function ConsultationClient({
           visitId={visitId}
           settings={settings}
         />
+      )}
+
+      {/* Modal Dédié : Dépôt & Consultation des Bilans & Pièces Jointes */}
+      {showDocModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header Modal */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between gap-3 bg-slate-50/80">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-violet-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <span className="material-symbols-outlined text-[20px]">attach_file</span>
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
+                    Dossier & Bilans Médicaux — {patient.lastName} {patient.firstName}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Visite #{visitId} · Déposez vos clichés, analyses ou observations cliniques
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowDocModal(false)}
+                className="p-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 transition cursor-pointer"
+                title="Fermer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Corps Modal en 2 Colonnes */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-50/30">
+              {/* Formulaire de dépôt (5 cols) */}
+              <form
+                onSubmit={handleAddDocument}
+                className="lg:col-span-5 p-4 sm:p-5 rounded-2xl border border-slate-200/90 bg-white shadow-2xs space-y-3.5"
+              >
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-violet-700">add_circle</span>
+                  <span>Déposer un document ou motif</span>
+                </h4>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Catégorie
+                  </label>
+                  <select
+                    value={newDocType}
+                    onChange={(e) => setNewDocType(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-medium bg-white rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
+                  >
+                    <option value="biologie">Bilan Biologique / Analyses sanguines</option>
+                    <option value="imagerie">Imagerie Médicale (Radio, Scanner, Écho)</option>
+                    <option value="compte_rendu">Compte-rendu médical / Spécialiste</option>
+                    <option value="ordonnance_externe">Ordonnance antérieure / Externe</option>
+                    <option value="note">Observation clinique / Note interne</option>
+                    <option value="autre">Autre document</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Intitulé du document / motif
+                  </label>
+                  <input
+                    type="text"
+                    value={newDocTitle}
+                    onChange={(e) => setNewDocTitle(e.target.value)}
+                    placeholder="Ex: NFS + Bilan rénal, Radio Thorax..."
+                    className="w-full px-3 py-2 text-xs font-medium bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Fichier numérique <span className="text-slate-400 font-normal">(Optionnel)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="clinical-doc-file-input"
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    {newDocFile ? (
+                      <div className="p-2.5 rounded-xl border border-violet-200 bg-violet-50/50 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="material-symbols-outlined text-[18px] text-violet-700 shrink-0">
+                            {newDocFile.fileType.startsWith("image/") ? "image" : "picture_as_pdf"}
+                          </span>
+                          <span className="text-xs font-bold text-slate-900 truncate">
+                            {newDocFile.fileName}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewDocFile(null);
+                            const el = document.getElementById("clinical-doc-file-input") as HTMLInputElement | null;
+                            if (el) el.value = "";
+                          }}
+                          className="text-slate-400 hover:text-rose-600 p-1"
+                          title="Retirer"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">close</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="clinical-doc-file-input"
+                        className="flex flex-col items-center justify-center p-3.5 border-2 border-dashed border-slate-200 hover:border-violet-400 rounded-xl bg-slate-50/50 hover:bg-white transition cursor-pointer text-center"
+                      >
+                        <span className="material-symbols-outlined text-[20px] text-slate-400 mb-1">
+                          cloud_upload
+                        </span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          Glissez ou cliquez pour choisir un fichier
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">
+                          Photos (JPG, PNG) ou document PDF
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Observation clinique ou motif
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newDocNotes}
+                    onChange={(e) => setNewDocNotes(e.target.value)}
+                    placeholder="Résultats d'analyses, conclusions du confrère, consignes de surveillance..."
+                    className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs resize-y leading-relaxed"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isUploadingDoc}
+                  className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">save</span>
+                  <span>{isUploadingDoc ? "Enregistrement..." : "Enregistrer dans le dossier"}</span>
+                </button>
+              </form>
+
+              {/* Liste des documents attachés (7 cols) */}
+              <div className="lg:col-span-7 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-slate-500">folder_shared</span>
+                    <span>Documents attachés à cette visite ({documents.length})</span>
+                  </h4>
+                </div>
+
+                {documents.length === 0 ? (
+                  <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                      <span className="material-symbols-outlined text-[20px]">note_add</span>
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-800">Aucun document rattaché</h5>
+                    <p className="text-[11px] text-slate-500 mt-0.5 max-w-sm mx-auto">
+                      Déposez les bilans ou notez les motifs de cette consultation dans le formulaire à gauche.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+                    {documents.map((doc) => {
+                      const isImg =
+                        doc.fileType?.startsWith("image/") ||
+                        doc.fileUrl?.startsWith("data:image/") ||
+                        /\.(jpg|jpeg|png|webp)$/i.test(doc.fileName || "");
+
+                      return (
+                        <div
+                          key={doc.id}
+                          className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2 flex flex-col justify-between"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-800 text-[10px] font-bold">
+                                {DOCUMENT_TYPE_LABELS[doc.type] || doc.type}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDocument(doc.id)}
+                                className="text-slate-400 hover:text-rose-600 p-0.5 rounded transition"
+                                title="Supprimer"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">delete</span>
+                              </button>
+                            </div>
+
+                            <h5 className="font-bold text-slate-900 text-xs truncate" title={doc.title}>
+                              {doc.title}
+                            </h5>
+
+                            {doc.notes && (
+                              <p className="text-[11px] text-slate-600 line-clamp-3 italic leading-relaxed">
+                                "{doc.notes}"
+                              </p>
+                            )}
+                          </div>
+
+                          {doc.fileUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setActiveDocPreview(doc)}
+                              className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[15px] text-violet-700">
+                                {isImg ? "visibility" : "open_in_new"}
+                              </span>
+                              <span>Visualiser</span>
+                            </button>
+                          ) : (
+                            <div className="text-[10px] text-slate-400 italic pt-1">
+                              Observation textuelle enregistrée
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-3.5 bg-white border-t border-slate-200 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDocModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition cursor-pointer"
+              >
+                Terminer & Revenir à la consultation
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Visualiseur Modal Haute Résolution de Document / Bilan */}
