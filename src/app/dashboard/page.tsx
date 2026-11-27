@@ -29,6 +29,7 @@ export default async function DashboardIndex() {
         id: visits.id,
         status: visits.status,
         paymentStatus: visits.paymentStatus,
+        paymentMethod: visits.paymentMethod,
         isAppointment: visits.isAppointment,
         createdAt: visits.createdAt,
         amountToPay: visits.amountToPay,
@@ -67,7 +68,9 @@ export default async function DashboardIndex() {
   const waitingVisits = todayVisits.filter((v) => v.status === "waiting").reverse();
   const readyVisits = todayVisits.filter((v) => v.status === "ready");
   const finishedVisits = todayVisits.filter((v) => v.status === "finished");
-  const pendingPaymentsCount = finishedVisits.filter((v) => v.paymentStatus !== "paid").length;
+  const pendingPaymentsCount = finishedVisits.filter(
+    (v) => v.paymentStatus !== "paid" && parseFloat((v.amountToPay as string) || "0") > 0
+  ).length;
   const readyPatient = readyVisits[0];
 
   // Recettes effectivement perçues en caisse (uniquement les visites payées)
@@ -384,13 +387,22 @@ export default async function DashboardIndex() {
                         {statusInfo.label}
                       </span>
 
-                      {v.status === "finished" && v.amountToPay && (
-                        <span className="text-xs font-medium text-slate-700 tabular-nums">
-                          {parseFloat(v.amountToPay as string).toFixed(0)} DH
-                          <span className="text-slate-400 ml-1">
-                            ({v.paymentStatus === "paid" ? "Payé" : "À encaisser"})
-                          </span>
-                        </span>
+                      {v.status === "finished" && (
+                        <div className="flex items-center gap-1.5">
+                          {v.paymentMethod === "free" || parseFloat((v.amountToPay as string) || "0") === 0 ? (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold inline-flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px] text-emerald-600">check_circle</span>
+                              <span>Contrôle gratuit (0 DH)</span>
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-700 tabular-nums">
+                              {parseFloat((v.amountToPay as string) || "0").toFixed(0)} DH
+                              <span className="text-slate-400 ml-1">
+                                ({v.paymentStatus === "paid" ? "Payé" : "À encaisser"})
+                              </span>
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

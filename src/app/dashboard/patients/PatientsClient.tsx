@@ -168,10 +168,10 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-2.5 rounded-full shadow-lg text-xs font-bold flex items-center gap-2 border border-slate-700"
+            exit={{ opacity: 0, y: 16 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-2.5 rounded-full shadow-lg text-xs font-bold flex items-center gap-2 border border-slate-700"
           >
             <span className="material-symbols-outlined text-emerald-400 text-base">check_circle</span>
             <span>{toast}</span>

@@ -401,10 +401,10 @@ export default function SettingsClient({
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, y: -12 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-xs font-medium flex items-center gap-2 ${
+            exit={{ opacity: 0, y: 16 }}
+            className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl shadow-xl text-xs font-medium flex items-center gap-2 border border-slate-700 ${
               toast.type === "error" ? "bg-red-600 text-white" : "bg-slate-900 text-white"
             }`}
           >

@@ -137,7 +137,8 @@ export async function finishConsultation(
 
   const clinicId = await getTenantClinicId();
 
-  const finalAmount = amountToPay !== null && !isNaN(amountToPay) && amountToPay >= 0 
+  const isFree = amountToPay === 0 || paymentMethod === "free";
+  const finalAmount = !isFree && amountToPay !== null && !isNaN(amountToPay) && amountToPay > 0 
     ? amountToPay.toFixed(2) 
     : "0.00";
 
@@ -147,9 +148,9 @@ export async function finishConsultation(
       .set({ 
         amountToPay: finalAmount, 
         status: "finished", 
-        paymentStatus: amountToPay === 0 ? "paid" : "pending",
-        paymentMethod: paymentMethod || "cash",
-        paidAt: amountToPay === 0 ? new Date() : null,
+        paymentStatus: isFree ? "paid" : "pending",
+        paymentMethod: isFree ? "free" : (paymentMethod || "cash"),
+        paidAt: isFree ? new Date() : null,
       })
       .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)))
       .returning({ patientId: visits.patientId, createdAt: visits.createdAt });

@@ -470,16 +470,16 @@ export default function ConsultationClient({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden relative">
-      {/* Toast discret de confirmation */}
+      {/* Toast discret de confirmation (positionné en bas au centre pour ne jamais masquer l'en-tête ni les boutons) */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -12 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+            exit={{ opacity: 0, y: 16 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
           >
-            <div className="bg-slate-900 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold">
+            <div className="bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold border border-slate-700">
               <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
               <span>{toastMessage}</span>
             </div>
@@ -1052,6 +1052,58 @@ export default function ConsultationClient({
           </div>
 
           <div className="space-y-4">
+            {/* Option directe : Consultation gratuite / Contrôle (0 DH) */}
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              amount.trim() === "0" || paymentMethod === "free"
+                ? "bg-emerald-50/80 border-emerald-300 shadow-2xs"
+                : "bg-slate-50/80 border-slate-200/90"
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs transition ${
+                    amount.trim() === "0" || paymentMethod === "free"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-white border border-slate-200 text-slate-500"
+                  }`}>
+                    <span className="material-symbols-outlined text-[20px]">
+                      {amount.trim() === "0" || paymentMethod === "free" ? "task_alt" : "money_off"}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900">
+                      Pas d'honoraires / Contrôle gratuit (0 DH)
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Consultation de contrôle, avis sur bilan, simple question ou patient exonéré (aucun encaissement requis).
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (amount.trim() === "0" || paymentMethod === "free") {
+                      const def = settings?.defaultFee ? String(Number(settings.defaultFee)) : "250";
+                      setAmount(def);
+                      setPaymentMethod("cash");
+                    } else {
+                      setAmount("0");
+                      setPaymentMethod("free");
+                    }
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 border whitespace-nowrap shadow-2xs ${
+                    amount.trim() === "0" || paymentMethod === "free"
+                      ? "bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-700"
+                      : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+                  }`}
+                >
+                  {amount.trim() === "0" || paymentMethod === "free"
+                    ? "✓ Gratuité appliquée (0 DH)"
+                    : "Appliquer 0 DH (Gratuit)"}
+                </button>
+              </div>
+            </div>
+
             {/* Montant des honoraires avec raccourcis rapides en 1 clic */}
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1.5">
@@ -1062,7 +1114,12 @@ export default function ConsultationClient({
                   type="number"
                   name="amount"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAmount(val);
+                    if (val === "0") setPaymentMethod("free");
+                    else if (paymentMethod === "free") setPaymentMethod("cash");
+                  }}
                   autoComplete="off"
                   placeholder="250"
                   step="10"
@@ -1074,20 +1131,31 @@ export default function ConsultationClient({
               </div>
 
               {/* Raccourcis montants en 1 clic */}
-              <div className="flex items-center gap-1.5 mt-2">
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
                 <span className="text-[11px] text-slate-400 mr-1">Tarifs usuels :</span>
-                {["150", "200", "250", "300", "400"].map((preset) => (
+                {[
+                  { label: "0 DH (Gratuit)", val: "0", free: true },
+                  { label: "150 DH", val: "150", free: false },
+                  { label: "200 DH", val: "200", free: false },
+                  { label: "250 DH", val: "250", free: false },
+                  { label: "300 DH", val: "300", free: false },
+                  { label: "400 DH", val: "400", free: false },
+                ].map((preset) => (
                   <button
-                    key={preset}
+                    key={preset.val}
                     type="button"
-                    onClick={() => setAmount(preset)}
+                    onClick={() => {
+                      setAmount(preset.val);
+                      if (preset.free) setPaymentMethod("free");
+                      else if (paymentMethod === "free") setPaymentMethod("cash");
+                    }}
                     className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      amount === preset
+                      amount === preset.val
                         ? "bg-slate-900 text-white"
                         : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                     }`}
                   >
-                    {preset} DH
+                    {preset.label}
                   </button>
                 ))}
               </div>
@@ -1098,24 +1166,29 @@ export default function ConsultationClient({
               <label className="block text-xs font-bold text-slate-800 mb-1.5">
                 Mode de règlement prévu
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { id: "cash", label: "Espèces", icon: "payments" },
                   { id: "card", label: "Carte bancaire", icon: "credit_card" },
                   { id: "check", label: "Chèque", icon: "fact_check" },
+                  { id: "free", label: "Gratuit / Contrôle", icon: "money_off" },
                 ].map((m) => (
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => setPaymentMethod(m.id)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    onClick={() => {
+                      setPaymentMethod(m.id);
+                      if (m.id === "free") setAmount("0");
+                      else if (amount === "0") setAmount(settings?.defaultFee ? String(Number(settings.defaultFee)) : "250");
+                    }}
+                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
                       paymentMethod === m.id
                         ? "bg-slate-900 border-slate-900 text-white shadow-2xs"
                         : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                   >
                     <span className="material-symbols-outlined text-[16px]">{m.icon}</span>
-                    <span>{m.label}</span>
+                    <span className="truncate">{m.label}</span>
                   </button>
                 ))}
               </div>
@@ -1164,10 +1237,22 @@ export default function ConsultationClient({
             <button
               type="submit"
               disabled={isFinishing}
-              className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 shadow-xs"
+              className={`flex-1 px-5 py-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 shadow-xs ${
+                amount.trim() === "0" || paymentMethod === "free"
+                  ? "bg-slate-900 hover:bg-slate-800 text-white"
+                  : "bg-emerald-700 hover:bg-emerald-800 text-white"
+              }`}
             >
-              <span className="material-symbols-outlined text-[16px]">check_circle</span>
-              <span>{isFinishing ? "Clôture en cours..." : "Clôturer et envoyer à l'assistante"}</span>
+              <span className="material-symbols-outlined text-[16px]">
+                {amount.trim() === "0" || paymentMethod === "free" ? "task_alt" : "check_circle"}
+              </span>
+              <span>
+                {isFinishing
+                  ? "Enregistrement en cours..."
+                  : amount.trim() === "0" || paymentMethod === "free"
+                  ? "Valider la visite (0 DH — Sans encaissement)"
+                  : "Clôturer et envoyer à l'assistante"}
+              </span>
             </button>
           </div>
         </form>

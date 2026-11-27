@@ -131,7 +131,7 @@ export default function RealtimeSync({ role }: { role: string }) {
     }
     notifTimerRef.current = setTimeout(() => {
       setNotification(null);
-    }, 7500);
+    }, 4500);
   }, []);
 
   const checkSync = useCallback(async () => {
@@ -178,7 +178,7 @@ export default function RealtimeSync({ role }: { role: string }) {
         setJustSynced(true);
         setTimeout(() => setJustSynced(false), 1800);
 
-        // Notifications intelligentes selon le rôle
+        // Notifications intelligentes selon le rôle (uniquement pour les événements clés réels)
         if (role === "doctor") {
           const prevReadyIds = new Set(prev.readyVisits.map((v) => v.id));
           const newlyReady = data.readyVisits.find((v) => !prevReadyIds.has(v.id));
@@ -194,41 +194,20 @@ export default function RealtimeSync({ role }: { role: string }) {
               },
               true
             );
-          } else if (data.waitingCount > prev.waitingCount) {
-            showNotification(
-              {
-                title: "Nouveau patient en salle d'attente",
-                subtitle: `${data.waitingCount} patient${data.waitingCount > 1 ? "s" : ""} actuellement en attente.`,
-                tone: "sky",
-                href: "/dashboard/queue",
-                cta: "Voir la file",
-              },
-              false
-            );
-          } else if (data.appointmentsCount > prev.appointmentsCount) {
-            showNotification(
-              {
-                title: "Nouveau rendez-vous planifié",
-                subtitle: "L'agenda du cabinet vient d'être mis à jour.",
-                tone: "sky",
-                href: "/dashboard/appointments",
-                cta: "Voir agenda",
-              },
-              false
-            );
           }
         } else if (role === "assistant") {
           const prevPaymentIds = new Set(prev.pendingPayments.map((p) => p.id));
           const newPayment = data.pendingPayments.find((p) => !prevPaymentIds.has(p.id));
 
           if (newPayment) {
+            const isFree = newPayment.amount === "0.00" || newPayment.amount === "0" || !newPayment.amount;
             showNotification(
               {
-                title: "Consultation terminée — Paiement prêt",
-                subtitle: `${newPayment.patientName}${newPayment.amount ? ` • ${newPayment.amount} DH` : ""}`,
-                tone: "teal",
-                href: "/dashboard/payments",
-                cta: "Encaisser",
+                title: isFree ? "Consultation terminée (0 DH)" : "Consultation terminée — À encaisser",
+                subtitle: `${newPayment.patientName}${!isFree ? ` • ${newPayment.amount} DH` : " • Contrôle gratuit"}`,
+                tone: isFree ? "emerald" : "teal",
+                href: isFree ? "/dashboard" : "/dashboard/payments",
+                cta: isFree ? "Voir le dossier" : "Encaisser",
               },
               true
             );

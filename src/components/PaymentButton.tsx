@@ -201,62 +201,93 @@ export default function PaymentButton({
         </span>
       )}
 
-      {/* 3. ENCAISSEMENT & RÈGLEMENT */}
-      {!initialAmount && !isSuccess && (
-        <div className="relative">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 font-mono">
-            DH
-          </span>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Montant"
-            className="w-24 pl-8 pr-2 py-1.5 text-xs font-bold text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-none"
-          />
-        </div>
-      )}
+      {/* 3. ENCAISSEMENT OU VALIDATION SANS FRAIS */}
+      {(() => {
+        const isFreeVisit =
+          initialAmount === "0.00" ||
+          initialAmount === "0" ||
+          paymentMethod === "free";
 
-      {!isSuccess && (
-        <select
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-          className="text-[11px] font-semibold py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-700"
-        >
-          <option value="cash">Espèces</option>
-          <option value="card">Carte (TPE)</option>
-          <option value="check">Chèque</option>
-          <option value="insurance">Tiers-payant</option>
-          <option value="free">Gratuit</option>
-        </select>
-      )}
+        if (isSuccess) {
+          return (
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1 ${
+                isFreeVisit
+                  ? "text-slate-800 bg-slate-100 border-slate-200"
+                  : "text-emerald-700 bg-emerald-50 border-emerald-200"
+              }`}>
+                <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
+                {isFreeVisit ? "Visite validée (0 DH)" : "Encaissé"}
+              </span>
+              {!isFreeVisit && (
+                <button
+                  type="button"
+                  onClick={handlePrintReceipt}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  title="Imprimer la quittance pour la mutuelle"
+                >
+                  <span className="material-symbols-outlined text-sm">print</span>
+                  Reçu Mutuelle
+                </button>
+              )}
+            </div>
+          );
+        }
 
-      {isSuccess ? (
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
-            Encaissé
-          </span>
-          <button
-            type="button"
-            onClick={handlePrintReceipt}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-            title="Imprimer la quittance pour la mutuelle"
-          >
-            <span className="material-symbols-outlined text-sm">print</span>
-            Reçu Mutuelle
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={handlePayment}
-          disabled={isLoading}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-sm">payments</span>
-          {isLoading ? "Enregistrement..." : "Encaisser"}
-        </button>
-      )}
+        if (isFreeVisit) {
+          return (
+            <button
+              onClick={handlePayment}
+              disabled={isLoading}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              title="Valider et classer cette consultation sans encaissement"
+            >
+              <span className="material-symbols-outlined text-sm text-emerald-400">task_alt</span>
+              <span>{isLoading ? "Validation..." : "Valider la visite (0 DH)"}</span>
+            </button>
+          );
+        }
+
+        return (
+          <>
+            {!initialAmount && (
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 font-mono">
+                  DH
+                </span>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Montant"
+                  className="w-24 pl-8 pr-2 py-1.5 text-xs font-bold text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-none"
+                />
+              </div>
+            )}
+
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="text-[11px] font-semibold py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-700"
+            >
+              <option value="cash">Espèces</option>
+              <option value="card">Carte (TPE)</option>
+              <option value="check">Chèque</option>
+              <option value="insurance">Tiers-payant</option>
+              <option value="free">Gratuit</option>
+            </select>
+
+            <button
+              onClick={handlePayment}
+              disabled={isLoading}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">payments</span>
+              {isLoading ? "Enregistrement..." : "Encaisser"}
+            </button>
+          </>
+        );
+      })()}
 
       {/* 4. MODALE DONNER UN RENDEZ-VOUS */}
       {isRdvModalOpen && (
