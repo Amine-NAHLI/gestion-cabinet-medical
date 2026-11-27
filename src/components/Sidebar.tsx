@@ -37,9 +37,9 @@ export default async function Sidebar() {
           <span>File d'attente</span>
         </MotionLink>
 
-        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/patients" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
-          <span className="material-symbols-outlined text-slate-400 group-hover:text-blue-500 transition-colors">folder_shared</span>
-          <span>Dossiers Patients</span>
+        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/appointments" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
+          <span className="material-symbols-outlined text-slate-400 group-hover:text-fuchsia-500 transition-colors">event</span>
+          <span>Rendez-vous</span>
         </MotionLink>
 
         {role === 'assistant' && (
@@ -55,12 +55,7 @@ export default async function Sidebar() {
 
         <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
           <span className="material-symbols-outlined text-slate-400 group-hover:text-indigo-500 transition-colors">history</span>
-          <span>Historique</span>
-        </MotionLink>
-
-        <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/appointments" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">
-          <span className="material-symbols-outlined text-slate-400 group-hover:text-fuchsia-500 transition-colors">event</span>
-          <span>Rendez-vous</span>
+          <span>Historique & Dossiers</span>
         </MotionLink>
 
         <MotionLink whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }} href="/dashboard/stats" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors group font-medium">

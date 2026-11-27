@@ -218,7 +218,6 @@ export default function DashboardShell({
       tourId: "queue",
       badgeCount: notifCounts.queue,
     },
-    { href: "/dashboard/patients", label: "Patients", icon: "folder_shared", exact: false, tourId: "patients" },
     ...(role === "assistant"
       ? [{ href: "/dashboard/payments", label: "Encaissements", icon: "payments", exact: false, tourId: "payments" }]
       : []),
@@ -246,7 +245,7 @@ export default function DashboardShell({
   ];
 
   const secondaryItems = [
-    { href: "/dashboard/history", label: "Historique", icon: "history", exact: false, tourId: "history" },
+    { href: "/dashboard/history", label: "Historique & Dossiers", icon: "history", exact: false, tourId: "history" },
     {
       href: "/dashboard/stats",
       label: "Statistiques",

@@ -49,29 +49,9 @@ export default function BottomNav({ role = "assistant", user }: BottomNavProps) 
       activeBg: "bg-amber-600 text-white shadow-amber-500/25",
     },
     {
-      href: "/dashboard/patients",
-      label: "Patients",
-      icon: "folder_shared",
-      exact: false,
-      color: "text-blue-600 bg-blue-50",
-      activeBg: "bg-blue-600 text-white shadow-blue-500/25",
-    },
-    ...(role === "assistant"
-      ? [
-          {
-            href: "/dashboard/payments",
-            label: "Paiements",
-            icon: "payments",
-            exact: false,
-            color: "text-emerald-600 bg-emerald-50",
-            activeBg: "bg-emerald-600 text-white shadow-emerald-500/25",
-          },
-        ]
-      : []),
-    {
       href: "/dashboard/history",
       label: "Historique",
-      icon: "history",
+      icon: "folder_shared",
       exact: false,
       color: "text-indigo-600 bg-indigo-50",
       activeBg: "bg-indigo-600 text-white shadow-indigo-500/25",
