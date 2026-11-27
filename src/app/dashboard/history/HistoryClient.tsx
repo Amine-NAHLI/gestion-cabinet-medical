@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { exportClinicPatientsData } from "@/actions/settings";
 import { downloadFilledPrescriptionPdf } from "@/lib/prescriptionTemplateUtils";
-import { createVisitForExistingPatient, updatePatient, deletePatient } from "@/actions/patients";
+import { updatePatient, deletePatient } from "@/actions/patients";
 import AddPatientModal from "@/components/AddPatientModal";
 
 export interface ClinicalDocument {
@@ -170,7 +170,6 @@ export default function HistoryClient({
   } | null>(null);
 
   // États de chargement et retours d'action
-  const [loadingAdmitId, setLoadingAdmitId] = useState<number | null>(null);
   const [deletingPatientId, setDeletingPatientId] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -205,23 +204,6 @@ export default function HistoryClient({
       if (current) setSelectedPatientDossier(current);
     }
   }, [patientsList, selectedPatientDossier]);
-
-  // Admission rapide en salle d'attente
-  const handleAdmit = async (patientId: number) => {
-    try {
-      setLoadingAdmitId(patientId);
-      const res = await createVisitForExistingPatient(patientId);
-      if (res && res.success) {
-        showToast("Patient admis en salle d'attente avec succès.");
-      } else {
-        showToast(res?.error || "Erreur lors de l'admission.");
-      }
-    } catch {
-      showToast("Erreur lors de la mise en salle d'attente.");
-    } finally {
-      setLoadingAdmitId(null);
-    }
-  };
 
   // Suppression d'un dossier patient
   const handleDeletePatient = async (patientId: number, name: string) => {
@@ -879,17 +861,6 @@ export default function HistoryClient({
 
                             <button
                               type="button"
-                              disabled={loadingAdmitId === patient.id}
-                              onClick={() => handleAdmit(patient.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
-                              title="Admettre immédiatement en salle d'attente pour aujourd'hui"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">queue</span>
-                              <span>{loadingAdmitId === patient.id ? "Admission..." : "Admettre"}</span>
-                            </button>
-
-                            <button
-                              type="button"
                               disabled={deletingPatientId === patient.id}
                               onClick={() => handleDeletePatient(patient.id, `${patient.lastName} ${patient.firstName}`)}
                               className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-slate-400 hover:text-rose-600 transition cursor-pointer disabled:opacity-50"
@@ -991,17 +962,7 @@ export default function HistoryClient({
                         onClick={() => setSelectedPatientDossier(patient)}
                         className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] transition shadow-2xs"
                       >
-                        Consulter
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={loadingAdmitId === patient.id}
-                        onClick={() => handleAdmit(patient.id)}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[11px] transition"
-                        title="Admettre en salle d'attente"
-                      >
-                        {loadingAdmitId === patient.id ? "..." : "Admettre"}
+                        Consulter dossier
                       </button>
                     </div>
                   </div>
@@ -1332,16 +1293,6 @@ export default function HistoryClient({
                   <span className="material-symbols-outlined text-[14px]">edit</span>
                   <span>Modifier coordonnées</span>
                 </button>
-
-                <button
-                  type="button"
-                  disabled={loadingAdmitId === selectedPatientDossier.id}
-                  onClick={() => handleAdmit(selectedPatientDossier.id)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold transition flex items-center gap-1 cursor-pointer disabled:opacity-50 shadow-2xs"
-                >
-                  <span className="material-symbols-outlined text-[14px]">queue</span>
-                  <span>{loadingAdmitId === selectedPatientDossier.id ? "Admission..." : "Admettre aujourd'hui"}</span>
-                </button>
               </div>
             </div>
 
@@ -1390,7 +1341,7 @@ export default function HistoryClient({
                     </span>
                     <p className="font-semibold text-slate-700 text-xs">Aucune consultation enregistrée pour ce patient.</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Utilisez le bouton « Admettre aujourd'hui » pour l'envoyer en salle d'attente.
+                      Les consultations passées s'afficheront ici au fur et à mesure.
                     </p>
                   </div>
                 ) : (
