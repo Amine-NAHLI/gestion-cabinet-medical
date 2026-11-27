@@ -88,9 +88,25 @@ export default async function DashboardIndex() {
       d.setHours(0, 0, 0, 0);
       return d.getTime() === today.getTime();
     })
-    .sort((a, b) => (a.time || "09:00").localeCompare(b.time || "09:00"));
+    .map((a) => {
+      // Si la consultation de ce patient a été clôturée aujourd'hui, refléter immédiatement le statut terminé
+      const isFinishedToday = finishedVisits.some((v) => v.patient.id === a.patientId);
+      if (isFinishedToday && a.status !== "cancelled") {
+        return { ...a, status: "completed" };
+      }
+      return a;
+    })
+    .sort((a, b) => {
+      // Trier : les rendez-vous restants en premier, les terminés en dernier, puis par heure
+      const orderA = a.status === "completed" ? 1 : 0;
+      const orderB = b.status === "completed" ? 1 : 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.time || "09:00").localeCompare(b.time || "09:00");
+    });
 
   const todayAppointmentsCount = todayAppointments.length;
+  const remainingAppointmentsCount = todayAppointments.filter((a) => a.status !== "completed").length;
+  const completedAppointmentsCount = todayAppointments.filter((a) => a.status === "completed").length;
 
   const formatTime = (date: Date) =>
     new Date(date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -227,23 +243,28 @@ export default async function DashboardIndex() {
           ) : (
             <div className="divide-y divide-indigo-50/80">
               {todayAppointments.map((appt) => {
+                const isCompleted = appt.status === "completed";
                 const isAdmitted = appt.status === "admitted";
                 return (
                   <div
                     key={appt.id}
                     className={`px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
-                      isAdmitted ? "bg-slate-50/50" : "hover:bg-indigo-50/30 bg-white"
+                      isCompleted ? "bg-slate-50/60 opacity-65" : isAdmitted ? "bg-slate-50/50" : "hover:bg-indigo-50/30 bg-white"
                     }`}
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
                       {/* Badge Heure du RDV */}
-                      <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-950 text-xs font-black tabular-nums shrink-0 border border-indigo-200">
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black tabular-nums shrink-0 border ${
+                        isCompleted
+                          ? "bg-slate-100 text-slate-500 border-slate-200 line-through"
+                          : "bg-indigo-100 text-indigo-950 border-indigo-200"
+                      }`}>
                         {appt.time || "09:00"}
                       </span>
 
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-xs font-bold text-slate-900 truncate">
+                          <p className={`text-xs font-bold truncate ${isCompleted ? "text-slate-600 line-through" : "text-slate-900"}`}>
                             {appt.patient.lastName} {appt.patient.firstName}
                           </p>
                           <span className="text-[11px] text-slate-500">
@@ -268,7 +289,12 @@ export default async function DashboardIndex() {
 
                     {/* Statut ou Bouton d'admission en 1 clic */}
                     <div className="shrink-0 self-start sm:self-auto">
-                      {isAdmitted ? (
+                      {isCompleted ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold">
+                          <span className="material-symbols-outlined text-[15px] text-emerald-600">check_circle</span>
+                          <span>Consultation terminée</span>
+                        </span>
+                      ) : isAdmitted ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           <span>Arrivé en salle d'attente</span>
@@ -458,9 +484,23 @@ export default async function DashboardIndex() {
           </p>
         </div>
         <div className="bg-white p-4 sm:p-5">
-          <p className="text-xs font-medium text-slate-500">RDV du jour</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-slate-500">RDV du jour</p>
+            {completedAppointmentsCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                {completedAppointmentsCount} honoré{completedAppointmentsCount > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
           <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
             {todayAppointmentsCount}
+          </p>
+          <p className="text-[11px] text-slate-500 mt-1">
+            {todayAppointmentsCount === 0
+              ? "Aucun RDV prévu"
+              : remainingAppointmentsCount === 0
+              ? "Tous les RDV ont été honorés"
+              : `${remainingAppointmentsCount} restant${remainingAppointmentsCount > 1 ? "s" : ""} à recevoir`}
           </p>
         </div>
         <div className="bg-white p-4 sm:p-5">
@@ -642,6 +682,11 @@ export default async function DashboardIndex() {
               <h2 className="text-xs font-bold text-slate-900 flex items-center gap-2">
                 <span className="material-symbols-outlined text-indigo-600 text-base">event_available</span>
                 <span>Rendez-vous du jour ({todayAppointments.length})</span>
+                {remainingAppointmentsCount === 0 && todayAppointments.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold">
+                    Tous vus
+                  </span>
+                )}
               </h2>
               <Link href="/dashboard/appointments" className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900">
                 Planning &rarr;
@@ -653,31 +698,53 @@ export default async function DashboardIndex() {
                 Aucun RDV aujourd'hui.
               </div>
             ) : (
-              <div className="divide-y divide-indigo-50/60 max-h-56 overflow-y-auto">
-                {todayAppointments.map((appt) => (
-                  <div key={appt.id} className="px-4 py-2.5 flex items-center justify-between gap-2.5 text-xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-950 font-bold text-[11px] tabular-nums shrink-0">
-                        {appt.time || "09:00"}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 truncate text-xs">
-                          {appt.patient.lastName} {appt.patient.firstName}
-                        </p>
-                        <p className="text-[10px] text-slate-400 truncate">
-                          {appt.reason || "Consultation"}
-                        </p>
+              <div className="divide-y divide-indigo-50/60 max-h-60 overflow-y-auto">
+                {todayAppointments.map((appt) => {
+                  const isCompleted = appt.status === "completed";
+                  const isAdmitted = appt.status === "admitted";
+                  return (
+                    <div
+                      key={appt.id}
+                      className={`px-4 py-2.5 flex items-center justify-between gap-2.5 text-xs transition ${
+                        isCompleted ? "bg-slate-50/60 opacity-65" : "bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`px-2 py-0.5 rounded font-bold text-[11px] tabular-nums shrink-0 ${
+                          isCompleted
+                            ? "bg-slate-100 text-slate-500 line-through"
+                            : isAdmitted
+                            ? "bg-emerald-100 text-emerald-950"
+                            : "bg-indigo-100 text-indigo-950"
+                        }`}>
+                          {appt.time || "09:00"}
+                        </span>
+                        <div className="min-w-0">
+                          <p className={`font-semibold truncate text-xs ${
+                            isCompleted ? "text-slate-600 line-through" : "text-slate-900"
+                          }`}>
+                            {appt.patient.lastName} {appt.patient.firstName}
+                          </p>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {appt.reason || "Consultation"}
+                          </p>
+                        </div>
                       </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
+                        isCompleted
+                          ? "bg-slate-100 text-slate-600 border border-slate-200"
+                          : isAdmitted
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                      }`}>
+                        {isCompleted && (
+                          <span className="material-symbols-outlined text-[13px] text-emerald-600">check</span>
+                        )}
+                        {isCompleted ? "Terminé" : isAdmitted ? "En salle" : "Attendu"}
+                      </span>
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                      appt.status === "admitted"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "bg-slate-100 text-slate-600"
-                    }`}>
-                      {appt.status === "admitted" ? "En salle" : "Attendu"}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

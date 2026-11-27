@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { visits, prescriptions, customMedications, patients } from "@/db/schema";
-import { eq, and, ne, desc } from "drizzle-orm";
+import { visits, prescriptions, customMedications, patients, appointments } from "@/db/schema";
+import { eq, and, ne, desc, gte, lt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
@@ -142,7 +142,7 @@ export async function finishConsultation(
     : "0.00";
 
   try {
-    await db
+    const [finishedVisit] = await db
       .update(visits)
       .set({ 
         amountToPay: finalAmount, 
@@ -151,9 +151,32 @@ export async function finishConsultation(
         paymentMethod: paymentMethod || "cash",
         paidAt: amountToPay === 0 ? new Date() : null,
       })
-      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)));
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)))
+      .returning({ patientId: visits.patientId, createdAt: visits.createdAt });
+
+    if (finishedVisit) {
+      // Clôturer automatiquement le rendez-vous correspondant d'aujourd'hui s'il existe
+      const startOfDay = new Date(finishedVisit.createdAt);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+
+      await db
+        .update(appointments)
+        .set({ status: "completed" })
+        .where(
+          and(
+            eq(appointments.clinicId, clinicId),
+            eq(appointments.patientId, finishedVisit.patientId),
+            ne(appointments.status, "cancelled"),
+            gte(appointments.date, startOfDay),
+            lt(appointments.date, endOfDay)
+          )
+        );
+    }
     
     revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/appointments");
     revalidatePath("/dashboard/history");
     revalidatePath("/dashboard/payments");
     return { success: true };

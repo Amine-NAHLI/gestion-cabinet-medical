@@ -79,13 +79,14 @@ export default async function AppointmentsPage() {
                   day: 'numeric'
                 });
 
+                const isCompleted = appt.status === 'completed';
                 const isAdmitted = appt.status === 'admitted';
 
                 return (
                   <div
                     key={appt.id}
                     className={`p-4 sm:p-5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 ${
-                      isAdmitted ? "bg-slate-50/40 opacity-75" : "hover:bg-slate-50/70"
+                      isCompleted ? "bg-slate-50/60 opacity-65" : isAdmitted ? "bg-slate-50/40 opacity-75" : "hover:bg-slate-50/70"
                     }`}
                   >
                     <div className="flex items-start sm:items-center gap-3.5 min-w-0">
@@ -132,10 +133,15 @@ export default async function AppointmentsPage() {
                     </div>
                     
                     <div className="flex items-center justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
-                      {isAdmitted ? (
+                      {isCompleted ? (
+                        <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded-md text-xs font-medium inline-flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[14px] text-emerald-600">check_circle</span>
+                          Honoré / Terminé
+                        </span>
+                      ) : isAdmitted ? (
                         <span className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-md text-xs font-medium inline-flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Admis
+                          En salle
                         </span>
                       ) : (
                         <>
