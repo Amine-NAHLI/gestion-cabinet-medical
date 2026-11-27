@@ -7,9 +7,15 @@ interface MedicalAutocompleteProps {
   value: string;
   onChange: (val: string) => void;
   onSelectInstruction?: (instruction: string) => void;
+  hideLabel?: boolean;
 }
 
-export default function MedicalAutocomplete({ value, onChange, onSelectInstruction }: MedicalAutocompleteProps) {
+export default function MedicalAutocomplete({
+  value,
+  onChange,
+  onSelectInstruction,
+  hideLabel = false,
+}: MedicalAutocompleteProps) {
   const [results, setResults] = useState<MedicationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -111,9 +117,11 @@ export default function MedicalAutocomplete({ value, onChange, onSelectInstructi
 
   return (
     <div ref={wrapperRef} className="relative w-full">
-      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-        Médicament / Spécialité
-      </label>
+      {!hideLabel && (
+        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+          Médicament / Spécialité
+        </label>
+      )}
       <div className="relative">
         <input 
           type="text" 
@@ -121,7 +129,13 @@ export default function MedicalAutocomplete({ value, onChange, onSelectInstructi
           onChange={(e) => { onChange(e.target.value); setIsOpen(true); }} 
           onFocus={() => { if (value.length >= 2) setIsOpen(true); }}
           placeholder="Ex: Doliprane, Augmentin, Inexium..." 
-          className="w-full pl-9 pr-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none transition-all shadow-xs" 
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-gramm="false"
+          data-enable-grammarly="false"
+          className="w-full pl-9 pr-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:outline-none transition-all shadow-xs" 
         />
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">
           medication

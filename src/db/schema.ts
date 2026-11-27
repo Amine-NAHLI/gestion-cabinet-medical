@@ -127,6 +127,7 @@ export const visits = pgTable("visits", {
   weight: decimal("weight", { precision: 5, scale: 1 }), // e.g. 70.5 kg
   height: decimal("height", { precision: 5, scale: 1 }), // e.g. 175 cm
   customData: json("custom_data"), // Custom doctor consultation fields snapshot
+  documents: json("documents"), // Attached documents, lab reports, imaging, motifs/notes [{ id, title, type, fileUrl, fileName, notes, createdAt }]
   
   // Financial Info (filled by doctor, received by assistant)
   amountToPay: decimal("amount_to_pay", { precision: 10, scale: 2 }),

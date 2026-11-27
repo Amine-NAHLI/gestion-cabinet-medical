@@ -4,13 +4,37 @@ import { useState } from "react";
 import { transformAppointmentToVisit } from "@/actions/appointments";
 import { motion } from "framer-motion";
 
-export default function TransformAppointmentButton({ appointmentId, patientId }: { appointmentId: number, patientId: number }) {
+export default function TransformAppointmentButton({
+  appointmentId,
+  patientId,
+  variant = "default",
+}: {
+  appointmentId: number;
+  patientId: number;
+  variant?: "default" | "dashboard";
+}) {
   const [loading, setLoading] = useState(false);
 
   async function handleTransform() {
     setLoading(true);
     await transformAppointmentToVisit(appointmentId, patientId);
     setLoading(false);
+  }
+
+  if (variant === "dashboard") {
+    return (
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={handleTransform}
+        disabled={loading}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer shrink-0"
+        title="Enregistrer l'arrivée et faire entrer en salle d'attente"
+      >
+        <span className="material-symbols-outlined text-[16px]">how_to_reg</span>
+        <span>{loading ? "Admission..." : "Patient arrivé"}</span>
+      </motion.button>
+    );
   }
 
   return (

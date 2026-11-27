@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { updateMedicalNotes, savePrescription, finishConsultation } from "@/actions/consultation";
+import {
+  updateMedicalNotes,
+  savePrescription,
+  finishConsultation,
+  addVisitDocument,
+  deleteVisitDocument,
+  ClinicalDocument,
+} from "@/actions/consultation";
 import { createAppointment } from "@/actions/appointments";
 import MedicalAutocomplete from "@/components/MedicalAutocomplete";
 import PrescriptionPDF from "@/components/PrescriptionPDF";
@@ -33,6 +40,7 @@ interface PastVisit {
   paymentMethod: string | null;
   paidAt: string | null;
   customData?: CustomFieldValue[];
+  documents?: ClinicalDocument[];
   medicines: { name: string; instructions: string }[];
 }
 
@@ -59,6 +67,7 @@ interface ConsultationClientProps {
     height?: string | null;
     amountToPay?: string | null;
     customData?: CustomFieldValue[];
+    documents?: ClinicalDocument[];
     [key: string]: unknown;
   };
   patient: {
@@ -92,6 +101,15 @@ const PAYMENT_LABELS: Record<string, string> = {
   free: "Gratuit",
 };
 
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  biologie: "Bilan Biologique / Analyses",
+  imagerie: "Imagerie / Radio / Scanner / Écho",
+  compte_rendu: "Compte-rendu médical",
+  ordonnance_externe: "Ordonnance antérieure / Externe",
+  note: "Observation clinique / Note",
+  autre: "Autre document",
+};
+
 export default function ConsultationClient({
   visitId,
   initialData,
@@ -104,7 +122,7 @@ export default function ConsultationClient({
   const router = useRouter();
   const hasHistory = pastVisits.length > 0;
 
-  const [activeTab, setActiveTab] = useState<"history" | "dossier" | "ordonnance" | "cloture">("dossier");
+  const [activeTab, setActiveTab] = useState<"history" | "dossier" | "ordonnance" | "documents" | "cloture">("dossier");
   const [historySearch, setHistorySearch] = useState("");
   const [expandedVisits, setExpandedVisits] = useState<Record<number, boolean>>(() => {
     const initial: Record<number, boolean> = {};
@@ -115,6 +133,21 @@ export default function ConsultationClient({
   });
 
   const [medicines, setMedicines] = useState<{ name: string; instructions: string }[]>(initialMedicines);
+
+  // Documents & Bilans attachés
+  const [documents, setDocuments] = useState<ClinicalDocument[]>(
+    Array.isArray(initialData.documents) ? (initialData.documents as ClinicalDocument[]) : []
+  );
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [newDocTitle, setNewDocTitle] = useState("");
+  const [newDocType, setNewDocType] = useState("biologie");
+  const [newDocNotes, setNewDocNotes] = useState("");
+  const [newDocFile, setNewDocFile] = useState<{
+    fileUrl: string;
+    fileName: string;
+    fileType: string;
+  } | null>(null);
+  const [activeDocPreview, setActiveDocPreview] = useState<ClinicalDocument | null>(null);
 
   const consultationFields: ConsultationFieldConfig[] = normalizeConsultationFields(
     settings?.consultationFields
@@ -276,7 +309,7 @@ export default function ConsultationClient({
       await savePrescription(visitId, validMeds);
       if (mode === "print") {
         showToast("Préparation de l'impression...");
-        triggerPrint("prescription", () => setActiveTab("cloture"));
+        triggerPrint("prescription", () => setActiveTab("documents"));
       } else if (mode === "pdf") {
         downloadFilledPrescriptionPdf({
           patient,
@@ -285,15 +318,84 @@ export default function ConsultationClient({
           settings,
         });
         showToast("Ordonnance PDF téléchargée");
-        setActiveTab("cloture");
+        setActiveTab("documents");
       } else {
         showToast("Ordonnance enregistrée");
-        setActiveTab("cloture");
+        setActiveTab("documents");
       }
     } else {
-      setActiveTab("cloture");
+      setActiveTab("documents");
     }
   }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setNewDocFile({
+        fileUrl: reader.result as string,
+        fileName: file.name,
+        fileType: file.type || "application/octet-stream",
+      });
+      if (!newDocTitle.trim()) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, "");
+        setNewDocTitle(cleanName);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDocTitle.trim() && !newDocNotes.trim() && !newDocFile) {
+      showToast("Veuillez renseigner un titre, une observation ou joindre un fichier.");
+      return;
+    }
+
+    setIsUploadingDoc(true);
+    try {
+      const res = await addVisitDocument(visitId, {
+        title: newDocTitle.trim() || (newDocFile ? newDocFile.fileName : "Observation médicale"),
+        type: newDocType,
+        fileUrl: newDocFile?.fileUrl || null,
+        fileName: newDocFile?.fileName || null,
+        fileType: newDocFile?.fileType || null,
+        notes: newDocNotes.trim() || null,
+      });
+
+      if (res.success && res.document) {
+        setDocuments((prev) => [res.document!, ...prev]);
+        setNewDocTitle("");
+        setNewDocNotes("");
+        setNewDocFile(null);
+        const fileInput = document.getElementById("clinical-doc-file-input") as HTMLInputElement | null;
+        if (fileInput) fileInput.value = "";
+        showToast("Bilan / document joint au dossier.");
+      } else {
+        alert(res.error || "Erreur lors de l'enregistrement du document.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'enregistrement du document.");
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string) => {
+    if (!confirm("Voulez-vous supprimer ce document du dossier clinique ?")) return;
+    try {
+      const res = await deleteVisitDocument(visitId, docId);
+      if (res.success) {
+        setDocuments((prev) => prev.filter((d) => d.id !== docId));
+        showToast("Document retiré.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   async function handleFinish(e?: React.FormEvent<HTMLFormElement>) {
     if (e) e.preventDefault();
@@ -330,18 +432,20 @@ export default function ConsultationClient({
     const dateStr = formatVisitDateTime(v.date).toLowerCase();
     const medsStr = v.medicines.map((m) => `${m.name} ${m.instructions}`).join(" ").toLowerCase();
     const customStr = (v.customData || []).map((c) => `${c.label} ${c.value}`).join(" ").toLowerCase();
+    const docStr = (v.documents || []).map((d) => `${d.title} ${d.notes}`).join(" ").toLowerCase();
     return (
       dateStr.includes(q) ||
       (v.disease && v.disease.toLowerCase().includes(q)) ||
       (v.diagnosis && v.diagnosis.toLowerCase().includes(q)) ||
       (v.notes && v.notes.toLowerCase().includes(q)) ||
       medsStr.includes(q) ||
-      customStr.includes(q)
+      customStr.includes(q) ||
+      docStr.includes(q)
     );
   });
 
   const tabs: {
-    id: "dossier" | "ordonnance" | "cloture" | "history";
+    id: "dossier" | "ordonnance" | "documents" | "cloture" | "history";
     step: string;
     label: string;
     icon: string;
@@ -351,11 +455,18 @@ export default function ConsultationClient({
     {
       id: "ordonnance",
       step: "2",
-      label: "Prescription / Ordonnance",
+      label: "Prescription",
       icon: "prescriptions",
       badge: medicines.filter((m) => m.name.trim()).length || undefined,
     },
-    { id: "cloture", step: "3", label: "Honoraires & Clôture", icon: "payments" },
+    {
+      id: "documents",
+      step: "3",
+      label: "Documents & Bilans",
+      icon: "attach_file",
+      badge: documents.length || undefined,
+    },
+    { id: "cloture", step: "4", label: "Honoraires & Clôture", icon: "payments" },
     ...(hasHistory
       ? [{ id: "history" as const, step: "Dossier", label: "Historique patient", icon: "history_edu", badge: pastVisits.length }]
       : []),
@@ -472,7 +583,31 @@ export default function ConsultationClient({
         </div>
 
         {/* Action Controls & LE BOUTON D'ACTION PRINCIPAL (Visible sans scroller !) */}
-        <div className="flex items-center gap-2.5 self-end lg:self-center shrink-0">
+        <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
+          {/* Bouton d'accès rapide Pièces jointes & Bilans */}
+          <button
+            type="button"
+            onClick={() => setActiveTab(activeTab === "documents" ? "dossier" : "documents")}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
+              activeTab === "documents"
+                ? "bg-violet-700 border-violet-700 text-white shadow-xs"
+                : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800"
+            }`}
+            title="Dossier, bilans & pièces jointes du patient"
+          >
+            <span className="material-symbols-outlined text-[16px]">attach_file</span>
+            <span className="hidden sm:inline">Bilans & Pièces</span>
+            {documents.length > 0 && (
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  activeTab === "documents" ? "bg-white text-violet-800" : "bg-violet-100 text-violet-800"
+                }`}
+              >
+                {documents.length}
+              </span>
+            )}
+          </button>
+
           {activeTab === "dossier" && (
             <button
               type="button"
@@ -489,6 +624,17 @@ export default function ConsultationClient({
             <button
               type="button"
               onClick={() => handleSavePrescription("none")}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 whitespace-nowrap"
+            >
+              <span>Valider & Bilans</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+          )}
+
+          {activeTab === "documents" && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("cloture")}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 whitespace-nowrap"
             >
               <span>Passer à la clôture</span>
@@ -739,6 +885,34 @@ export default function ConsultationClient({
          ============================================================ */}
       {activeTab === "ordonnance" && (
         <div className="p-4 sm:p-5 space-y-4">
+          {/* Alerte Vigilance Thérapeutique (Allergies & Antécédents majeurs) */}
+          {(patient.allergies || patient.antecedents) && (
+            <div className="p-3.5 rounded-xl bg-gradient-to-r from-rose-50 via-amber-50/60 to-rose-50 border border-rose-200/90 shadow-2xs flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                <span className="material-symbols-outlined text-[18px]">warning</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xs font-bold text-rose-950 uppercase tracking-wider">
+                  Vigilance Thérapeutique & Contre-indications
+                </h4>
+                <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
+                  {patient.allergies && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-100 text-rose-900 font-bold border border-rose-300">
+                      <span className="material-symbols-outlined text-[14px] text-rose-700">do_not_disturb_on</span>
+                      <span>Allergies connues : {patient.allergies}</span>
+                    </span>
+                  )}
+                  {patient.antecedents && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 font-bold border border-amber-300">
+                      <span className="material-symbols-outlined text-[14px] text-amber-700">medical_information</span>
+                      <span>Antécédents majeurs : {patient.antecedents}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Barre d'outils Ordonnance (Ajout + Impression + PDF) */}
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
             <div className="flex items-center gap-2">
@@ -823,42 +997,80 @@ export default function ConsultationClient({
               </div>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
+              <div className="hidden sm:grid sm:grid-cols-12 gap-2.5 px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="col-span-1">#</span>
+                <span className="col-span-5">Médicament / Spécialité</span>
+                <span className="col-span-5">Posologie &amp; Durée</span>
+                <span className="col-span-1 text-right">Action</span>
+              </div>
+
               {medicines.map((med, i) => (
                 <div
                   key={i}
-                  className="p-3 rounded-xl border border-slate-200/90 bg-slate-50/50 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5"
+                  className="p-3 sm:p-3.5 rounded-xl border border-slate-200/90 bg-slate-50/50 space-y-2"
                 >
-                  <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center shrink-0">
-                    {i + 1}
-                  </span>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                    <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center shrink-0">
+                      {i + 1}
+                    </span>
 
-                  <div className="flex-1 min-w-0">
-                    <MedicalAutocomplete
-                      value={med.name}
-                      onChange={(val) => updateMedicine(i, "name", val)}
-                      onSelectInstruction={(inst) => updateMedicine(i, "instructions", inst)}
-                    />
+                    <div className="flex-1 sm:w-5/12 min-w-0">
+                      <MedicalAutocomplete
+                        value={med.name}
+                        onChange={(val) => updateMedicine(i, "name", val)}
+                        onSelectInstruction={(inst) => updateMedicine(i, "instructions", inst)}
+                        hideLabel={true}
+                      />
+                    </div>
+
+                    <div className="flex-1 sm:w-6/12 min-w-0">
+                      <input
+                        type="text"
+                        value={med.instructions}
+                        onChange={(e) => updateMedicine(i, "instructions", e.target.value)}
+                        placeholder="Posologie & durée (ex: 1 cp matin et soir pendant 7 jours)"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-slate-900 shadow-xs"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setMedicines(medicines.filter((_, idx) => idx !== i))}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer shrink-0 self-end sm:self-center"
+                      title="Supprimer ce médicament"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <input
-                      type="text"
-                      value={med.instructions}
-                      onChange={(e) => updateMedicine(i, "instructions", e.target.value)}
-                      placeholder="Posologie & durée (ex: 1 cp matin et soir pendant 7 jours)"
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:border-slate-900"
-                    />
+                  {/* Raccourcis de posologies rapides en 1 clic */}
+                  <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-8 pt-0.5">
+                    <span className="text-[10px] text-slate-400 font-semibold mr-1">Raccourcis :</span>
+                    {[
+                      "1 cp x 3/j",
+                      "1 cp matin et soir",
+                      "1 sachet si douleur",
+                      "1 gélule au coucher",
+                      "Pendant 5 jours",
+                      "Pendant 7 jours",
+                    ].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => {
+                          const current = med.instructions.trim();
+                          const nextVal = current ? `${current} • ${chip}` : chip;
+                          updateMedicine(i, "instructions", nextVal);
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-white hover:bg-slate-200/80 border border-slate-200 text-slate-700 text-[10px] font-medium transition cursor-pointer shadow-2xs"
+                      >
+                        + {chip}
+                      </button>
+                    ))}
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setMedicines(medicines.filter((_, idx) => idx !== i))}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer shrink-0 self-end sm:self-center"
-                    title="Supprimer ce médicament"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
                 </div>
               ))}
             </div>
@@ -867,7 +1079,259 @@ export default function ConsultationClient({
       )}
 
       {/* ============================================================
-          ONGLET 3 : HONORAIRES & CLÔTURE DE CONSULTATION
+          ONGLET 3 : DOSSIER, BILANS & PIÈCES JOINTES
+         ============================================================ */}
+      {activeTab === "documents" && (
+        <div className="p-4 sm:p-6 space-y-6">
+          {/* En-tête explicatif */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-violet-700">attach_file</span>
+                <span>Dossier, Bilans & Pièces Jointes du Patient</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Déposez des bilans (radios, analyses, scanners, PDF) ou notez un motif / observation pour enrichir l'archive.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg bg-violet-50 text-violet-800 text-xs font-bold border border-violet-200">
+                {documents.length} pièce{documents.length > 1 ? "s" : ""} jointe{documents.length > 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Formulaire d'ajout de document ou de motif (5 colonnes) */}
+            <form
+              onSubmit={handleAddDocument}
+              className="lg:col-span-5 p-4 sm:p-5 rounded-2xl border border-slate-200/90 bg-slate-50/60 shadow-2xs space-y-4"
+            >
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-violet-700">add_circle</span>
+                <span>Ajouter un document ou une observation</span>
+              </h3>
+
+              {/* Catégorie */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Type de document / examen
+                </label>
+                <select
+                  value={newDocType}
+                  onChange={(e) => setNewDocType(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-medium bg-white rounded-xl border border-slate-200 text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
+                >
+                  <option value="biologie">Bilan Biologique / Analyses sanguines</option>
+                  <option value="imagerie">Imagerie Médicale (Radio, Scanner, Écho)</option>
+                  <option value="compte_rendu">Compte-rendu médical / Spécialiste</option>
+                  <option value="ordonnance_externe">Ordonnance antérieure / Externe</option>
+                  <option value="note">Observation clinique / Note interne</option>
+                  <option value="autre">Autre document</option>
+                </select>
+              </div>
+
+              {/* Titre */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Intitulé du document / motif
+                </label>
+                <input
+                  type="text"
+                  value={newDocTitle}
+                  onChange={(e) => setNewDocTitle(e.target.value)}
+                  placeholder="Ex: NFS + Bilan rénal, Radio Thorax, Avis cardio..."
+                  className="w-full px-3 py-2 text-xs font-medium bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs"
+                />
+              </div>
+
+              {/* Fichier joint (optionnel) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Fichier numérique <span className="text-slate-400 font-normal">(Optionnel : image ou PDF)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="clinical-doc-file-input"
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  {newDocFile ? (
+                    <div className="p-3 rounded-xl border border-violet-200 bg-violet-50/50 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="material-symbols-outlined text-[18px] text-violet-700 shrink-0">
+                          {newDocFile.fileType.startsWith("image/") ? "image" : "picture_as_pdf"}
+                        </span>
+                        <span className="text-xs font-bold text-slate-900 truncate">
+                          {newDocFile.fileName}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewDocFile(null);
+                          const el = document.getElementById("clinical-doc-file-input") as HTMLInputElement | null;
+                          if (el) el.value = "";
+                        }}
+                        className="text-slate-400 hover:text-rose-600 p-1"
+                        title="Retirer le fichier"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor="clinical-doc-file-input"
+                      className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 hover:border-violet-400 rounded-xl bg-white hover:bg-slate-50 transition cursor-pointer text-center"
+                    >
+                      <span className="material-symbols-outlined text-[24px] text-slate-400 mb-1">
+                        cloud_upload
+                      </span>
+                      <span className="text-xs font-semibold text-slate-700">
+                        Cliquez pour sélectionner une photo ou un PDF
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5">
+                        JPG, PNG, WEBP ou document PDF
+                      </span>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Observation / Motif textuel */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Observation clinique ou motif détaillé
+                </label>
+                <textarea
+                  rows={3}
+                  value={newDocNotes}
+                  onChange={(e) => setNewDocNotes(e.target.value)}
+                  placeholder="Ex: Glycémie à jeun 0.98 g/L, pas de foyer infectieux pulmonaire, recontrôler dans 3 mois..."
+                  className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs resize-y leading-relaxed"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isUploadingDoc}
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[16px]">save</span>
+                <span>{isUploadingDoc ? "Enregistrement en cours..." : "Enregistrer dans le dossier patient"}</span>
+              </button>
+            </form>
+
+            {/* Liste des documents attachés à cette consultation (7 colonnes) */}
+            <div className="lg:col-span-7 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-slate-500">folder_shared</span>
+                  <span>Documents de la visite courante ({documents.length})</span>
+                </h3>
+              </div>
+
+              {documents.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                    <span className="material-symbols-outlined text-[20px]">note_add</span>
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-800">Aucun document joint pour le moment</h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5 max-w-sm mx-auto">
+                    Utilisez le formulaire ci-contre pour joindre les bilans, scanners ou observations de cette consultation.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {documents.map((doc) => {
+                    const isImg =
+                      doc.fileType?.startsWith("image/") ||
+                      doc.fileUrl?.startsWith("data:image/") ||
+                      /\.(jpg|jpeg|png|webp)$/i.test(doc.fileName || "");
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2.5 flex flex-col justify-between"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-800 text-[10px] font-bold">
+                              {DOCUMENT_TYPE_LABELS[doc.type] || doc.type}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDocument(doc.id)}
+                              className="text-slate-400 hover:text-rose-600 p-0.5 rounded transition"
+                              title="Supprimer ce document"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">delete</span>
+                            </button>
+                          </div>
+
+                          <h4 className="font-bold text-slate-900 text-xs truncate" title={doc.title}>
+                            {doc.title}
+                          </h4>
+
+                          {doc.notes && (
+                            <p className="text-[11px] text-slate-600 line-clamp-3 italic leading-relaxed">
+                              "{doc.notes}"
+                            </p>
+                          )}
+                        </div>
+
+                        {doc.fileUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveDocPreview(doc)}
+                            className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[15px] text-violet-700">
+                              {isImg ? "visibility" : "open_in_new"}
+                            </span>
+                            <span>Visualiser le document</span>
+                          </button>
+                        ) : (
+                          <div className="text-[10px] text-slate-400 italic pt-1">
+                            Observation textuelle enregistrée
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Pied de section Documents avec transition vers Clôture */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("ordonnance")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 text-xs font-semibold transition"
+                >
+                  <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                  <span>Retour à l'ordonnance</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("cloture")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                >
+                  <span>Passer à la clôture et honoraires</span>
+                  <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================
+          ONGLET 4 : HONORAIRES & CLÔTURE DE CONSULTATION
          ============================================================ */}
       {activeTab === "cloture" && (
         <form
@@ -1116,6 +1580,47 @@ export default function ConsultationClient({
                           </ul>
                         </div>
                       )}
+
+                      {/* Documents et bilans de cette consultation passée */}
+                      {pv.documents && pv.documents.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <span className="font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[15px] text-violet-700">attach_file</span>
+                            <span>Bilans & Documents joints ({pv.documents.length}) :</span>
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {pv.documents.map((doc) => (
+                              <div
+                                key={doc.id}
+                                className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between"
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                                    <span className="px-1.5 py-0.2 rounded bg-violet-100 text-violet-800 font-bold">
+                                      {DOCUMENT_TYPE_LABELS[doc.type] || doc.type}
+                                    </span>
+                                    <span>{new Date(doc.createdAt).toLocaleDateString("fr-FR")}</span>
+                                  </div>
+                                  <strong className="text-slate-900 block truncate">{doc.title}</strong>
+                                  {doc.notes && (
+                                    <p className="text-slate-600 text-[11px] mt-0.5 italic">"{doc.notes}"</p>
+                                  )}
+                                </div>
+                                {doc.fileUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveDocPreview(doc)}
+                                    className="mt-2 py-1 px-2 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-[13px] text-violet-700">visibility</span>
+                                    <span>Visualiser</span>
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1145,6 +1650,98 @@ export default function ConsultationClient({
           visitId={visitId}
           settings={settings}
         />
+      )}
+
+      {/* Visualiseur Modal Haute Résolution de Document / Bilan */}
+      {activeDocPreview && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between gap-3 bg-slate-50">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-800 text-[10px] font-bold">
+                    {DOCUMENT_TYPE_LABELS[activeDocPreview.type] || activeDocPreview.type}
+                  </span>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
+                    {activeDocPreview.title}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Patient : <strong>{patient.lastName} {patient.firstName}</strong> — Ajouté le {new Date(activeDocPreview.createdAt).toLocaleDateString("fr-FR")}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {activeDocPreview.fileUrl && (
+                  <a
+                    href={activeDocPreview.fileUrl}
+                    download={activeDocPreview.fileName || "document_medical"}
+                    className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition"
+                    title="Télécharger le fichier"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">download</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveDocPreview(null)}
+                  className="p-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 transition cursor-pointer"
+                  title="Fermer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-slate-100 min-h-[300px]">
+              {activeDocPreview.notes && (
+                <div className="w-full mb-4 p-3 rounded-xl bg-white border border-slate-200 text-xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                    Observation & Motif clinique
+                  </span>
+                  <p className="text-slate-800 leading-relaxed italic">
+                    "{activeDocPreview.notes}"
+                  </p>
+                </div>
+              )}
+
+              {activeDocPreview.fileUrl ? (
+                activeDocPreview.fileType?.startsWith("image/") ||
+                activeDocPreview.fileUrl.startsWith("data:image/") ||
+                /\.(jpg|jpeg|png|webp)$/i.test(activeDocPreview.fileName || "") ? (
+                  <div className="max-w-full max-h-[60vh] overflow-auto flex items-center justify-center rounded-xl border border-slate-300 bg-black/5 p-2">
+                    <img
+                      src={activeDocPreview.fileUrl}
+                      alt={activeDocPreview.title}
+                      className="max-h-[58vh] max-w-full object-contain rounded-lg shadow-sm"
+                    />
+                  </div>
+                ) : (
+                  <iframe
+                    src={activeDocPreview.fileUrl}
+                    title={activeDocPreview.title}
+                    className="w-full h-[60vh] rounded-xl border border-slate-300 bg-white shadow-sm"
+                  />
+                )
+              ) : (
+                <div className="p-8 text-center text-slate-500 text-xs">
+                  Observation textuelle sans fichier numérique joint.
+                </div>
+              )}
+            </div>
+
+            <div className="p-3.5 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+              <span>{activeDocPreview.fileName || "Observation clinique"}</span>
+              <button
+                type="button"
+                onClick={() => setActiveDocPreview(null)}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

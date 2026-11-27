@@ -45,9 +45,28 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
   const [search, setSearch] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<PatientWithHistory | null>(null);
   const [editingPatient, setEditingPatient] = useState<PatientWithHistory | null>(null);
+  const [editMutuelleChoice, setEditMutuelleChoice] = useState("");
+  const [editCustomMutuelle, setEditCustomMutuelle] = useState("");
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editingPatient) {
+      const val = editingPatient.mutuelle || "";
+      const KNOWN = ["CNSS", "CNOPS", "FAR", "Saham", "RMA", "AXA", "Wafa Assurance", "AtlantaSanad", "MGPAP"];
+      if (!val) {
+        setEditMutuelleChoice("");
+        setEditCustomMutuelle("");
+      } else if (KNOWN.includes(val)) {
+        setEditMutuelleChoice(val);
+        setEditCustomMutuelle("");
+      } else {
+        setEditMutuelleChoice("Autre");
+        setEditCustomMutuelle(val);
+      }
+    }
+  }, [editingPatient]);
 
   // Synchronisation automatique lorsque de nouveaux patients arrivent en direct
   useEffect(() => {
@@ -653,13 +672,44 @@ export default function PatientsClient({ initialPatients }: { initialPatients: P
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Mutuelle</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Organisme Mutuelle / Assurance
+                  </label>
+                  <select
+                    value={editMutuelleChoice}
+                    onChange={(e) => setEditMutuelleChoice(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-slate-900 cursor-pointer"
+                  >
+                    <option value="">Aucune / Sans mutuelle (Particulier)</option>
+                    <option value="CNSS">CNSS (AMO)</option>
+                    <option value="CNOPS">CNOPS (Secteur public)</option>
+                    <option value="FAR">FAR (Forces Armées Royales)</option>
+                    <option value="Saham">Saham / Sanlam</option>
+                    <option value="RMA">RMA Watanya</option>
+                    <option value="AXA">AXA Assurance</option>
+                    <option value="Wafa Assurance">Wafa Assurance</option>
+                    <option value="AtlantaSanad">AtlantaSanad</option>
+                    <option value="MGPAP">MGPAP / Mutuelles publiques</option>
+                    <option value="Autre">Autre organisme (Préciser...)</option>
+                  </select>
+
+                  {editMutuelleChoice === "Autre" && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={editCustomMutuelle}
+                        onChange={(e) => setEditCustomMutuelle(e.target.value)}
+                        placeholder="Saisir le nom de la mutuelle..."
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-slate-900"
+                        autoFocus
+                      />
+                    </div>
+                  )}
+
                   <input
-                    type="text"
+                    type="hidden"
                     name="mutuelle"
-                    defaultValue={editingPatient.mutuelle || ""}
-                    placeholder="CNSS, CNOPS..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs"
+                    value={editMutuelleChoice === "Autre" ? editCustomMutuelle.trim() : editMutuelleChoice}
                   />
                 </div>
 

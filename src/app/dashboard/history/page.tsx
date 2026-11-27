@@ -1,10 +1,11 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { db } from "@/db";
-import { visits, patients, clinics } from "@/db/schema";
-import { eq, and, desc, gte } from "drizzle-orm";
+import { visits, patients, clinics, prescriptions } from "@/db/schema";
+import { eq, and, desc, gte, inArray } from "drizzle-orm";
 import { getTenantClinicId } from "@/lib/tenant";
 import { getPlatformSettings } from "@/actions/platform";
+import { getClinicSettings } from "@/actions/settings";
 import HistoryClient from "./HistoryClient";
 
 export const dynamic = "force-dynamic";
@@ -39,20 +40,30 @@ export default async function HistoryPage() {
   let archivedCount = 0;
   let daysUntilReset = 30;
 
+  const visitSelection = {
+    id: visits.id,
+    amountToPay: visits.amountToPay,
+    status: visits.status,
+    paymentStatus: visits.paymentStatus,
+    paymentMethod: visits.paymentMethod,
+    paidAt: visits.paidAt,
+    disease: visits.disease,
+    diagnosis: visits.diagnosis,
+    notes: visits.notes,
+    bloodPressure: visits.bloodPressure,
+    heartRate: visits.heartRate,
+    temperature: visits.temperature,
+    weight: visits.weight,
+    height: visits.height,
+    documents: visits.documents,
+    patient: patients,
+    createdAt: visits.createdAt,
+  };
+
   if (isStandard) {
     // FORMULE STANDARD : Filtrer strictement aux 30 derniers jours
     historyList = await db
-      .select({
-        id: visits.id,
-        amountToPay: visits.amountToPay,
-        status: visits.status,
-        paymentStatus: visits.paymentStatus,
-        paymentMethod: visits.paymentMethod,
-        disease: visits.disease,
-        diagnosis: visits.diagnosis,
-        patient: patients,
-        createdAt: visits.createdAt,
-      })
+      .select(visitSelection)
       .from(visits)
       .innerJoin(patients, eq(visits.patientId, patients.id))
       .where(
@@ -82,17 +93,7 @@ export default async function HistoryPage() {
   } else {
     // FORMULE PRO : Accès illimité à vie sans coupure
     historyList = await db
-      .select({
-        id: visits.id,
-        amountToPay: visits.amountToPay,
-        status: visits.status,
-        paymentStatus: visits.paymentStatus,
-        paymentMethod: visits.paymentMethod,
-        disease: visits.disease,
-        diagnosis: visits.diagnosis,
-        patient: patients,
-        createdAt: visits.createdAt,
-      })
+      .select(visitSelection)
       .from(visits)
       .innerJoin(patients, eq(visits.patientId, patients.id))
       .where(and(eq(visits.clinicId, clinicId), eq(visits.status, "finished")))
@@ -100,12 +101,43 @@ export default async function HistoryPage() {
       .limit(300);
   }
 
-  const platform = await getPlatformSettings();
+  // Récupérer les ordonnances associées à ces consultations archivées
+  const visitIds = historyList.map((v) => v.id);
+  const prescriptionsRaw =
+    visitIds.length > 0
+      ? await db
+          .select()
+          .from(prescriptions)
+          .where(inArray(prescriptions.visitId, visitIds))
+      : [];
+
+  const prescriptionsByVisit = new Map<number, { name: string; instructions: string }[]>();
+  for (const pr of prescriptionsRaw) {
+    prescriptionsByVisit.set(
+      pr.visitId,
+      Array.isArray(pr.medicines) ? (pr.medicines as { name: string; instructions: string }[]) : []
+    );
+  }
+
+  const [platform, clinicSettings] = await Promise.all([
+    getPlatformSettings(),
+    getClinicSettings(clinicId),
+  ]);
 
   const formatted = historyList.map((v) => ({
     ...v,
-    amountToPay: v.amountToPay as string | null,
+    amountToPay: v.amountToPay ? String(v.amountToPay) : null,
+    temperature: v.temperature ? String(v.temperature) : null,
+    weight: v.weight ? String(v.weight) : null,
+    height: v.height ? String(v.height) : null,
+    paidAt: v.paidAt ? v.paidAt.toISOString() : null,
     createdAt: v.createdAt.toISOString(),
+    documents: Array.isArray(v.documents) ? (v.documents as any) : [],
+    medicines: prescriptionsByVisit.get(v.id) || [],
+    patient: {
+      ...v.patient,
+      createdAt: v.patient.createdAt.toISOString(),
+    },
   }));
 
   return (
@@ -118,6 +150,7 @@ export default async function HistoryPage() {
         daysUntilReset={daysUntilReset}
         supportWhatsapp={platform.supportWhatsapp}
         supportWhatsappMessage={platform.supportWhatsappMessage}
+        clinicSettings={clinicSettings}
       />
     </div>
   );

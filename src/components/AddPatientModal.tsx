@@ -14,6 +14,8 @@ export default function AddPatientModal() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [mutuelleChoice, setMutuelleChoice] = useState("");
+  const [customMutuelle, setCustomMutuelle] = useState("");
 
   // Recherche dynamique des patients existants
   async function handleSearch(query: string) {
@@ -329,12 +331,44 @@ export default function AddPatientModal() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Organisme Mutuelle (Optionnel)</label>
-                    <input 
-                      type="text" 
-                      name="mutuelle" 
-                      placeholder="CNSS, CNOPS, Saham, RMA, AXA..." 
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 focus:outline-none transition-all" 
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Organisme Mutuelle / Assurance
+                    </label>
+                    <select
+                      value={mutuelleChoice}
+                      onChange={(e) => setMutuelleChoice(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 focus:outline-none transition-all cursor-pointer"
+                    >
+                      <option value="">Aucune / Sans mutuelle (Particulier)</option>
+                      <option value="CNSS">CNSS (AMO)</option>
+                      <option value="CNOPS">CNOPS (Secteur public)</option>
+                      <option value="FAR">FAR (Forces Armées Royales)</option>
+                      <option value="Saham">Saham / Sanlam</option>
+                      <option value="RMA">RMA Watanya</option>
+                      <option value="AXA">AXA Assurance</option>
+                      <option value="Wafa Assurance">Wafa Assurance</option>
+                      <option value="AtlantaSanad">AtlantaSanad</option>
+                      <option value="MGPAP">MGPAP / Mutuelles publiques</option>
+                      <option value="Autre">Autre organisme (Préciser...)</option>
+                    </select>
+
+                    {mutuelleChoice === "Autre" && (
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          value={customMutuelle}
+                          onChange={(e) => setCustomMutuelle(e.target.value)}
+                          placeholder="Saisir le nom de la mutuelle ou assurance..."
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 focus:outline-none transition-all"
+                          autoFocus
+                        />
+                      </div>
+                    )}
+
+                    <input
+                      type="hidden"
+                      name="mutuelle"
+                      value={mutuelleChoice === "Autre" ? customMutuelle.trim() : mutuelleChoice}
                     />
                   </div>
 

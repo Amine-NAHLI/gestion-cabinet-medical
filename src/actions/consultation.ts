@@ -235,3 +235,109 @@ export async function getActiveConsultation() {
     return null;
   }
 }
+
+export interface ClinicalDocument {
+  id: string;
+  title: string;
+  type: string;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileType?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export async function addVisitDocument(
+  visitId: number,
+  document: {
+    title: string;
+    type: string;
+    fileUrl?: string | null;
+    fileName?: string | null;
+    fileType?: string | null;
+    notes?: string | null;
+  }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
+  const clinicId = await getTenantClinicId();
+
+  try {
+    const visitRes = await db
+      .select({ id: visits.id, documents: visits.documents })
+      .from(visits)
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)))
+      .limit(1);
+
+    if (visitRes.length === 0) {
+      return { success: false, error: "Consultation introuvable." };
+    }
+
+    const currentDocs: ClinicalDocument[] = Array.isArray(visitRes[0].documents)
+      ? (visitRes[0].documents as any)
+      : [];
+
+    const newDoc: ClinicalDocument = {
+      id: "doc_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+      title: document.title.trim() || "Document médical",
+      type: document.type || "autre",
+      fileUrl: document.fileUrl || null,
+      fileName: document.fileName || null,
+      fileType: document.fileType || null,
+      notes: document.notes?.trim() || null,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedDocs = [newDoc, ...currentDocs];
+
+    await db
+      .update(visits)
+      .set({ documents: updatedDocs })
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)));
+
+    revalidatePath(`/dashboard/consultation/${visitId}`);
+    revalidatePath("/dashboard/history");
+    return { success: true, document: newDoc };
+  } catch (error) {
+    console.error("Erreur ajout document:", error);
+    return { success: false, error: "Erreur lors de l'enregistrement du document." };
+  }
+}
+
+export async function deleteVisitDocument(visitId: number, documentId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Non autorisé" };
+
+  const clinicId = await getTenantClinicId();
+
+  try {
+    const visitRes = await db
+      .select({ id: visits.id, documents: visits.documents })
+      .from(visits)
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)))
+      .limit(1);
+
+    if (visitRes.length === 0) {
+      return { success: false, error: "Consultation introuvable." };
+    }
+
+    const currentDocs: ClinicalDocument[] = Array.isArray(visitRes[0].documents)
+      ? (visitRes[0].documents as any)
+      : [];
+
+    const updatedDocs = currentDocs.filter((d) => d.id !== documentId);
+
+    await db
+      .update(visits)
+      .set({ documents: updatedDocs })
+      .where(and(eq(visits.id, visitId), eq(visits.clinicId, clinicId)));
+
+    revalidatePath(`/dashboard/consultation/${visitId}`);
+    revalidatePath("/dashboard/history");
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur suppression document:", error);
+    return { success: false, error: "Erreur lors de la suppression du document." };
+  }
+}

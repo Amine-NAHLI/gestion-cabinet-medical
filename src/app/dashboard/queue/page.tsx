@@ -213,8 +213,9 @@ export default async function QueuePage() {
                             {visit.patient.lastName} {visit.patient.firstName}
                           </h3>
                           {visit.isAppointment && (
-                            <span className="px-2 py-0.5 bg-sky-50 border border-sky-200/70 text-sky-700 text-[10px] font-semibold rounded-md">
-                              RDV
+                            <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold rounded-md inline-flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px]">event_available</span>
+                              <span>Sur RDV</span>
                             </span>
                           )}
                         </div>

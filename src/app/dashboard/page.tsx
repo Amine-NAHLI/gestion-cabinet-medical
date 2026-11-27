@@ -10,6 +10,7 @@ import AddPatientModal from "@/components/AddPatientModal";
 import AddAppointmentModal from "@/components/AddAppointmentModal";
 import PatientHistoryButton from "@/components/PatientHistoryButton";
 import CancelVisitButton from "@/components/CancelVisitButton";
+import TransformAppointmentButton from "@/components/TransformAppointmentButton";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function DashboardIndex() {
         id: visits.id,
         status: visits.status,
         paymentStatus: visits.paymentStatus,
+        isAppointment: visits.isAppointment,
         createdAt: visits.createdAt,
         amountToPay: visits.amountToPay,
         patient: patients,
@@ -36,7 +38,19 @@ export default async function DashboardIndex() {
       .innerJoin(patients, eq(visits.patientId, patients.id))
       .where(eq(visits.clinicId, clinicId))
       .orderBy(desc(visits.createdAt)),
-    db.select().from(appointments).where(eq(appointments.clinicId, clinicId)),
+    db
+      .select({
+        id: appointments.id,
+        patientId: appointments.patientId,
+        date: appointments.date,
+        time: appointments.time,
+        reason: appointments.reason,
+        status: appointments.status,
+        patient: patients,
+      })
+      .from(appointments)
+      .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .where(eq(appointments.clinicId, clinicId)),
     db.select().from(clinics).where(eq(clinics.id, clinicId)).limit(1),
   ]);
 
@@ -56,17 +70,27 @@ export default async function DashboardIndex() {
   const pendingPaymentsCount = finishedVisits.filter((v) => v.paymentStatus !== "paid").length;
   const readyPatient = readyVisits[0];
 
-  const revenueToday = todayVisits.reduce(
-    (acc, v) => acc + (v.amountToPay ? parseFloat(v.amountToPay as string) : 0),
-    0
-  );
+  // Recettes effectivement perçues en caisse (uniquement les visites payées)
+  const collectedRevenueToday = todayVisits
+    .filter((v) => v.paymentStatus === "paid")
+    .reduce((acc, v) => acc + (v.amountToPay ? parseFloat(v.amountToPay as string) : 0), 0);
 
-  const todayAppointmentsCount = allAppointments.filter((a) => {
-    if (a.status === "cancelled") return false;
-    const d = new Date(a.date);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() === today.getTime();
-  }).length;
+  // Recettes en cours d'encaissement (consultations terminées avec montant fixé, que l'assistante doit encaisser)
+  const pendingRevenueToday = todayVisits
+    .filter((v) => v.status === "finished" && v.paymentStatus !== "paid")
+    .reduce((acc, v) => acc + (v.amountToPay ? parseFloat(v.amountToPay as string) : 0), 0);
+
+  // Rendez-vous programmés pour aujourd'hui
+  const todayAppointments = allAppointments
+    .filter((a) => {
+      if (a.status === "cancelled") return false;
+      const d = new Date(a.date);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime() === today.getTime();
+    })
+    .sort((a, b) => (a.time || "09:00").localeCompare(b.time || "09:00"));
+
+  const todayAppointmentsCount = todayAppointments.length;
 
   const formatTime = (date: Date) =>
     new Date(date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -139,14 +163,132 @@ export default async function DashboardIndex() {
             </p>
           </div>
           <div className="bg-white p-4 sm:p-5">
-            <p className="text-xs font-medium text-slate-500">RDV du jour</p>
+            <p className="text-xs font-medium text-slate-500">Recettes en caisse</p>
             <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
-              {todayAppointmentsCount}
+              {collectedRevenueToday.toLocaleString("fr-FR")}{" "}
+              <span className="text-xs font-normal text-slate-500">DH</span>
             </p>
+            {pendingRevenueToday > 0 ? (
+              <p className="text-[11px] text-amber-700 font-medium mt-0.5 truncate">
+                +{pendingRevenueToday} DH à encaisser
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                Caisse à jour
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Flux du jour */}
+        {/* ============================================================
+            BLOC SPÉCIAL : PLANNING DES RENDEZ-VOUS DU JOUR (Couleur Indigo Dédiée)
+           ============================================================ */}
+        <div className="bg-white rounded-2xl border border-indigo-200/90 shadow-[0_1px_3px_rgba(30,27,75,0.06)] overflow-hidden">
+          <div className="px-5 py-4 bg-gradient-to-r from-indigo-50/90 via-sky-50/40 to-indigo-50/90 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                <span className="material-symbols-outlined text-[18px]">event_available</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Rendez-vous programmés aujourd'hui
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-bold tabular-nums">
+                    {todayAppointments.length} RDV
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Dès qu'un patient se présente au secrétariat, validez son arrivée pour le faire entrer en salle d'attente en 1 clic.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/dashboard/appointments"
+              className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline underline-offset-4 self-start sm:self-auto shrink-0"
+            >
+              Voir le calendrier complet &rarr;
+            </Link>
+          </div>
+
+          {todayAppointments.length === 0 ? (
+            <div className="py-8 px-6 text-center bg-slate-50/40">
+              <span className="material-symbols-outlined text-slate-300 text-3xl mb-1 block">
+                calendar_today
+              </span>
+              <p className="text-xs font-semibold text-slate-600">
+                Aucun rendez-vous programmé pour aujourd'hui
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Utilisez « Nouveau rendez-vous » en haut à droite pour fixer un créneau.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-indigo-50/80">
+              {todayAppointments.map((appt) => {
+                const isAdmitted = appt.status === "admitted";
+                return (
+                  <div
+                    key={appt.id}
+                    className={`px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+                      isAdmitted ? "bg-slate-50/50" : "hover:bg-indigo-50/30 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      {/* Badge Heure du RDV */}
+                      <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-950 text-xs font-black tabular-nums shrink-0 border border-indigo-200">
+                        {appt.time || "09:00"}
+                      </span>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs font-bold text-slate-900 truncate">
+                            {appt.patient.lastName} {appt.patient.firstName}
+                          </p>
+                          <span className="text-[11px] text-slate-500">
+                            ({appt.patient.age} ans)
+                          </span>
+                          {appt.patient.phone && (
+                            <span className="text-[11px] text-slate-500 tabular-nums">
+                              &bull; {appt.patient.phone}
+                            </span>
+                          )}
+                          {appt.patient.mutuelle && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-semibold">
+                              {appt.patient.mutuelle}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                          Motif : <span className="text-slate-700 font-medium">{appt.reason || "Consultation générale"}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Statut ou Bouton d'admission en 1 clic */}
+                    <div className="shrink-0 self-start sm:self-auto">
+                      {isAdmitted ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          <span>Arrivé en salle d'attente</span>
+                        </span>
+                      ) : (
+                        <TransformAppointmentButton
+                          appointmentId={appt.id}
+                          patientId={appt.patientId}
+                          variant="dashboard"
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Flux des patients du jour */}
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
           <div className="px-4 sm:px-5 py-4 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
@@ -195,9 +337,16 @@ export default async function DashboardIndex() {
                     className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 hover:bg-slate-50/70 transition-colors"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
-                        {v.patient.lastName} {v.patient.firstName}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {v.patient.lastName} {v.patient.firstName}
+                        </p>
+                        {v.isAppointment && (
+                          <span className="px-1.5 py-0.2 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold">
+                            Sur RDV
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500 tabular-nums">
                         {formatTime(v.createdAt)} • {v.patient.age} ans • <span className="whitespace-nowrap">{v.patient.phone}</span>
                       </p>
@@ -315,11 +464,27 @@ export default async function DashboardIndex() {
           </p>
         </div>
         <div className="bg-white p-4 sm:p-5">
-          <p className="text-xs font-medium text-slate-500">Recettes du jour</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-slate-500">Recettes en caisse</p>
+            {pendingRevenueToday > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 text-[10px] font-bold">
+                {pendingPaymentsCount} à encaisser
+              </span>
+            )}
+          </div>
           <p className="text-2xl font-semibold text-slate-900 tabular-nums mt-1">
-            {revenueToday.toLocaleString("fr-FR")}{" "}
+            {collectedRevenueToday.toLocaleString("fr-FR")}{" "}
             <span className="text-xs font-normal text-slate-500">DH</span>
           </p>
+          {pendingRevenueToday > 0 ? (
+            <p className="text-[11px] text-amber-700 font-medium mt-1 truncate">
+              + {pendingRevenueToday.toLocaleString("fr-FR")} DH en cours d'encaissement
+            </p>
+          ) : (
+            <p className="text-[11px] text-emerald-600 font-medium mt-1">
+              Tous les encaissements à jour
+            </p>
+          )}
         </div>
       </div>
 
@@ -338,7 +503,7 @@ export default async function DashboardIndex() {
 
           {readyPatient ? (
             <div className="p-5 sm:p-6 space-y-4">
-              {/* Ligne Identité du patient (pleine largeur, ne se comprime jamais) */}
+              {/* Ligne Identité du patient */}
               <div className="flex items-center justify-between gap-4 min-w-0">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm sm:text-base shrink-0 shadow-xs">
@@ -346,9 +511,16 @@ export default async function DashboardIndex() {
                     {readyPatient.patient.lastName[0]}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
-                      {readyPatient.patient.lastName} {readyPatient.patient.firstName}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
+                        {readyPatient.patient.lastName} {readyPatient.patient.firstName}
+                      </h3>
+                      {readyPatient.isAppointment && (
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-[10px]">
+                          Sur RDV
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 mt-0.5">
                       <span className="font-medium text-slate-700 whitespace-nowrap">
                         {readyPatient.patient.age} ans
@@ -371,7 +543,7 @@ export default async function DashboardIndex() {
                 </div>
               </div>
 
-              {/* Barre d'actions responsive avec respiration propre et aucun débordement */}
+              {/* Barre d'actions responsive */}
               <div className="pt-3.5 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   {allVisits.some(
@@ -416,43 +588,99 @@ export default async function DashboardIndex() {
           )}
         </div>
 
-        {/* File d'attente en direct */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">
-              En attente ({waitingVisits.length})
-            </h2>
-            <Link href="/dashboard/queue" className="text-xs font-medium text-slate-500 hover:text-slate-900">
-              Tout voir
-            </Link>
+        {/* Colonne latérale : File d'attente & Rendez-vous du jour */}
+        <div className="space-y-4">
+          {/* File d'attente en direct */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900">
+                En attente ({waitingVisits.length})
+              </h2>
+              <Link href="/dashboard/queue" className="text-xs font-medium text-slate-500 hover:text-slate-900">
+                Tout voir
+              </Link>
+            </div>
+
+            {waitingVisits.length === 0 ? (
+              <div className="py-8 px-5 text-center text-xs text-slate-500">
+                La salle d'attente est vide.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {waitingVisits.slice(0, 6).map((v, idx) => (
+                  <div key={v.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-xs font-medium text-slate-400 tabular-nums w-4">
+                        {idx + 1}.
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-slate-900 truncate">
+                            {v.patient.lastName} {v.patient.firstName}
+                          </p>
+                          {v.isAppointment && (
+                            <span className="px-1.5 py-0.2 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 text-[9px] font-bold">
+                              RDV
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">{v.patient.age} ans</p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-400 tabular-nums shrink-0">
+                      {formatTime(v.createdAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {waitingVisits.length === 0 ? (
-            <div className="py-10 px-5 text-center text-xs text-slate-500">
-              La salle d'attente est vide.
+          {/* Planning des Rendez-vous du jour pour le médecin */}
+          <div className="bg-white rounded-xl border border-indigo-200/80 shadow-[0_1px_2px_rgba(30,27,75,0.04)] overflow-hidden">
+            <div className="px-5 py-3.5 bg-gradient-to-r from-indigo-50/80 to-sky-50/40 border-b border-indigo-100 flex items-center justify-between">
+              <h2 className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-indigo-600 text-base">event_available</span>
+                <span>Rendez-vous du jour ({todayAppointments.length})</span>
+              </h2>
+              <Link href="/dashboard/appointments" className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-900">
+                Planning &rarr;
+              </Link>
             </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {waitingVisits.slice(0, 6).map((v, idx) => (
-                <div key={v.id} className="px-5 py-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xs font-medium text-slate-400 tabular-nums w-4">
-                      {idx + 1}.
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
-                        {v.patient.lastName} {v.patient.firstName}
-                      </p>
-                      <p className="text-xs text-slate-500">{v.patient.age} ans</p>
+
+            {todayAppointments.length === 0 ? (
+              <div className="py-6 px-5 text-center text-xs text-slate-400">
+                Aucun RDV aujourd'hui.
+              </div>
+            ) : (
+              <div className="divide-y divide-indigo-50/60 max-h-56 overflow-y-auto">
+                {todayAppointments.map((appt) => (
+                  <div key={appt.id} className="px-4 py-2.5 flex items-center justify-between gap-2.5 text-xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-950 font-bold text-[11px] tabular-nums shrink-0">
+                        {appt.time || "09:00"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 truncate text-xs">
+                          {appt.patient.lastName} {appt.patient.firstName}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {appt.reason || "Consultation"}
+                        </p>
+                      </div>
                     </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                      appt.status === "admitted"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {appt.status === "admitted" ? "En salle" : "Attendu"}
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-400 tabular-nums shrink-0">
-                    {formatTime(v.createdAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

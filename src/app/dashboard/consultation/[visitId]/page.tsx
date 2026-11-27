@@ -109,6 +109,7 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
     paymentMethod: v.paymentMethod,
     paidAt: v.paidAt ? v.paidAt.toISOString() : null,
     customData: Array.isArray(v.customData) ? v.customData : [],
+    documents: Array.isArray(v.documents) ? v.documents : [],
     medicines: prescriptionsByVisit.get(v.id) || [],
   }));
 
@@ -135,6 +136,7 @@ export default async function ConsultationPage({ params }: { params: Promise<{ v
     height: visit.visits.height ? String(visit.visits.height) : null,
     amountToPay: visit.visits.amountToPay ? String(visit.visits.amountToPay) : null,
     customData: Array.isArray(visit.visits.customData) ? visit.visits.customData : [],
+    documents: Array.isArray(visit.visits.documents) ? visit.visits.documents : [],
   };
 
   const initials = `${visit.patients.firstName[0] || ""}${visit.patients.lastName[0] || ""}`.toUpperCase();
